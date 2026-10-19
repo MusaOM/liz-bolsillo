@@ -10,7 +10,7 @@
   else raiz.LizVersion = fabrica();
 })(typeof self !== 'undefined' ? self : this, function () {
   const liz = '1.0';
-  const bolsillo = 23;
+  const bolsillo = 24;
   return {
     liz,
     bolsillo,
@@ -31,12 +31,11 @@
     // compu solo lo de la compu (loNuevoPC); nada de uno en el otro, tampoco en "Acerca de Liz". Para la próxima actualización de cada uno:
     // cambiar su "id" (así se vuelve a mostrar) y sus "cosas".
     loNuevoCelular: {
-      id: 'celular-23',
+      id: 'celular-24',
       cosas: [
         'Pídeme recordatorios en la charla (“recuérdame sacar las placas a las 5”, “ponme uno en 10 minutos”) y quedan en tu Agenda al momento.',
-        'Si tienes la app abierta, te aviso a la hora exacta.',
-        'Ya no te repito lo de respirar en cada mensaje, y si me contaste cómo te sentías de madrugada, en la mañana te vuelvo a preguntar.',
-        'Sé cuáles mazos agregaste.',
+        'Te aviso aunque la app esté cerrada, en menos de un minuto (con la app abierta, a la hora exacta).',
+        'Una vez al día (a las 6 de la tarde, o a la hora que elijas en Más → Ajustes → Avisos) te recuerdo las tarjetas que te quedan de hoy.',
       ],
     },
     loNuevoPC: {

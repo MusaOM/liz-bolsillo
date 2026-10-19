@@ -2822,7 +2822,8 @@
       : !activo ? '<p class="suave ayudaAvisos">Enciende el interruptor y, cuando el iPhone pregunte, toca <b>Permitir</b>. Te aviso aunque la app esté cerrada: recordatorios, eventos y exámenes a su hora, y una vez al día tus tarjetas.</p>'
       : '<p class="suave ayudaAvisos">¿No te llegan? Revisa <b>Ajustes → Notificaciones → LIZ</b> y que un Modo de concentración (No molestar, Dormir) no la esté callando.</p>';
     // (prueba 14) RECORDARME ESTUDIAR: una vez al día "LIZ / ESTUDIO" a la hora que elija (o automático: a las 6 p. m., o al salir de
-    // clase si a esa hora está en una), nunca mientras está en clase y no si ese día ya repasó. Lo manda el servidor (avisos.sql).
+    // clase si a esa hora está en una), nunca mientras está en clase. Lo manda el servidor (avisos.sql). (19-oct-2026) Antes no salía si ese
+    // día ya había repasado algo; ahora sale si le quedan tarjetas de hoy ("Te quedan N…"), y no si ya repasó todo.
     const est = estudioPref();
     const horasEst = '<option value="">Automático</option>' + Array.from({ length: 16 }, (_, i) => i + 6).map((x) => '<option value="' + x + '"' + (String(x) === est.hora ? ' selected' : '') + '>' +
       (x <= 12 ? x : x - 12) + ':00 ' + (x < 12 ? 'a. m.' : 'p. m.') + '</option>').join('');
@@ -2830,7 +2831,7 @@
       '<span class="interruptor' + (activo ? ' on' : '') + '"></span></button></li>' +
       (activo ? '<li><button class="item" id="aEstudio"><span class="ico verde">📚</span><span class="txt"><b>Recordarme estudiar</b></span><span class="interruptor' + (est.on ? ' on' : '') + '"></span></button></li>' +
         (est.on ? '<li><div class="item"><span class="ico">🕖</span><span class="txt"><b>¿A qué hora?</b></span><select id="aHoraEst" class="selChico">' + horasEst + '</select></div></li>' : '') : '') +
-      '</ul></div>' + (activo && est.on ? '<p class="suave ayudaAvisos">📚 Te recuerdo estudiar una vez al día, nunca mientras estás en clase y no si ya repasaste. Automático = 6 p. m. (o al salir de clase).</p>' : '') +
+      '</ul></div>' + (activo && est.on ? '<p class="suave ayudaAvisos">📚 Te recuerdo estudiar una vez al día si te quedan tarjetas de hoy (nunca mientras estás en clase). Automático = 6 p. m. (o al salir de clase).</p>' : '') +
       ayuda + '<p class="error" id="aErr"></p>' +
       (activo ? '<div class="botones"><button class="bt grande" id="aProbar">🔔 Probar aviso</button></div><p class="suave ayudaAvisos" id="aServidor"></p>' : '') +
       '<button class="enlaceAgenda" data-a="irRecordatorios">Tus recordatorios se crean en Agenda → Recordatorios ›</button>');
@@ -3040,15 +3041,17 @@
   }
 
   // ---------- (19-oct-2026) AVISOS CON LA APP ABIERTA, a la hora exacta ----------
-  // El servidor manda el aviso al celular con 2 minutos de margen (para que, si la compu está prendida, avise ella primero: avisos.sql).
-  // Si él tiene la app abierta cuando toca un recordatorio, un evento o un aviso de examen, Liz avisa AHÍ, en la charla, a la hora exacta,
-  // y lo anota como avisado (como la compu: Agenda.paraAvisar), así ni el servidor ni la compu lo repiten. Solo lo que tocó hace menos de
-  // 2 minutos: lo de antes ya lo avisó el servidor (o la compu). Las clases y los bloques del pomodoro no van por aquí (Agenda.sonidos).
+  // El servidor manda el aviso al celular (con la app cerrada) 30 s-1 min después de su hora: espera 30 s por si la compu está prendida y
+  // avisa ella primero (avisos.sql). Si él tiene la app abierta cuando toca un recordatorio, un evento o un aviso de examen, Liz avisa AHÍ,
+  // en la charla, a la hora exacta, y lo anota como avisado (como la compu: Agenda.paraAvisar), así ni el servidor ni la compu lo repiten.
+  // Solo lo que tocó hace menos de 25 s (menos que el margen del servidor: lo de antes ya lo avisó él). Las clases y los bloques del
+  // pomodoro no van por aquí (Agenda.sonidos).
+  const VENTANA_AVISO = 25000;
   function revisarAvisosAbierta() {
     if (document.hidden || !$('#entrar').hidden || !E || !E.avisos) return 0;
     const ahora = Date.now();
     let n = 0;
-    for (const s of Ag.sonidos(E, ahora - 2 * MIN, ahora + 1)) {
+    for (const s of Ag.sonidos(E, ahora - VENTANA_AVISO, ahora + 1)) {
       if (Ag.yaSono(E, s.clave, s.ms)) continue;
       Sincro.agregar(E, 'avisos', { clave: s.clave, ocurrencia: s.ms, dispositivo: DISP, presente: true, fecha: ahora });
       n++;
