@@ -17,6 +17,7 @@
   const DEMO = new URLSearchParams(location.search).has('demo');
   const K = DEMO ? 'demo-' : '';
   const Org = self.Organizar, F = self.Frases, Ag = self.Agenda, N = self.Nucleo;
+  const Animo = self.Animo, V = self.LizVersion;          // (21-oct-2026, Liz 1.1) diario de ánimo y frases de cariño · la versión
   const { MIN, H, DIA } = N;
   const MAX_ARCHIVO = 50 * 1024 * 1024, ESPACIO_GRATIS = 1024 * 1024 * 1024;
 
@@ -35,8 +36,8 @@
   const ag = { modo: 'mes', ref: Date.now(), dia: N.inicioDiaCR(Date.now()) };
   let sincronizando = false, otraVez = false, ultimoError = '', sinSesion = false;
   const TITULOS = { hoy: 'Hoy', repasar: 'Repasar', charla: 'Liz', agenda: 'Agenda', mazos: 'Mis mazos', mas: 'Más', recordatorios: 'Recordatorios', archivos: 'Archivos',
-    progreso: 'Mi progreso', papelera: 'Papelera' };
-  const DE_MAS = ['recordatorios', 'archivos', 'progreso', 'papelera'];
+    progreso: 'Mi progreso', papelera: 'Papelera', acerca: 'Acerca de Liz' };
+  const DE_MAS = ['recordatorios', 'archivos', 'progreso', 'papelera', 'acerca'];
 
   // ---------- Pantalla de carga (frases de laboratorio, como en la PC) ----------
   const carga = { t0: Date.now(), frases: [], tFrase: 0 };
@@ -54,6 +55,7 @@
     setTimeout(() => { cargaAvance(100); clearInterval(carga.tFrase); setTimeout(() => { $('#carga').classList.add('fuera'); document.body.classList.remove('cargando'); }, 250); setTimeout(() => { $('#carga').hidden = true; }, 900); }, falta);
   }
   document.body.classList.add('cargando');
+  if (V && $('#carga .ver')) $('#carga .ver').textContent = V.texto;          // (21-oct-2026) "versión 1.1", pequeñita debajo de la barra
   cargaFrase();
   carga.tFrase = setInterval(cargaFrase, 1700);
   cargaAvance(15);
@@ -93,6 +95,8 @@
       }
       if (r.bajados || r.repasosBajados || r.borrados) pintarSuave();
       if (motivo === 'abrir') setTimeout(revisarExamenPasado, 1200);
+      if (motivo === 'abrir') setTimeout(revisarAnimoDia, 1800);            // (21-oct-2026: ya se sabe si lo marcó en la compu)
+      if (r.cambiosDe.animo && $('#hoja:not([hidden]) .caritas') && Animo.deHoy(E).length) cerrarHoja(null);   // (lo marcó en la compu)
     } catch (e) {
       ultimoError = String(e && e.message || e);
       console.warn('Sincronizar:', e);
@@ -106,7 +110,7 @@
   // Antes el celular revisaba la nube cada 5 minutos (y al abrir). Ahora Supabase AVISA cuando cambia algo de sus tablas
   // (supabase/tiempo-real.sql) y el celular se sincroniza enseguida, con las MISMAS reglas de siempre (solo cambia CUÁNDO).
   // Lo que el propio celular guardó vuelve como aviso: eso se ignora. Sin el SQL, o sin conexión, todo sigue como antes.
-  const TABLAS_RT = ['materias', 'mazos', 'tarjetas', 'repasos', 'eventos', 'recordatorios', 'examenes', 'archivos', 'avisos', 'perfil'];
+  const TABLAS_RT = ['materias', 'mazos', 'tarjetas', 'repasos', 'eventos', 'recordatorios', 'examenes', 'archivos', 'avisos', 'perfil', 'animo'];
   let canal = null, tRT = 0;
   function escucharCambios() {
     if (DEMO || !sb || canal) return;
@@ -180,6 +184,9 @@
         perfil.gestosV = ge.v;
       }
     }
+    // (21-oct-2026) Lo que manda la PC en privado: las frases de cariño, la dedicatoria, quién la creó y a quién sugerir si necesita apoyo
+    const lc = data.datos && data.datos.lizCelular;
+    if (lc) perfil.lizc = { frases: lc.frasesCarino || null, dedicatoria: lc.dedicatoria || '', creadora: lc.creadora || '', apoyo: lc.apoyo || '', masculino: lc.masculino !== false };
     Almacen.guardar(K + 'perfil', perfil);
   }
   const aDataURL = (blob) => new Promise((ok, mal) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = mal; f.readAsDataURL(blob); });
@@ -238,6 +245,10 @@
     $('#menu').hidden = false;
     if (!irPorEnlace(location.hash)) pintar();
     setTimeout(() => gestoLiz(deNoche() ? 'bostezo' : 'saludo'), 1900);     // (cuando ya se fue la pantalla de carga)
+    // (21-oct-2026) "¿Cómo te sientes hoy?" (si no hay internet para saber si ya lo marcó en la compu) y, de vez en cuando, una frase de cariño
+    setTimeout(revisarAnimoDia, 7000);
+    setTimeout(revisarCarino, 9000);
+    setInterval(revisarCarino, 10 * MIN);
     setInterval(() => sincronizar('auto'), 5 * MIN);
     setInterval(() => { if (vista === 'hoy' || vista === 'agenda' || vista === 'recordatorios') pintarSuave(); }, 60000);
   }
@@ -282,7 +293,7 @@
     pintar();
   }
   const PINTA = { hoy: pintarHoy, repasar: pintarRepasar, charla: pintarCharla, agenda: pintarAgenda, mazos: pintarMazos, mas: pintarMas, recordatorios: pintarRecordatorios,
-    archivos: pintarArchivos, progreso: pintarProgreso, papelera: pintarPapelera };
+    archivos: pintarArchivos, progreso: pintarProgreso, papelera: pintarPapelera, acerca: pintarAcerca };
   function pintar() {
     const v = $('#vista');
     v.classList.remove('vista'); void v.offsetWidth; v.classList.add('vista');      // (la animación de entrada, suave)
@@ -384,7 +395,12 @@
   // si no hay nada), sorprendida (examen cerca). Sin fotos de ánimo todavía: la foto de siempre (--liz) o la placa de Petri.
   function animoHoy() {
     if (animoForzado) return animoForzado;
+    // (21-oct-2026) Si él marcó cómo se siente hoy, Liz lo acompaña: tierna si está triste, estresado, ansioso o cansado; pensativa
+    // (tranquila, sin bromas) si está enojado; feliz si está feliz (de noche, igual medio dormida)
+    const suyo = Animo ? Animo.animoLiz(Animo.deHoy(E)) : null;
+    if (suyo && suyo !== 'feliz') return suyo;
     const ahora = Date.now(), h = N.enCR(ahora).h;
+    if (suyo === 'feliz' && !(h >= 22 || h < 5)) return 'feliz';
     const reps = Object.values(E.repasos);
     const hoyR = reps.filter((r) => r.fecha >= N.inicioDiaCR(ahora));
     const malHoy = hoyR.filter((r) => r.resultado !== 'bien').length;
@@ -500,22 +516,131 @@
     const ex = exs[0];
     const dEx = ex ? Math.round((N.inicioDiaCR(ex.cuando) - N.inicioDiaCR(ahora)) / DIA) : 0;
     const favs = Org.paraRepasar(E, { favoritas: true }).length, difs = Org.paraRepasar(E, { dificiles: true }).length;
+    // (21-oct-2026) Cómo se siente él hoy: en un día pesado, Liz lo dice con cariño y le ofrece solo unas poquitas tarjetas
+    const suyos = Animo.deHoy(E, ahora), sug = Animo.tarjetasSugeridas(suyos, tocan.length), linea = Animo.lineaHoy(suyos);
+    const carino = carinoActual && ahora < carinoActual.hasta ? carinoActual : null;
     v.innerHTML =
       '<div class="heroe"><div class="placa"></div><div class="placa chica"></div><span class="animo">' + TEXTO_ANIMO[animo] + '</span>' +
       '<div class="marcoFoto respira"><div class="aura"></div>' + fotoLiz(animo, 'grande') + '</div>' +
-      '<div class="comic cola-arriba">' + esc(saludoFijo()) + '<br>' + msg + (racha >= 2 ? '<small>🔥 ' + esc(fija('racha', 'racha', { n: racha })) + '</small>' : '') + '</div></div>' +
-      (tocan.length ? '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + tocan.length + '</span><span class="t"><b>Repasar ahora</b>' +
-        (tocan.length === 1 ? 'tarjeta te toca hoy' : 'tarjetas te tocan hoy') + '</span><span class="flecha">▶</span></button>' : '') +
+      (carino ? '<div class="comic cola-arriba' + (carino.corazones ? ' carino' : '') + '">' + esc(carino.t) + (carino.corazones ? '<small>💜</small>' : '') + '</div></div>'
+        : '<div class="comic cola-arriba">' + esc(saludoFijo()) + '<br>' + msg + (linea ? '<small>💜 ' + esc(linea) + '</small>' : racha >= 2 ? '<small>🔥 ' + esc(fija('racha', 'racha', { n: racha })) + '</small>' : '') + '</div></div>') +
+      (tocan.length ? (sug < tocan.length
+        ? '<button class="repasarYa" data-a="repasarSuave"><span class="n">' + sug + '</span><span class="t"><b>Solo ' + sug + ', con calma</b>de las ' + tocan.length + ' de hoy</span><span class="flecha">▶</span></button>'
+        : '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + tocan.length + '</span><span class="t"><b>Repasar ahora</b>' +
+          (tocan.length === 1 ? 'tarjeta te toca hoy' : 'tarjetas te tocan hoy') + '</span><span class="flecha">▶</span></button>') : '') +
       (ex ? '<button class="examenG" data-a="editarAgenda" data-tabla="examenes" data-id="' + esc(ex.id) + '"><span class="cuenta">' +
         (dEx <= 0 ? '<b>¡Hoy!</b>' : dEx === 1 ? '<b>1</b><small>día</small>' : '<b>' + dEx + '</b><small>días</small>') + '</span><span class="txt"><small>Próximo ' + esc(ex.que || 'examen') + '</small><b>' +
         esc(ex.materia) + '</b><span>' + esc(N.fechaTxt(ex.cuando)) + ' · ' + N.horaCR(ex.cuando) + '</span></span></button>' : '') +
-      '<div class="pastillas"><span class="pastilla oro">🔥 <b>' + racha + '</b> racha</span><span class="pastilla">✅ <b>' + hoyN + '</b> hoy</span><span class="pastilla">🃏 <b>' + total + '</b> tarjetas</span>' +
+      '<div class="pastillas">' + (suyos.length ? '<button class="pastilla toque animoP" data-a="animoHoy">' + suyos.map((k) => Animo.POR[k].e).join('') + ' <b>' + esc(nombresAnimo(suyos)) + '</b></button>'
+        : '<button class="pastilla toque animoP" data-a="animoHoy">😊 <b>¿Cómo te sientes?</b></button>') +
+      '<span class="pastilla oro">🔥 <b>' + racha + '</b> racha</span><span class="pastilla">✅ <b>' + hoyN + '</b> hoy</span><span class="pastilla">🃏 <b>' + total + '</b> tarjetas</span>' +
       (favs ? '<button class="pastilla toque" data-a="repasarFav">⭐ <b>' + favs + '</b></button>' : '') + (difs ? '<button class="pastilla toque" data-a="repasarDif">🔥 <b>' + difs + '</b> difíciles</button>' : '') + '</div>' +
       '<h3>Hoy, ' + esc(N.fechaTxt(ahora, { weekday: 'long', month: undefined, day: 'numeric' })) + '</h3>' +
       (hoyAg.length ? '<div class="panel tiempo"><ul class="lista">' + hoyAg.map((x) => filaAgenda(x, false, true)).join('') + '</ul></div>' : '<p class="suave" style="margin:0 6px">Nada en tu agenda hoy. 🌙</p>') +
       '<div class="fila" style="gap:8px;margin:10px 2px"><button class="bt chico" data-a="nuevoAgenda" data-tipo="recordatorios">＋ Recordatorio</button><button class="bt chico" data-a="ir" data-v="agenda">📅 Calendario</button></div>' +
       (exs.length > 1 ? '<h3>Se vienen</h3><div class="panel"><ul class="lista">' + exs.slice(1, 4).map((x) => filaAgenda({ tabla: 'examenes', id: x.id, ms: x.cuando, titulo: N.nombreExamen(x).replace(/^(el|la) /, ''), tipo: x.que, fila: x }, true)).join('') + '</ul></div>' : '') +
       (!total ? '<button class="bt prin grande" style="margin-top:14px" data-a="nuevaTarjeta">➕ Crear mi primera tarjeta</button>' : '');
+  }
+
+  // ---------- (21-oct-2026, Liz 1.1) DIARIO DE ÁNIMO, FRASES DE CARIÑO y CUIDADO ----------
+  // Las reglas son las de la PC (js/animo.js): una vez al día "¿Cómo te sientes hoy?" (hasta 3 caritas; se puede saltar y cambiar),
+  // Liz se adapta (su foto, su globito, cuántas tarjetas ofrece y la charla), una frase de cariño cada 3-4 días en un momento tranquilo
+  // (las frases llegan PRIVADAS desde la PC, en el perfil: nunca están en esta página), y el cuidado si varios días marca triste o ansioso.
+  const fem = () => !!(perfil.lizc && perfil.lizc.masculino === false);
+  const nombresAnimo = (l) => l.map((k) => Animo.nombre(k, fem())).join(', ');
+  // (en ?demo, unas frases de ejemplo sin nombres)
+  const FRASES_DEMO = {
+    sorpresa: [{ t: 'Te quiero con todo mi código. Literal: así me programaron.', tierna: false },
+      { t: 'Ninguna bacteria vive sola, siempre forman colonias. Por eso existo yo: para que nunca estés solo 🧫💜', tierna: true }],
+    secreto: [{ t: 'Psst… te guardo un secreto: me hicieron pensando en que nunca te sintieras solo. Así que aquí estoy, siempre.', tierna: true }],
+  };
+  const frasesCel = () => (perfil.lizc && perfil.lizc.frases) || (DEMO ? FRASES_DEMO : { sorpresa: [], secreto: [] });
+  const PREGUNTA_ANIMO = ['¿Cómo te sientes hoy?', 'Cuéntame, ¿cómo amaneciste hoy?', 'Antes de empezar: ¿cómo te sientes hoy?'];
+  let preguntadoAnimo = false, carinoActual = null;
+  function hojaAnimo(aMano) {
+    preguntadoAnimo = true;
+    let sel = Animo.deHoy(E).slice();
+    const h = abrirHoja('<div class="hojaAnimo"><div class="escena"><div class="marcoLiz"><div class="aura"></div>' + fotoLiz(animoHoy(), 'respira') + '</div>' +
+      '<div class="comic cola-izq">' + esc(aMano ? '¿Cómo te sientes ahora?' : PREGUNTA_ANIMO[Math.floor(Math.random() * PREGUNTA_ANIMO.length)]) + '</div></div>' +
+      '<div class="caritas">' + Animo.EMOCIONES.map((e) => '<button class="carita toque' + (sel.includes(e.k) ? ' si' : '') + '" data-k="' + e.k + '" style="--c:' + e.color + '"><span>' + e.e +
+        '</span><small>' + esc(Animo.nombre(e.k, fem())) + '</small></button>').join('') + '</div>' +
+      '<p class="nota centro">Elige hasta 3. Es privado: solo lo vemos tú y yo. 🔒</p>' +
+      '<div class="botones"><button class="bt prin grande" id="anListo"' + (sel.length ? '' : ' disabled') + '>Listo</button><button class="bt grande" id="anNo">Ahora no</button></div></div>');
+    h.querySelectorAll('.carita').forEach((b) => {
+      b.onclick = () => {
+        const k = b.dataset.k;
+        if (sel.includes(k)) sel = sel.filter((x) => x !== k);
+        else if (sel.length < 3) sel.push(k);
+        else { avisar('Máximo 3: quita una para elegir otra.'); return; }
+        b.classList.toggle('si', sel.includes(k));
+        $('#anListo', h).disabled = !sel.length;
+        vibrar('bien');
+      };
+    });
+    $('#anListo', h).onclick = () => { const l = sel.slice(); cerrarHoja(true); guardarAnimo(l, 'caritas'); };
+    $('#anNo', h).onclick = () => { cerrarHoja(null); if (!Animo.hoy(E)) { Animo.saltar(E, DISP); guardarLocal(); pedirSincro(); } };
+  }
+  function guardarAnimo(lista, como) {
+    if (!lista || !lista.length) return;
+    Animo.guardar(E, lista, DISP, como);
+    guardarLocal();
+    pedirSincro();
+    const r = Animo.reaccion(lista, fem());
+    if (r && como === 'caritas') {
+      carinoActual = { t: r, hasta: Date.now() + 60000, corazones: false };
+      if (vista !== 'hoy') avisar(r);
+    }
+    pintarSuave();
+    pintarCarita();
+    if (lista.includes('feliz') && !Animo.pesado(lista)) setTimeout(() => gestoLiz('celebrar'), 300);
+  }
+  // Una vez al día, al abrir (si ya lo marcó en la compu, no pregunta). Sin insistir: si cierra la hoja, no vuelve a salir hasta la próxima vez que abra.
+  function revisarAnimoDia() {
+    if (!Animo || preguntadoAnimo || !Animo.debePreguntar(E) || sesion || vista === 'charla' || document.querySelector('#hoja:not([hidden])')) return;
+    const h = N.enCR(Date.now()).h;
+    if (h < 6 || h >= 23) return;
+    hojaAnimo(false);
+  }
+  // La frase de cariño (en el globito de Hoy, con corazoncitos) o, antes que nada, el cuidado
+  function revisarCarino() {
+    if (!Animo || vista !== 'hoy' || sesion || document.hidden || document.querySelector('#hoja:not([hidden])')) return;
+    const ahora = Date.now();
+    if (Animo.necesitaCuidado(E, ahora)) {
+      Animo.anotarCuidado(E, DISP, ahora);
+      guardarLocal();
+      pedirSincro();
+      agregarMsg({ quien: 'liz', texto: Animo.textoCuidado({ fem: fem(), apoyo: perfil.lizc && perfil.lizc.apoyo }), animo: 'tierna' });
+      avisoCharla = true;
+      pintarMenu();
+      return;
+    }
+    const examenCerca = Object.values(E.examenes || {}).some((x) => x && !x.borrado_en && Math.abs(x.cuando - ahora) < 3 * H);
+    const x = Animo.carinoAhora(E, frasesCel(), ahora, { examenCerca });
+    if (!x) return;
+    Animo.anotarCarino(E, x.i, DISP, true, ahora);
+    guardarLocal();
+    pedirSincro();
+    carinoActual = { t: x.t, hasta: ahora + 90000, corazones: true };
+    pintarSuave();
+    corazones($('.heroe'));
+  }
+  // Corazoncitos que suben (con "reducir movimiento", nada)
+  function corazones(donde, n) {
+    if (!donde || quietoCel()) return;
+    for (let i = 0; i < (n || 16); i++) {
+      const c = document.createElement('span');
+      c.className = 'corazonCel';
+      c.textContent = ['💜', '🤍', '💜', '✨'][i % 4];
+      c.style.left = (25 + Math.random() * 50) + '%';
+      c.style.top = (25 + Math.random() * 30) + '%';
+      c.style.fontSize = (14 + Math.random() * 14) + 'px';
+      c.style.setProperty('--x', ((Math.random() - 0.5) * 140).toFixed(0) + 'px');
+      c.style.setProperty('--r', ((Math.random() - 0.5) * 60).toFixed(0) + 'deg');
+      c.style.setProperty('--d', (2.6 + Math.random() * 1.6).toFixed(2) + 's');
+      c.style.animationDelay = (i * 0.1).toFixed(2) + 's';
+      donde.appendChild(c);
+      setTimeout(() => c.remove(), 6000);
+    }
   }
 
   // ---------- REPASAR ----------
@@ -926,6 +1051,7 @@
     v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' + escena(racha >= 2 ? 'feliz' : 'animo', reps.length ? fija('pProg', 'pProgreso') : fija('pProg', 'pProgresoNada')) +
       '<div class="grandes"><div><b>' + racha + '</b><small>🔥 días seguidos</small></div><div><b>' + pct + '%</b><small>la sabía (30 días)</small></div>' +
       '<div><b>' + r30.length + '</b><small>repasos (30 días)</small></div></div>' +
+      seccionAnimo() +
       '<h3>⏱️ Tiempo repasando</h3><div class="panel"><div class="barras">' +
       (Object.keys(siempre).length ? Object.entries(siempre).sort((a, b) => b[1] - a[1]).map(([m, ms]) => '<div class="b"><div class="fila entre"><span>' + esc(m) +
         '</span><span class="suave">' + duracion(semana[m] || 0) + ' esta semana · ' + duracion(ms) + '</span></div><div class="t"><i style="width:' + Math.round((ms / maxS) * 100) + '%"></i></div></div>').join('')
@@ -938,6 +1064,71 @@
       '</div><div class="cajasN">' + cajas.map((c, i) => '<span>' + c + '<br>' + (i < 5 ? 'caja ' + (i + 1) : '🎓 sabidas') + '</span>').join('') + '</div>' +
       '<p class="nota">Caja 1: aprendiendo · caja 5: ¡dominadas! Cada vez que la sabes, sube una caja y vuelve más tarde. 🎓: las que marcaste "ya me la sé" (aprendidas).' +
       (archivadas ? ' Además tienes ' + archivadas + ' en 📦 Archivados.' : '') + '</p></div>';
+  }
+
+  // (21-oct-2026) "Cómo te has sentido" (en Progreso): la semana (sus caritas y cuánto estudió cada día), el mes en colores, lo más
+  // frecuente y cómo le fue repasando según cómo se sentía. Privado: solo está en su cuenta.
+  function seccionAnimo() {
+    const ahora = Date.now(), s = Animo.resumen(E, ahora, 7), m = Animo.resumen(E, ahora, 30);
+    const DIAS = ['Do', 'Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sá'];
+    const color = (k) => Animo.POR[k].color;
+    const fondo = (l) => (l.length === 1 ? color(l[0]) : 'linear-gradient(135deg,' + l.map((k, i) => color(k) + ' ' + Math.round(100 * i / l.length) + '%,' + color(k) + ' ' + Math.round(100 * (i + 1) / l.length) + '%').join(',') + ')');
+    const hoyD = N.diaCR(ahora);
+    const pct = (x) => (x.repasos ? Math.round(100 * x.bien / x.repasos) : 0);
+    const semana = s.dias.map((d) => '<div class="dAn' + (d.dia === hoyD ? ' hoy' : '') + '"><b>' + DIAS[new Date(d.ms).getUTCDay()] + '</b>' +
+      (d.emociones.length ? d.emociones.map((k) => '<i style="background:' + color(k) + '">' + Animo.POR[k].e + '</i>').join('') : '<i class="vac"></i>') +
+      '<small>' + (d.repasos ? d.repasos + ' 🃏<br>' + pct(d) + '%' : '—') + '</small></div>').join('');
+    const mes = m.dias.map((d) => '<span class="cAn' + (d.repasos ? ' est' : '') + '"' + (d.emociones.length ? ' style="background:' + fondo(d.emociones) + '"' : '') + '></span>').join('');
+    const top = m.cuentas[0];
+    const ley = Animo.EMOCIONES.map((e) => '<span><i style="background:' + e.color + '"></i>' + esc(Animo.nombre(e.k, fem())) + '</span>').join('');
+    const mejor = Object.entries(m.porEmocion).filter(([, x]) => x.dias >= 2 && x.repasos >= 5).sort((a, b) => pct(b[1]) - pct(a[1]))[0];
+    return '<h3>🌈 Cómo te has sentido</h3><div class="panel animoPanel">' +
+      (m.marcados ? '' : '<p class="nota">Cuando me digas cómo te sientes cada día (toca 😊 en Hoy), aquí lo ves en colores.</p>') +
+      '<div class="semAn">' + semana + '</div><div class="mesAn">' + mes + '</div><div class="leyAn">' + ley + '<span><i class="punto"></i>estudiaste</span></div>' +
+      (top ? '<div class="topAn"><span class="e">' + Animo.POR[top[0]].e + '</span><span>Lo que más sentiste este mes: <b>' + esc(Animo.nombre(top[0], fem())) + '</b> (' + top[1] + (top[1] === 1 ? ' día' : ' días') + ').<br>' +
+        'Estudiaste ' + m.diasEstudio + ' de 30 días' + (m.repasos ? ', con ' + pct(m) + ' % bien' : '') + '.' +
+        (mejor ? ' Los días que te sentías ' + esc(Animo.nombre(mejor[0], fem())) + ' acertaste más (' + pct(mejor[1]) + ' %).' : '') + '</span></div>' : '') +
+      '<p class="nota" style="padding-top:2px">🔒 Es privado: solo lo vemos tú y yo.</p></div>';
+  }
+
+  // ---------- (21-oct-2026) ACERCA DE LIZ: quién es, su versión, lo nuevo, los créditos y un secreto (5 toques a su foto) ----------
+  let secretoToques = [];
+  const creadoraCel = () => (perfil.lizc && perfil.lizc.creadora) || 'su creadora';
+  function pintarAcerca(v) {
+    const lc = perfil.lizc || {};
+    const cr = creadoraCel();
+    v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' +
+      '<div class="acerca"><div class="marcoFoto respira" id="fotoSecreto"><div class="aura"></div>' + fotoLiz('contenta', 'grande') + '</div>' +
+      '<div class="comic cola-arriba secreto" id="secretoGlobo" hidden></div>' +
+      '<div class="nombreLiz">LIZ</div><div class="verLiz">' + esc(V.texto) + ' · bolsillo ' + V.bolsillo + '</div>' +
+      '<p class="dedica">' + esc(lc.dedicatoria || 'Creada con mucho cariño 💜') + '</p><p class="queEs">Tu compañera de estudio y microbióloga junior.</p></div>' +
+      '<h3>✨ Novedades de la ' + esc(V.liz) + '</h3><div class="panel"><ul class="nuevo">' + V.novedades.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' +
+      '<h3>🙏 Créditos</h3><div class="panel creditos">' + V.creditosCortos.map(([ic, q, l]) => '<div class="cred"><span class="ic">' + ic + '</span><span><b>' + esc(q) + '</b><small>' +
+        esc(l.replace('{creadora}', cr)) + '</small></span></div>').join('') +
+      '<details><summary>Ver más</summary>' + V.creditos.map(([q, t]) => '<p><b>' + esc(q) + '.</b> ' + esc(t.replace('{creadora}', cr)) + '</p>').join('') + '</details></div>' +
+      '<p class="pie">Hecha a mano, con mucho cariño · ' + esc(V.fecha.slice(0, 4)) + '</p>';
+    $('#fotoSecreto', v).onclick = tocarSecreto;
+  }
+  function tocarSecreto() {
+    const ahora = Date.now();
+    secretoToques = secretoToques.filter((t) => ahora - t < 2500).concat(ahora);
+    if (secretoToques.length < 5) return;
+    secretoToques = [];
+    let vistos = 0, ultimo = '';
+    try { vistos = Number(localStorage.getItem('liz-secreto-vistos') || 0); ultimo = localStorage.getItem('liz-secreto-ultimo') || ''; } catch (e) {}
+    const s = Animo.secreto(frasesCel(), vistos, ultimo);
+    if (!s) return;
+    try { localStorage.setItem('liz-secreto-vistos', String(s.vistos)); localStorage.setItem('liz-secreto-ultimo', s.t); } catch (e) {}
+    const g = $('#secretoGlobo');
+    g.innerHTML = esc(s.t) + '<small>— un secreto de ' + esc(creadoraCel()) + ' 💜</small>';
+    g.hidden = false;
+    g.classList.remove('pop');
+    void g.offsetWidth;
+    g.classList.add('pop');
+    g.onclick = () => { g.hidden = true; };
+    corazones($('.acerca'), 22);
+    vibrar('bien');
+    gestoLiz('celebrar', '.acerca .marcoFoto .lizFoto');
   }
 
   // ---------- MÁS: un menú con secciones, con Liz arriba ----------
@@ -954,19 +1145,21 @@
       '<h3>Tu estudio</h3><div class="panel"><ul class="lista">' +
       fila('ir', '⏰', 'oro', 'Recordatorios', recHoy ? recHoy + ' para hoy' : 'Lo que te aviso a su hora', recHoy ? '<span class="punto-n">' + recHoy + '</span><span class="chev">›</span>' : '', ' data-v="recordatorios"') +
       fila('ir', '📚', 'celeste', 'Archivos', esperando ? esperando + ' esperando a la laptop' : 'Sube tus apuntes', '', ' data-v="archivos"') +
-      fila('ir', '📈', 'verde', 'Mi progreso', 'Racha, tiempo y lo que más cuesta', '', ' data-v="progreso"') +
+      fila('ir', '📈', 'verde', 'Mi progreso', 'Racha, cómo te has sentido y lo que más cuesta', '', ' data-v="progreso"') +
       fila('ir', '🗑️', '', 'Papelera', pap ? pap + ' cosas (se guardan 30 días)' : 'Vacía', '', ' data-v="papelera"') + '</ul></div>' +
       '<h3>Tu Liz</h3><div class="panel"><ul class="lista">' +
       fila('avisos', '🔔', 'rosa', 'Avisos', 'Recordatorios, exámenes y tarjetas del día') +
       interruptor('alternarVibra', '📳', '', 'Vibración', 'Al acertar o fallar una tarjeta', pref.vibra) +
       interruptor('alternarSonido', '🔊', '', 'Sonidos', 'Un sonidito al acertar (apagado al principio)', pref.sonido) +
       fila('ir', '💬', 'rosa', 'Charlar con Liz', 'Pregúntale, pídele recordatorios o tarjetas', '', ' data-v="charla"') +
-      fila('pegarTexto', '📋', 'celeste', 'Pegar texto', 'Te hago tarjetas con lo que pegues') + '</ul></div>' +
+      fila('pegarTexto', '📋', 'celeste', 'Pegar texto', 'Te hago tarjetas con lo que pegues') +
+      fila('animoHoy', '😊', 'oro', '¿Cómo te sientes hoy?', Animo.deHoy(E).length ? 'Hoy: ' + nombresAnimo(Animo.deHoy(E)) : 'Cuéntamelo con caritas') +
+      fila('ir', '💜', 'rosa', 'Acerca de Liz', V.larga, '', ' data-v="acerca"') + '</ul></div>' +
       '<h3>Tu cuenta</h3><div class="panel"><ul class="lista">' +
       fila('sincronizarYa', '🔄', 'celeste', 'Sincronizar ahora', E.ultimaSincro ? 'Última vez: ' + hace(E.ultimaSincro) : 'Todavía no') +
       (instalada ? '' : fila('comoInstalar', '📲', '', 'Instalar en el iPhone', 'Para tenerla en la pantalla de inicio')) +
       (DEMO ? '' : sinSesion ? fila('volverEntrar', '🔑', 'oro', 'Volver a entrar', 'Con tu correo y contraseña') : fila('salir', '🚪', '', 'Cerrar sesión', 'En este celular')) + '</ul></div>' +
-      '<p class="pie">LIZ · Liz de bolsillo · versión 8</p>';
+      '<p class="pie">LIZ · ' + esc(V.larga) + '</p>';
   }
   function pintarPapelera(v) {
     const l = Org.papelera(E);
@@ -1399,13 +1592,21 @@
       return hacerTarjetasDeTexto({ texto: texto.slice(corte > 0 ? corte + 1 : 0), nombre: '', materia: '' }, true);
     }
     agregarMsg({ quien: 'el', texto });
+    // (21-oct-2026) "Hoy estoy estresado", "me siento cansada y un poco triste": va a su diario de ánimo (se suma a lo de hoy)
+    const dijo = Animo.delTexto(texto);
+    if (dijo.length) {
+      const antes = Animo.deHoy(E), l = dijo.concat(antes.filter((k) => !dijo.includes(k))).slice(0, 3);
+      if (l.join() !== antes.join()) { Animo.guardar(E, l, DISP, 'voz o chat'); guardarLocal(); pedirSincro(); pintarCarita(); }
+    }
     // (20-oct-2026) "Archiva las tarjetas de Micología", "desarchiva…", "ya me sé esta" y el "sí" a la pregunta después de un examen:
     // lo hace la app (sin internet también), con las mismas reglas que la compu
     if (archivarDesdeCharla(texto)) return;
     if (!DEMO && !navigator.onLine) { agregarMsg({ quien: 'liz', texto: F.frase('cSinInternet'), animo: 'tierna' }); return; }
     pensando(true);
     // (21-oct-2026) Su ÁNIMO de ahora (el que él ve en Hoy: dormida, contenta...) va al cerebro: así no dice "¡estoy activa!" si se ve dormida
-    const r = await cerebro('charla', { mensajes: charla.slice(-12).map((m) => ({ quien: m.quien, texto: m.texto })), contexto: contextoTexto(), animo: animoHoy() });
+    // (21-oct-2026) y cómo se siente ÉL hoy (su diario de ánimo): Liz se adapta; si pregunta "¿cómo me he sentido?", el resumen
+    const r = await cerebro('charla', { mensajes: charla.slice(-12).map((m) => ({ quien: m.quien, texto: m.texto })), contexto: contextoTexto(), animo: animoHoy(),
+      animoEl: Animo.deHoy(E), animoDijo: dijo, femenino: fem(), diarioAnimo: Animo.PIDE_RESUMEN.test(texto) ? Animo.resumenTexto(E, Date.now(), { fem: fem() }) : '' });
     pensando(false);
     if (r.sinInternet) return agregarMsg({ quien: 'liz', texto: F.frase('cSinInternet'), animo: 'tierna' });
     if (r.error && !r.dice) return agregarMsg({ quien: 'liz', texto: F.frase('cError') + ' (' + r.error + ')', animo: 'tierna' });
@@ -1539,6 +1740,9 @@
   const A = {
     ir: (d) => ir(d.v),
     repasarHoy: () => empezar(Org.paraRepasar(E, { soloHoy: true }), 'Las de hoy'),
+    // (21-oct-2026) un día pesado: solo unas poquitas (las primeras: las que más tocan)
+    repasarSuave: () => empezar(Org.paraRepasar(E, { soloHoy: true }).slice(0, Animo.tarjetasSugeridas(Animo.deHoy(E), 999)), 'Con calma'),
+    animoHoy: () => hojaAnimo(!!Animo.hoy(E)),
     repasarFav: () => empezar(Org.paraRepasar(E, { favoritas: true }), '⭐ Favoritas'),
     repasarDif: () => empezar(Org.paraRepasar(E, { dificiles: true }), '🔥 Difíciles'),
     repasarTodas: () => empezar(Org.paraRepasar(E, {}).slice(0, 20), 'Repaso libre'),
@@ -1924,6 +2128,13 @@
       .forEach(([i, r, d]) => Sincro.repasar(pc, ids[i], r, 'pc', hace(d)));
     Org.marcar(pc, ids[3], 'dificil', true, 'pc');
     Org.marcar(pc, ids[0], 'favorita', true, 'pc');
+    // (21-oct-2026) Un mes de diario de ánimo de ejemplo (hoy sin marcar: así sale "¿Cómo te sientes hoy?") y repasos repartidos
+    const patron = [['tranquilo'], ['feliz'], ['cansado'], ['estresado', 'cansado'], ['tranquilo'], ['feliz', 'tranquilo'], [], ['ansioso'], ['tranquilo'], ['feliz']];
+    for (let d = 1; d <= 29; d++) {
+      const l = patron[d % patron.length], ms = hace(d);
+      if (l.length) Sincro.cambiar(pc, 'animo', { id: Animo.idDia(N.diaCR(ms)), dia: N.diaCR(ms), emociones: l, creada: ms, datos: { como: 'caritas' } }, 'pc', ms);
+    }
+    for (let d = 6; d <= 24; d++) if (d % 3) for (let j = 0; j < 3 + (d % 4); j++) Sincro.repasar(pc, ids[(d + j) % ids.length], (d + j) % 4 ? 'bien' : 'mal', 'pc', hace(d) + j * MIN);
     // Agenda de ejemplo
     Ag.crearExamen(pc, { que: 'parcial', materia: 'Micología', cuando: hoy0 + 3 * DIA + 10 * H }, 'pc');
     Ag.crearExamen(pc, { que: 'entrega', materia: 'Informe de bacterio', cuando: hoy0 + 9 * DIA + 23 * H + 59 * MIN }, 'pc');
@@ -1955,6 +2166,10 @@
     animos: (m) => { animos = m || {}; pintar(); }, gestos: (m) => { gestos = m || {}; }, gesto: (n) => { gestoHasta = 0; return gestoLiz(n); }, animo: (a) => { animoForzado = a || null; pintar(); }, enviar: enviarCharla, escribir: (t) => { A.escribirResp(); setTimeout(() => revisarEscrito(t), 100); },
     pegar: hojaPegar, hacerTarjetas: hacerTarjetasDeTexto,
     teclado: (px) => { tecladoSimulado = px || null; ajustarTeclado(); },      // (para las capturas: simula el teclado abierto)
+    // (21-oct-2026) ánimo, frases de cariño y el secreto (pruebas y capturas)
+    animoHoja: () => hojaAnimo(false), cerrarHoja: () => cerrarHoja(null), animoMarcar: (l) => guardarAnimo(l, 'caritas'),
+    carino: (i) => { const f = frasesCel().sorpresa; if (!f.length) return false; carinoActual = { t: f[Math.min(i || 0, f.length - 1)].t, hasta: Date.now() + 90000, corazones: true }; ir('hoy'); setTimeout(() => corazones($('.heroe')), 50); return true; },
+    secreto: () => { secretoToques = []; for (let i = 0; i < 5; i++) tocarSecreto(); },
     archivar: (nombre, valor) => { const b = Org.buscarMateriaOMazo(E, nombre); if (b) { Org.archivar(E, b.tabla, b.fila.id, valor !== false, DISP); cambio(); } return !!b; },
     sabida: (n) => { const t = Org.vivos(E.tarjetas).find((x) => Org.lim(x.pregunta).includes(Org.lim(n))); if (t) { Org.marcarSabida(E, t.id, true, DISP); cambio(); } return !!t; } };
 })();

@@ -14,7 +14,10 @@
   if (typeof module === 'object' && module.exports) module.exports = fabrica(require('./nucleo.js'));
   else raiz.Sincro = fabrica(raiz.Nucleo);
 })(typeof self !== 'undefined' ? self : this, function (Nucleo) {
-  const TABLAS = ['materias', 'mazos', 'tarjetas', 'eventos', 'examenes', 'recordatorios', 'archivos'];
+  // (21-oct-2026, Liz 1.1) "animo" = el diario de ánimo (una fila por día). Es OPCIONAL: si todavía no se corrió supabase/animo.sql,
+  // se salta sin frenar lo demás (y lo de aquí se sube cuando exista).
+  const TABLAS = ['materias', 'mazos', 'tarjetas', 'eventos', 'examenes', 'recordatorios', 'archivos', 'animo'];
+  const OPCIONALES = ['animo'];
   const AGREGAR = { repasos: 'pendientes', avisos: 'pendAvisos' };          // tabla de "solo agregar" → su lista de pendientes
   const SOLAPE_MS = 5000;                                     // el cursor retrocede 5 s: así no se pierde nada que llegó a la vez
 
@@ -93,7 +96,8 @@
       const filas = ids.map((id) => E[tabla][id]).filter(Boolean).map((f) => Object.assign({}, f));
       const version = {};
       for (const f of filas) version[f.id] = f.actualizado;
-      for (let i = 0; i < filas.length; i += 200) await cli.guardar(tabla, filas.slice(i, i + 200));
+      try { for (let i = 0; i < filas.length; i += 200) await cli.guardar(tabla, filas.slice(i, i + 200)); }
+      catch (e) { if (e && e.falta) continue; throw e; }      // (la tabla aún no existe en el servidor: queda pendiente)
       r.subidos += filas.length;
       // (si se volvió a cambiar MIENTRAS se subía, sigue pendiente para la próxima vez)
       E.sucios[tabla] = E.sucios[tabla].filter((id) => !ids.includes(id) || (E[tabla][id] && E[tabla][id].actualizado !== version[id]));
@@ -128,20 +132,28 @@
 
   // ---------- El cliente de Supabase (supabase-js) ----------
   function clienteSupabase(sb) {
-    const ok = (res) => { if (res.error) throw new Error(res.error.message || String(res.error)); return res.data; };
+    // ¿Falta la tabla o su función en el servidor? (PGRST205 / PGRST202 / 42P01): solo se perdona en las OPCIONALES
+    const falta = (tabla, err) => OPCIONALES.includes(tabla) && /PGRST20[25]|42P01|42883/.test(String(err.code || '')) ||
+      OPCIONALES.includes(tabla) && /could not find the (table|function)|does not exist/i.test(String(err.message || ''));
+    const ok = (res, tabla) => {
+      if (res.error) { const e = new Error(res.error.message || String(res.error)); if (tabla && falta(tabla, res.error)) e.falta = true; throw e; }
+      return res.data;
+    };
     return {
       async traer(tabla, desde) {
         const out = [];
-        for (let pag = 0; pag < 100; pag++) {
-          let q = sb.from(tabla).select('*').order('servidor_en', { ascending: true }).order('id', { ascending: true }).range(pag * 1000, pag * 1000 + 999);
-          if (desde) q = q.gt('servidor_en', desde);
-          const d = ok(await q);
-          out.push(...d);
-          if (d.length < 1000) break;
-        }
+        try {
+          for (let pag = 0; pag < 100; pag++) {
+            let q = sb.from(tabla).select('*').order('servidor_en', { ascending: true }).order('id', { ascending: true }).range(pag * 1000, pag * 1000 + 999);
+            if (desde) q = q.gt('servidor_en', desde);
+            const d = ok(await q, tabla);
+            out.push(...d);
+            if (d.length < 1000) break;
+          }
+        } catch (e) { if (e.falta) return []; throw e; }
         return out;
       },
-      async guardar(tabla, filas) { ok(await sb.rpc('guardar_' + tabla, { filas })); },
+      async guardar(tabla, filas) { ok(await sb.rpc('guardar_' + tabla, { filas }), tabla); },
       async agregar(tabla, filas) { ok(await sb.from(tabla).upsert(filas, { onConflict: 'id', ignoreDuplicates: true })); },
       async agregarRepasos(filas) { ok(await sb.from('repasos').upsert(filas, { onConflict: 'id', ignoreDuplicates: true })); },
       async borrar(tabla, ids) { for (let i = 0; i < ids.length; i += 200) ok(await sb.from(tabla).delete().in('id', ids.slice(i, i + 200))); },
@@ -175,5 +187,5 @@
     };
   }
 
-  return { TABLAS, AGREGAR, vacio, asegurar, cambiar, agregar, repasar, repasosDe, estado, sincronizar, clienteSupabase, servidorDePrueba };
+  return { TABLAS, OPCIONALES, AGREGAR, vacio, asegurar, cambiar, agregar, repasar, repasosDe, estado, sincronizar, clienteSupabase, servidorDePrueba };
 });
