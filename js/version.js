@@ -10,7 +10,7 @@
   else raiz.LizVersion = fabrica();
 })(typeof self !== 'undefined' ? self : this, function () {
   const liz = '1.0';
-  const bolsillo = 17;
+  const bolsillo = 18;
   return {
     liz,
     bolsillo,
@@ -31,8 +31,9 @@
     // compu solo lo de la compu (loNuevoPC); nada de uno en el otro, tampoco en "Acerca de Liz". Para la próxima actualización de cada uno:
     // cambiar su "id" (así se vuelve a mostrar) y sus "cosas".
     loNuevoCelular: {
-      id: 'celular-17',
+      id: 'celular-18',
       cosas: [
+        'Cuando hay una versión nueva, me actualizo sola: ya no hace falta abrirme dos o tres veces.',
         'Soy la misma Liz de la compu: la misma forma de ser y lo que sé de ti, siempre al día.',
         'Avisos más claros: arriba dice “LIZ” y el tipo va al principio (POMODORO, ESTUDIO, RECORDATORIO, EXAMEN…).',
         'Avisos más seguros: lo que tiene hora se guarda en la nube al instante, y “Probar aviso” te dice si de verdad llegan.',

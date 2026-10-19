@@ -217,10 +217,39 @@
   const aDataURL = (blob) => new Promise((ok, mal) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = mal; f.readAsDataURL(blob); });
   function ponerFoto(url) { document.documentElement.style.setProperty('--liz', 'url("' + url + '")'); document.body.classList.remove('sin-foto'); }
 
+  // ---------- (Liz 1.0 · prueba 17, al final) VERSIÓN NUEVA: la app cambia SOLA ----------
+  // Los archivos se sirven primero desde lo guardado (así abre sin internet). Antes, al publicar una versión nueva, la primera vez que se
+  // abría la app se veía la VIEJA (el service worker nuevo se instalaba por detrás) y la nueva recién en la 2ª o 3ª apertura: en la prueba
+  // 17 el iPhone de Catalina siguió con la versión de antes. Ahora, cuando el service worker nuevo toma el control, la app se recarga sola:
+  // al instante si está en la pantalla de carga o recién abierta en Hoy (≤20 s y sin escribir: una hoja que se abrió sola, como "¿Cómo
+  // amaneciste hoy?", vuelve a salir después); si no, la próxima vez que vuelva a la app. Nunca dos veces seguidas (no se queda recargando).
+  const t0App = Date.now();
+  let versionNueva = false, recargando = false;
+  const recienRecargada = () => { try { return Date.now() - Number(sessionStorage.getItem('liz-recargo') || 0) < 30000; } catch (e) { return false; } };
+  const momentoSeguro = () => !escribiendo() && (document.body.classList.contains('cargando') || !$('#entrar').hidden ||
+    (Date.now() - t0App < 20000 && vista === 'hoy'));
+  function recargarVersion() {
+    if (recargando || recienRecargada()) return;
+    recargando = true;
+    try { sessionStorage.setItem('liz-recargo', String(Date.now())); } catch (e) {}
+    // lo de este celular se guarda antes (guardarLocal espera 250 ms: aquí no)
+    const guardar = DEMO ? Promise.resolve() : Almacen.guardar(K + 'E', E).catch(() => {});
+    Promise.race([guardar, new Promise((ok) => setTimeout(ok, 800))]).then(() => location.reload());
+  }
+  window.__lizVersion = () => ({ versionNueva, recargando });     // (para las pruebas: herramientas/probar-version-nueva.js)
+
   // ---------- Arrancar ----------
   async function arrancar() {
     document.body.classList.add('sin-foto');
-    if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch((e) => console.warn('sw', e));
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      const habia = !!navigator.serviceWorker.controller;      // (la primera instalación no necesita recargar: ya se bajó todo fresco)
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!habia) return;
+        versionNueva = true;
+        if (momentoSeguro()) recargarVersion();
+      });
+      navigator.serviceWorker.register('sw.js').catch((e) => console.warn('sw', e));
+    }
     try {
       const g = await Almacen.leer(K + 'E');
       if (g) E = Sincro.asegurar(g);
@@ -271,6 +300,8 @@
     $('#app').hidden = false;
     $('#menu').hidden = false;
     if (!irPorEnlace(location.hash)) pintar();
+    // (prueba 18) ¿toca mostrar "Lo nuevo"? (entonces va ANTES que "¿Cómo te sientes hoy?": ver revisarAnimoDia)
+    try { const v = localStorage.getItem('liz-lo-nuevo'); loNuevoPendiente = !!(V && V.loNuevoCelular) && v !== V.loNuevoCelular.id && !!(v || yaUsada || DEMO); } catch (e) {}
     setTimeout(() => revisarLoNuevo(false, yaUsada), 3200);
     setTimeout(refrescarAvisos, 4000);      // (prueba 17: el servidor queda con la suscripción ACTUAL de este iPhone)
     setTimeout(() => gestoLiz(deNoche() ? 'bostezo' : 'saludo'), 1900);     // (cuando ya se fue la pantalla de carga)
@@ -753,13 +784,14 @@
   // Una vez al día, al abrir (si ya lo marcó en la compu, no pregunta). Sin insistir: si cierra la hoja, no vuelve a salir hasta la próxima vez que abra.
   // (Liz 1.0 · prueba 14) "LO NUEVO EN ESTA VERSIÓN": una sola vez después de actualizarse (version.js → loNuevo.id). En una instalación nueva
   // no sale (se anota y listo). Si está repasando, charlando o hay otra hoja abierta, espera. La lista queda en Acerca de Liz.
+  let loNuevoPendiente = false;
   function revisarLoNuevo(forzar, yaUsada) {
     if (!V || !V.loNuevoCelular) return;
     let visto = null;
     try { visto = localStorage.getItem('liz-lo-nuevo'); } catch (e) {}
-    const anotar = () => { try { localStorage.setItem('liz-lo-nuevo', V.loNuevoCelular.id); } catch (e) {} };
+    const anotar = () => { loNuevoPendiente = false; try { localStorage.setItem('liz-lo-nuevo', V.loNuevoCelular.id); } catch (e) {} };
     if (!forzar) {
-      if (visto === V.loNuevoCelular.id) return;
+      if (visto === V.loNuevoCelular.id) { loNuevoPendiente = false; return; }
       if (!visto && !yaUsada && !DEMO) return anotar();
       if (sesion || vista === 'charla' || document.querySelector('#hoja:not([hidden])')) return void setTimeout(() => revisarLoNuevo(false, true), 20000);
     }
@@ -768,8 +800,13 @@
       V.loNuevoCelular.cosas.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div><div class="botones"><button class="bt prin grande" data-cerrar>¡Genial!</button></div>' +
       '<button class="enlaceAgenda" data-a="verPrivacidad">🔒 Leer cómo cuido tu privacidad ›</button>');
   }
+  let esperasAnimo = 0;
   function revisarAnimoDia() {
-    if (!Animo || preguntadoAnimo || !Animo.debePreguntar(E) || sesion || vista === 'charla' || document.querySelector('#hoja:not([hidden])')) return;
+    if (!Animo || preguntadoAnimo || !Animo.debePreguntar(E) || sesion || vista === 'charla') return;
+    // (prueba 18) Después de actualizarse, "Lo nuevo" va PRIMERO (antes, la pregunta le ganaba y "Lo nuevo" salía 20 s después en cualquier
+    // pantalla). Si hay una hoja abierta, espera a que se cierre (como mucho ~1 min) y solo pregunta si él sigue en Hoy.
+    if (loNuevoPendiente || document.querySelector('#hoja:not([hidden])')) { if (esperasAnimo++ < 4) setTimeout(revisarAnimoDia, 15000); return; }
+    if (esperasAnimo && vista !== 'hoy') return;
     const h = N.enCR(Date.now()).h;
     if (h < 6 || h >= 23) return;
     hojaAnimo(false);
@@ -2662,6 +2699,12 @@
   document.addEventListener('visibilitychange', () => {
     // (prueba 17) Al irse a otra app o bloquear el iPhone: lo pendiente se sube YA (iOS congela la app enseguida)
     if (document.hidden) { ocultaDesde = Date.now(); if (E.usuario && porSubir()) subirYa(); return; }
+    // (prueba 17, al final) Llegó una versión nueva mientras la usaba: se pone al volver a la app (no en medio de lo que estaba haciendo).
+    // Y si estuvo fuera un rato, se revisa si hay versión nueva (un iPhone puede dejar la app "viva" por días sin volver a cargarla).
+    if (document.visibilityState === 'visible' && versionNueva && !escribiendo()) { recargarVersion(); return; }
+    if (document.visibilityState === 'visible' && ocultaDesde && Date.now() - ocultaDesde > 5 * MIN && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistration().then((r) => r && r.update()).catch(() => {});
+    }
     if (document.visibilityState === 'visible' && E.usuario) {
       pintarSuave();
       sincronizar('abrir');
