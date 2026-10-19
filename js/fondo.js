@@ -55,7 +55,8 @@
     const g = lienzo.getContext('2d');
     const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let W = 0, H = 0;
-    const medir = () => { const w0 = W, h0 = H; W = lienzo.width = innerWidth; H = lienzo.height = lienzo.clientHeight || innerHeight;   // (el alto real del lienzo: llega hasta el borde de la pantalla aunque iOS mida la vista más corta) if (w0) for (const c of cosas) { c.x *= W / w0; c.y *= H / h0; } };
+    // (el alto real del lienzo, el de la vista; prueba 16: antes un comentario en medio de esta línea rompía TODO el archivo y no había bacterias)
+    const medir = () => { const w0 = W, h0 = H; W = lienzo.width = innerWidth; H = lienzo.height = lienzo.clientHeight || innerHeight; if (w0) for (const c of cosas) { c.x *= W / w0; c.y *= H / h0; } };
     const cs = colores().length ? colores() : ['#a98bff', '#4cc9f0', '#f72585', '#7cf29a'];
     const imgs = {};
     for (const [k, f] of Object.entries(FORMAS)) imgs[k] = cs.map((c) => f(c));
@@ -108,21 +109,26 @@
       }
       g.setTransform(1, 0, 0, 1, 0, 0); g.globalAlpha = 1;
     }
+    // (prueba 16) "Reducir movimiento" (el del iPhone o el de Más): las bacterias QUIETAS pero VISIBLES. Antes con el de Más no se dibujaba
+    // nada, y con el del iPhone se dibujaban casi transparentes (todavía "apareciendo"). Al cambiar de tamaño se vuelven a dibujar.
+    const estaQuieto = () => quieto || document.body.classList.contains('quieto');
+    function estatico() { for (const c of cosas) c.aparece = 1; dibujar(0); }
+    const remedir = () => { medir(); if (estaQuieto()) estatico(); };
+    removeEventListener('resize', medir); removeEventListener('liz-pantalla', medir);
+    addEventListener('resize', remedir); addEventListener('liz-pantalla', remedir);
     function cuadro(ahora) {
       pedido = 0;
       if (document.hidden) return;                     // pausa: vuelve con visibilitychange
-      if (document.body.classList.contains('quieto')) return;      // (21-oct-2026: "Reducir movimiento" en Más; vuelve con 'liz-movimiento')
+      if (estaQuieto()) { estatico(); return; }        // (quietas; vuelven a moverse con 'liz-movimiento')
       pedido = requestAnimationFrame(cuadro);
       acum += ahora - ultimo; ultimo = ahora;
       if (acum < 48) return;                           // ~20 cuadros por segundo
       dibujar(Math.min(0.1, acum / 1000)); acum = 0;
     }
-    if (quieto) dibujar(0.016);
-    else {
-      pedido = requestAnimationFrame(cuadro);
-      document.addEventListener('visibilitychange', () => { if (!document.hidden && !pedido) { ultimo = performance.now(); pedido = requestAnimationFrame(cuadro); } });
-      document.addEventListener('liz-movimiento', () => { if (!pedido) { ultimo = performance.now(); pedido = requestAnimationFrame(cuadro); } });
-    }
+    const seguir = () => { if (estaQuieto()) estatico(); else if (!pedido && !document.hidden) { ultimo = performance.now(); pedido = requestAnimationFrame(cuadro); } };
+    seguir();
+    document.addEventListener('visibilitychange', seguir);
+    document.addEventListener('liz-movimiento', seguir);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', crear); else crear();
 })();

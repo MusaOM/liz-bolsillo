@@ -797,17 +797,26 @@ body.desplazado::before { opacity: 1; }
    subido. app.js (medirHueco) mide esa diferencia contra el alto REAL de la pantalla y la pone en --hueco (0 si no hay falla): aquí se
    descuenta UNA vez. El menú queda a 8 px de la rayita (safe-area-inset-bottom), y el fondo sólido, #app y las bacterias llegan al borde.
    Lo último de cada pantalla queda justo encima del menú (16 px de aire). */
-:root { --hueco: 0px; --sobreRayita: 8px; --zocalo: calc(var(--menu) + var(--sobreRayita) + var(--abajo)); }
-#menu { bottom: calc(var(--sobreRayita) + var(--abajo) - var(--hueco)); }
-#app, body.enCharla #app { bottom: calc(-1 * var(--hueco)); }
-#app { padding-bottom: calc(var(--zocalo) + 16px); }
-body::after { bottom: calc(-1 * var(--hueco)); }
-#micro { height: auto; bottom: calc(-1 * var(--hueco)); }
-#escribirLiz { bottom: calc(var(--zocalo) + 10px - var(--hueco)); }
-.fab { bottom: calc(var(--zocalo) + 16px - var(--hueco)); }
-#aviso { bottom: calc(var(--zocalo) + 14px - var(--hueco)); }
-/* La pantalla de carga, centrada en la pantalla REAL (igual que la imagen de arranque del iPhone, que es una foto de su primer instante) */
-#carga { bottom: calc(-1 * var(--hueco)); }/* ---------- (Liz 1.0 · prueba 14) "Más": Acerca de Liz sola, con la carita de Liz como ícono (mismo tamaño que los demás, en círculo) ---------- */
+/* (Liz 1.0 · prueba 16) CORREGIDO: lo de la prueba 14 se pasó. En el iPhone real, lo que queda DEBAJO de la vista de iOS 26 (los ~50 px que
+   iOS deja sin medir) NO se dibuja: el menú corrido hacia allá se cortaba (sin su borde redondeado de abajo) y debajo quedaba solo el color
+   de fondo de la página (#0e0b13: una franja negra). Ahora NADA se corre fuera de la vista. Con la falla, la vista ya termina ARRIBA de la
+   rayita (la zona segura de abajo cae fuera de ella), así que la parte de la rayita que queda DENTRO de la vista es
+   --abajoEf = máx(0, rayita − hueco): con la falla 0 px, sin la falla (iOS 26.1+) la rayita entera (34 px). El menú va 8 px arriba de eso,
+   completo. --hueco lo sigue midiendo app.js (medirHueco). */
+:root { --hueco: 0px; --sobreRayita: 8px; --abajoEf: max(0px, calc(var(--abajo) - var(--hueco))); --zocalo: calc(var(--menu) + var(--sobreRayita) + var(--abajoEf)); }
+#menu { bottom: calc(var(--sobreRayita) + var(--abajoEf)); }
+/* Sin "zócalo" (el fondo sólido que había debajo del menú): alrededor y debajo del menú se ve el MISMO fondo de la app, con sus bacterias.
+   Para que el contenido no pase por detrás del menú, #app (lo que se desplaza) termina justo arriba del menú y se difumina en 14 px. */
+body::after { display: none !important; }
+#app, body.enCharla #app { bottom: calc(var(--zocalo) + 4px); }
+#app { padding-bottom: 14px; -webkit-mask-image: linear-gradient(#000 calc(100% - 14px), transparent); mask-image: linear-gradient(#000 calc(100% - 14px), transparent); }
+#micro { inset: 0; height: 100%; }
+#escribirLiz { bottom: calc(var(--zocalo) + 10px); }
+.fab { bottom: calc(var(--zocalo) + 16px); }
+#aviso { bottom: calc(var(--zocalo) + 14px); }
+/* Lo que iOS deja fuera de la vista (con la falla) se pinta con el color de fondo de la PÁGINA: el mismo tono del borde de abajo de la app */
+html { background: #0c0a10; }
+/* ---------- (Liz 1.0 · prueba 14) "Más": Acerca de Liz sola, con la carita de Liz como ícono (mismo tamaño que los demás, en círculo) ---------- */
 .compacta .item .ico.icoLiz { border-radius: 50%; padding: 0; overflow: hidden; background: none; box-shadow: 0 0 0 1.5px rgba(169, 139, 255, .55), 0 0 10px rgba(169, 139, 255, .35); }
 .compacta .item .ico.icoLiz .lizFoto { width: 100%; height: 100%; border: 0; box-shadow: none; }
 .soloAcerca { margin-top: 22px; }
