@@ -10,7 +10,7 @@
   else raiz.LizVersion = fabrica();
 })(typeof self !== 'undefined' ? self : this, function () {
   const liz = '1.0';
-  const bolsillo = 20;
+  const bolsillo = 21;
   return {
     liz,
     bolsillo,
@@ -24,24 +24,18 @@
       'Tu agenda: exámenes, eventos y recordatorios, con avisos aunque la app esté cerrada.',
       'Charla con Liz desde el celular: pregúntale, pídele recordatorios o que te explique algo.',
       '“¿Cómo te sientes hoy?”: tu diario de ánimo, y Liz se adapta a cómo estás.',
-      'Y alguna sorpresa de vez en cuando… 💜',
+      'Y alguna sorpresa de vez en cuando…',
     ],
     // LO NUEVO EN ESTA VERSIÓN: Liz lo muestra UNA vez después de actualizarse (no en una instalación nueva) y queda la lista en "Acerca de
     // Liz". (Liz 1.0 · prueba 17) UNA LISTA POR APARATO, con su propio id: el celular muestra solo lo nuevo del celular (loNuevoCelular) y la
     // compu solo lo de la compu (loNuevoPC); nada de uno en el otro, tampoco en "Acerca de Liz". Para la próxima actualización de cada uno:
     // cambiar su "id" (así se vuelve a mostrar) y sus "cosas".
     loNuevoCelular: {
-      id: 'celular-20',
+      id: 'celular-21',
       cosas: [
-        'En la charla pienso con un cerebro más grande: más rápida y con más ingenio de laboratorio, y sigo siendo yo.',
-        'Mis frases cambian cada día, según la hora y cómo te sientes. Las bacterias no duermen, pero tú sí deberías.',
-        'Cuando hay una versión nueva, me actualizo sola: ya no hace falta abrirme dos o tres veces.',
-        'Soy la misma Liz de la compu: la misma forma de ser y lo que sé de ti, siempre al día.',
-        'Avisos más claros: arriba dice “LIZ” y el tipo va al principio (POMODORO, ESTUDIO, RECORDATORIO, EXAMEN…).',
-        'Avisos más seguros: lo que tiene hora se guarda en la nube al instante, y “Probar aviso” te dice si de verdad llegan.',
-        'En “Estudiar con Liz” ves si el aviso del final ya quedó programado.',
-        'Lo que me escribes sin internet le llega a la Liz de la compu en cuanto vuelve la conexión.',
-        'El menú de abajo se ve completo y volvió el fondo de bacterias.',
+        'Ahora me muevo mucho más liviana: cada pantalla, la charla y escribir se sienten al instante, sin tirones.',
+        'Un fondo nuevo, como mirar por un microscopio de campo oscuro: diatomeas, bacterias de Gram y alguna colonia. Además gasta menos batería.',
+        'Con muchas tarjetas y repasos ya no me pongo lenta: hago las cuentas una sola vez.',
       ],
     },
     loNuevoPC: {

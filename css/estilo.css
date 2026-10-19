@@ -74,7 +74,7 @@ svg.ic { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-wid
 @keyframes saltaLiz { 35% { transform: translateY(-16px) scale(1.04) rotate(-2deg); } }
 @keyframes ladeaLiz { 30% { transform: rotate(-5deg); } 65% { transform: rotate(3deg); } }
 .aura { position: absolute; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle, rgba(169, 139, 255, .42) 0%, rgba(142, 107, 255, .18) 38%, transparent 68%); filter: blur(4px); animation: late 6s ease-in-out infinite; }
+  background: radial-gradient(circle, rgba(169, 139, 255, .42) 0%, rgba(149, 117, 255, .3) 18%, rgba(142, 107, 255, .17) 38%, rgba(142, 107, 255, .05) 56%, transparent 70%); animation: late 6s ease-in-out infinite; }
 @keyframes late { 50% { opacity: .7; transform: scale(1.06); } }
 .placa { position: absolute; border-radius: 50%; border: 2px solid rgba(142, 107, 255, .25); box-shadow: inset 0 0 40px rgba(142, 107, 255, .12), 0 0 30px rgba(142, 107, 255, .12); pointer-events: none; }
 .placa::before { content: ''; position: absolute; inset: 8%; border-radius: 50%; border: 1px solid rgba(169, 139, 255, .18); }
@@ -184,8 +184,8 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .repasarYa .t { flex: 1; font-size: 15px; font-weight: 800; line-height: 1.25; opacity: .95; }
 .repasarYa .t b { display: block; font-size: 21px; font-weight: 900; }
 .repasarYa .flecha { width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .2); font-size: 22px; }
-.repasarYa::before { content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .28), transparent); animation: barrido 3.8s ease-in-out infinite; }
-@keyframes barrido { 60%, 100% { left: 130%; } }
+.repasarYa::before { content: ''; position: absolute; top: 0; bottom: 0; width: 40%; left: -60%; background: linear-gradient(100deg, transparent, rgba(255, 255, 255, .28), transparent); animation: barrido 3.8s ease-in-out infinite; will-change: transform; }
+@keyframes barrido { 0% { transform: translateX(0); } 60%, 100% { transform: translateX(475%); } }
 .examenG { position: relative; display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; margin: 14px 0; padding: 14px 16px; border-radius: 22px;
   background: linear-gradient(150deg, rgba(142, 107, 255, .16), rgba(40, 30, 52, .9) 55%); border: 1.5px solid rgba(142, 107, 255, .55); box-shadow: var(--brillo-rosa); }
 .examenG .cuenta { width: 74px; height: 74px; flex: none; border-radius: 20px; display: grid; place-content: center; text-align: center; background: rgba(142, 107, 255, .18); border: 1px solid rgba(142, 107, 255, .45); }
@@ -198,8 +198,8 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .pastilla { display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 999px; background: rgba(34, 27, 44, .78); border: 1px solid var(--vidrio-borde); font-size: 14px; font-weight: 800; color: var(--t-texto-suave); }
 .pastilla b { color: var(--t-texto); font-size: 16px; font-weight: 900; }
 .pastilla.oro b { color: var(--t-oro); text-shadow: 0 0 10px rgba(255, 209, 102, .55); }
-.panel { position: relative; margin: 12px 0; padding: 6px 4px; border-radius: 24px; background: var(--vidrio); border: 1px solid var(--vidrio-borde);
-  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 14px 36px rgba(0, 0, 0, .35); }
+.panel { position: relative; margin: 12px 0; padding: 6px 4px; border-radius: 24px; background: rgba(34, 27, 44, .78); border: 1px solid var(--vidrio-borde);
+  box-shadow: 0 14px 36px rgba(0, 0, 0, .35); }
 .panel.brilla { border-color: rgba(169, 139, 255, .5); box-shadow: var(--brillo); }
 .lista { list-style: none; padding: 0; margin: 0; }
 .fila { display: flex; align-items: center; gap: 10px; }
@@ -387,8 +387,7 @@ body.teclado .rapidos { max-height: 0; opacity: 0; padding-top: 0; padding-botto
 body.enCharla #vista { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .charla { display: flex; flex-direction: column; flex: 1; min-height: 0; }
 #mensajes { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 16px;
-  margin: 0 -16px; padding: 14px 16px 12px; scrollbar-width: none;
-  -webkit-mask-image: linear-gradient(transparent, #000 16px, #000 calc(100% - 12px), transparent); mask-image: linear-gradient(transparent, #000 16px, #000 calc(100% - 12px), transparent); }
+  margin: 0 -16px; padding: 14px 16px 12px; scrollbar-width: none; }
 #mensajes::-webkit-scrollbar { display: none; }
 #mensajes > :first-child { margin-top: auto; }
 .msg.liz + .msg.el, .msg.el + .msg.liz { margin-top: 8px; }
@@ -408,7 +407,8 @@ body.charlaChica .bienvenida .liz2d.sin { width: 50px; height: 50px; margin-bott
 .bienvenida .comic .txt { display: block; }
 body.charlaChica .bienvenida .comic { margin: 0 0 14px 8px; font-size: 14px; padding: 10px 14px; }
 body.charlaChica .bienvenida .comic .txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.msg { display: flex; align-items: flex-end; gap: 8px; animation: aparece .35s var(--suave) both; }
+.msg { display: flex; align-items: flex-end; gap: 8px; }
+.msg.nuevo { animation: aparece .35s var(--suave) both; }
 .msg .lizFoto { width: 34px; flex: none; border-width: 1.5px; box-shadow: 0 0 12px rgba(169, 139, 255, .4); }
 .msg .burbuja { max-width: 80%; padding: 13px 17px; border-radius: 22px; font-weight: 700; font-size: 16.5px; line-height: 1.42; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.liz .burbuja { background: linear-gradient(170deg, #fbf6ff, #ece2fb); color: #2a1f3a; border-bottom-left-radius: 6px; box-shadow: 0 0 0 2px rgba(169, 139, 255, .45), 0 8px 20px rgba(0, 0, 0, .35); }
@@ -456,7 +456,7 @@ body.charlaChica .bienvenida .comic .txt { white-space: nowrap; overflow: hidden
 #menu .caraMenu { width: 27px; height: 27px; border-width: 1.5px; box-shadow: 0 0 10px rgba(169, 139, 255, .5); }
 #menu button.activo .caraMenu { transform: translateY(-2px) scale(1.12); box-shadow: 0 0 0 2px rgba(255, 255, 255, .5), 0 0 14px rgba(169, 139, 255, .9); }
 #menu .punto { position: absolute; top: 3px; right: calc(50% - 24px); min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--magenta); color: #fff; font-size: 12px; line-height: 20px; font-weight: 900; box-shadow: 0 0 12px rgba(142, 107, 255, .7); }
-#velo { position: fixed; inset: 0; z-index: 40; background: rgba(6, 4, 10, .66); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: fundido .25s; }
+#velo { position: fixed; inset: 0; z-index: 40; background: rgba(6, 4, 10, .7); animation: fundido .25s; }
 #hoja { position: fixed; left: 0; right: 0; bottom: 0; z-index: 41; max-height: 90vh; overflow-y: auto; margin: 0 auto; max-width: 640px;
   background: linear-gradient(170deg, #31283f, #1b1622); border-radius: 30px 30px 0 0; border: 1px solid rgba(169, 139, 255, .35); border-bottom: 0;
   padding: 10px calc(18px + var(--der)) calc(20px + var(--abajo)) calc(18px + var(--izq)); box-shadow: 0 -14px 44px rgba(0, 0, 0, .55), 0 0 30px rgba(142, 107, 255, .15); animation: sube .4s var(--suave); }
@@ -602,7 +602,7 @@ body.enCharla::after { height: calc(var(--zocaloCharla, calc(var(--zocalo) + 70p
 #escribirLiz { bottom: calc(var(--zocalo) + 10px); z-index: 29; }
 .fab { bottom: calc(var(--zocalo) + 16px); z-index: 29; }
 #aviso { bottom: calc(var(--zocalo) + 14px); }
-#mensajes { padding-top: 16px; -webkit-mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 10px), transparent); mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 10px), transparent); }
+#mensajes { padding-top: 16px; }
 :root { --barra: 30px; }
 body::before { display: none; }
 #cabeza { position: fixed; top: 0; left: 0; right: 0; z-index: 36; margin: 0; min-height: 0; height: calc(var(--arriba) + var(--barra));
@@ -649,7 +649,7 @@ body.desplazado::before { opacity: 1; }
 #menu { bottom: calc(var(--sobreRayita) + var(--abajoEf)); }
 body::after { display: none !important; }
 #app, body.enCharla #app { bottom: calc(var(--zocalo) + 4px); }
-#app { padding-bottom: 14px; -webkit-mask-image: linear-gradient(#000 calc(100% - 14px), transparent); mask-image: linear-gradient(#000 calc(100% - 14px), transparent); }
+#app { padding-bottom: 14px; }
 #micro { inset: 0; height: 100%; }
 #escribirLiz { bottom: calc(var(--zocalo) + 10px); }
 .fab { bottom: calc(var(--zocalo) + 16px); }
@@ -675,8 +675,7 @@ html { background: #0c0a10; }
 .msg .burbuja { padding: 10px 14px; border-radius: 19px; font-size: 14.5px; line-height: 1.45; }
 .msg .hora { margin-top: 3px; font-size: 10px; letter-spacing: .02em; }
 .msg.liz .burbuja, .bienvenida .comic {
-  background: linear-gradient(160deg, rgba(44, 33, 74, .78), rgba(24, 22, 52, .74)); color: #ebe6f5;
-  -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2);
+  background: linear-gradient(160deg, rgba(44, 33, 74, .86), rgba(24, 22, 52, .83)); color: #ebe6f5;
   border: 1px solid rgba(160, 140, 255, .5);
   box-shadow: 0 0 12px rgba(140, 120, 255, .22), inset 0 0 14px rgba(110, 190, 255, .06), 0 8px 20px rgba(0, 0, 0, .35); }
 .msg.liz .burbuja { border-bottom-left-radius: 6px; }
@@ -725,8 +724,8 @@ body.charlaChica .bienvenida .comic { font-size: 13px; }
 .pomoFila > span:first-child { font-weight: 800; }
 .pomoPaso { display: inline-flex; align-items: center; gap: 10px; } .pomoPaso b { min-width: 28px; text-align: center; font-size: 18px; }
 .pomoPaso button { width: 38px; height: 38px; border-radius: 12px; font-size: 20px; font-weight: 900; background: rgba(169, 139, 255, .14); border: 1px solid var(--vidrio-borde); color: var(--t-texto); }
-.comic { background: linear-gradient(160deg, rgba(44, 33, 74, .84), rgba(24, 22, 52, .8)); color: #ebe6f5;
-  -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); border: 1px solid rgba(160, 140, 255, .5);
+.comic { background: linear-gradient(160deg, rgba(44, 33, 74, .9), rgba(24, 22, 52, .87)); color: #ebe6f5;
+  border: 1px solid rgba(160, 140, 255, .5);
   box-shadow: 0 0 12px rgba(140, 120, 255, .22), inset 0 0 14px rgba(110, 190, 255, .06), 0 8px 20px rgba(0, 0, 0, .35); }
 .comic b { color: #cdb8ff; }
 .comic small, .acerca .comic.secreto small { color: #b9a6ff; }
@@ -749,3 +748,26 @@ body.charlaChica .bienvenida .comic { font-size: 13px; }
 .respAn .r b { flex: none; color: var(--t-texto); font-weight: 900; min-width: 58px; }
 .compacta .lista li.lineaCerebro { padding: 0 14px 9px 56px; margin-top: -4px; font-size: 12px; font-weight: 600; color: var(--t-texto-suave); line-height: 1.3; }
 .compacta .lista li.lineaCerebro[hidden] { display: none; }
+body::after { content: ''; display: block !important; position: fixed; left: 0; right: 0; top: auto; bottom: calc(var(--zocalo) + 4px); height: 14px; z-index: 27;
+  pointer-events: none; background: linear-gradient(to bottom, rgba(12, 10, 16, 0), rgba(12, 10, 16, .97)); }
+body.enCharla::after, body.cargando::after, body:not(:has(#menu:not([hidden])))::after { display: none !important; }
+.charla { position: relative; }
+.bordeMsg { position: relative; z-index: 3; flex: none; height: 0; pointer-events: none; }
+.bordeMsg::after { content: ''; position: absolute; left: -16px; right: -16px; top: 0; height: 10px; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(23, 17, 28, .96), rgba(23, 17, 28, 0)); }
+.charla::after { content: ''; position: absolute; left: -16px; right: -16px; bottom: 0; height: 10px; z-index: 3; pointer-events: none;
+  background: linear-gradient(to bottom, rgba(12, 10, 16, 0), rgba(12, 10, 16, .96)); }
+#micro { overflow: hidden; background: url(../img/campo-oscuro.svg) center top / cover no-repeat; }
+#micro .flota { position: absolute; display: block; height: auto; opacity: .4; will-change: transform, opacity; user-select: none; -webkit-user-drag: none; }
+#micro .f1 { width: 96px; right: 5%; top: 31%; animation: flotaA 88s ease-in-out infinite, brillaA 27s ease-in-out infinite; }
+#micro .f2 { width: 116px; left: 3%; top: 57%; animation: flotaB 104s ease-in-out infinite, brillaB 33s ease-in-out infinite; }
+#micro .f3 { width: 74px; left: 14%; top: 12%; animation: flotaC 96s ease-in-out infinite, brillaA 31s ease-in-out infinite; }
+#micro .f4 { width: 90px; right: 11%; bottom: 13%; animation: flotaD 118s ease-in-out infinite, brillaB 24s ease-in-out infinite; }
+@keyframes flotaA { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 35% { transform: translate(-18px, 26px) rotate(22deg); } 70% { transform: translate(12px, 40px) rotate(-12deg); } }
+@keyframes flotaB { 0%, 100% { transform: translate(0, 0) rotate(-8deg); } 40% { transform: translate(22px, -20px) rotate(10deg); } 75% { transform: translate(8px, 18px) rotate(-20deg); } }
+@keyframes flotaC { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 30% { transform: translate(16px, 14px) rotate(-18deg); } 65% { transform: translate(-10px, 30px) rotate(12deg); } }
+@keyframes flotaD { 0%, 100% { transform: translate(0, 0) rotate(6deg); } 45% { transform: translate(-24px, -18px) rotate(-16deg); } 80% { transform: translate(-6px, 14px) rotate(14deg); } }
+@keyframes brillaA { 0%, 100% { opacity: .3; } 50% { opacity: .52; } }
+@keyframes brillaB { 0%, 100% { opacity: .46; } 50% { opacity: .26; } }
+body.quieto #micro .flota { animation: none; }
+.icoLinea { width: 22px; height: 22px; fill: none; stroke: var(--especial); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }

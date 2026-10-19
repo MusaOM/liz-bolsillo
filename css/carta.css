@@ -1,0 +1,29 @@
+
+.carta { --serif: 'Iowan Old Style', 'Palatino Linotype', Palatino, 'Book Antiqua', Baskerville, Georgia, 'Times New Roman', serif;
+  position: relative; overflow: hidden; margin: 24px 0 10px; padding: 48px 24px 54px; border-radius: 28px; text-align: center;
+  background: radial-gradient(ellipse 120% 70% at 50% 0%, rgba(64, 44, 104, .62), rgba(25, 18, 37, .92) 60%, rgba(14, 10, 20, .97));
+  border: 1px solid rgba(169, 139, 255, .3); box-shadow: inset 0 0 50px rgba(142, 107, 255, .12), 0 16px 40px rgba(0, 0, 0, .4); }
+.carta .cartaArte { position: absolute; left: 0; right: 0; aspect-ratio: 400 / 260; pointer-events: none; opacity: .62;
+  background-repeat: no-repeat; background-size: 100% 100%; }
+.carta .cartaArte.arriba { top: 0; background-image: url(../img/quimica-arriba.svg); }
+.carta .cartaArte.abajo { bottom: 0; background-image: url(../img/quimica-abajo.svg); }
+.carta .sinapsis { position: absolute; height: 10px; margin-top: -5px; transform-origin: 0 50%; }
+.carta .sinapsis b { position: absolute; left: -5px; top: 0; width: 100%; height: 10px; opacity: 0; will-change: transform, opacity;
+  background: radial-gradient(circle at 5px 5px, rgba(255, 246, 255, .98) 0, rgba(222, 200, 255, .65) 2.2px, rgba(169, 139, 255, 0) 5px) no-repeat;
+  animation: sinapsis 10s linear infinite; }
+@keyframes sinapsis { 0% { transform: translateX(0); opacity: 0; } 14% { opacity: 1; } 82% { opacity: 1; } 100% { transform: translateX(100%); opacity: 0; } }
+.carta .cartaTitulo { position: relative; display: block; margin: 0; padding: 0; font: italic 400 27px/1.2 var(--serif); letter-spacing: .02em; text-transform: none;
+  color: #f4edff; text-shadow: 0 0 18px rgba(169, 139, 255, .45), 0 1px 10px rgba(14, 10, 20, .9); }
+.carta .cartaTitulo::after { content: none; display: none; }
+.carta .cartaAdorno { position: relative; width: 132px; height: 1px; margin: 16px auto 28px; background: linear-gradient(90deg, transparent, rgba(205, 184, 255, .75), transparent); }
+.carta .cartaAdorno::before { content: ''; position: absolute; left: 50%; top: -3.5px; width: 7px; height: 7px; margin-left: -3.5px; transform: rotate(45deg);
+  border: 1px solid rgba(205, 184, 255, .8); background: #1d1529; }
+.carta .cartaPoema { position: relative; font: 400 17.5px/1.45 var(--serif); letter-spacing: .005em; color: #efe7fa; text-shadow: 0 1px 12px rgba(14, 10, 20, .95); }
+.carta .estrofa { margin: 0 0 1.55em; }
+.carta .estrofa:last-child { margin-bottom: 0; }
+.carta .verso { display: block; margin: 0 0 .5em; }
+.carta .verso:last-child { margin-bottom: 0; }
+@media (max-width: 430px) { .carta { padding-left: 18px; padding-right: 18px; } .carta .cartaPoema { font-size: 16.5px; } }
+.carta .cartaFirma { position: relative; margin: 32px 0 0; font: italic 400 20px/1.3 var(--serif); color: #dccfff; text-shadow: 0 0 14px rgba(169, 139, 255, .4), 0 1px 10px rgba(14, 10, 20, .9); }
+body.quieto .carta .sinapsis b { animation: none; opacity: 0; }
+@media (prefers-reduced-motion: reduce) { .carta .sinapsis b { animation: none !important; opacity: 0 !important; } }

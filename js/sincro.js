@@ -38,17 +38,48 @@
     if (!E.sucios[tabla].includes(f.id)) E.sucios[tabla].push(f.id);
     return f;
   }
+  // (19-oct-2026, "el celular se siente pegado") Los repasos AGRUPADOS POR TARJETA (un Map tarjeta → sus repasos). Antes, para saber el
+  // estado de UNA tarjeta se recorrían TODOS los repasos (con 500 tarjetas y 5.000 repasos: 2,5 millones de vueltas cada vez que se
+  // calculaba "lo que toca hoy"). El índice se arma una vez, se actualiza al agregar un repaso (aquí o al bajarlo de la nube) y, si algo
+  // cambió por otro camino, revisarIndice lo nota (la cuenta no cuadra) y se rehace solo. Vive aparte (WeakMap): E no cambia de forma.
+  const indices = typeof WeakMap === 'function' ? new WeakMap() : null;
+  function sumarAlIndice(ix, r) { const l = ix.mapa.get(r.tarjeta_id); if (l) l.push(r); else ix.mapa.set(r.tarjeta_id, [r]); ix.n++; }
+  function indice(E) {
+    let ix = indices && indices.get(E.repasos);
+    if (!ix) {
+      ix = { mapa: new Map(), n: 0 };
+      for (const r of Object.values(E.repasos)) sumarAlIndice(ix, r);
+      if (indices) indices.set(E.repasos, ix);
+    }
+    return ix;
+  }
+  const olvidarIndice = (E) => { if (indices && E.repasos) indices.delete(E.repasos); };
+  // (lo llama la app una vez por pintado: barato, y así nunca queda un índice viejo)
+  function revisarIndice(E) {
+    asegurar(E);
+    const ix = indices && indices.get(E.repasos);
+    if (ix && ix.n !== Object.keys(E.repasos).length) olvidarIndice(E);
+  }
+  function alIndice(E, f, habia) {
+    if (!indices) return;
+    const ix = indices.get(E.repasos);
+    if (!ix) return;
+    if (habia) olvidarIndice(E); else sumarAlIndice(ix, f);
+  }
   // Algo que solo se AGREGA (un repaso, un aviso que sonó)
   function agregar(E, tabla, fila) {
     asegurar(E);
     const f = Object.assign({ id: Nucleo.uuid() }, fila);
+    const habia = !!E[tabla][f.id];
     E[tabla][f.id] = f;
     E[AGREGAR[tabla]].push(f.id);
+    if (tabla === 'repasos') alIndice(E, f, habia);
     return f;
   }
   // Un repaso hecho AQUÍ
   const repasar = (E, tarjetaId, resultado, dispositivo, fecha) => agregar(E, 'repasos', { tarjeta_id: tarjetaId, resultado, fecha: fecha || Date.now(), dispositivo });
-  const repasosDe = (E, tarjetaId) => Object.values(E.repasos).filter((r) => r.tarjeta_id === tarjetaId);
+  // (la lista es la del índice: no se modifica; estadoDe hace su propia copia para ordenarla)
+  const repasosDe = (E, tarjetaId) => (indices ? indice(E).mapa.get(tarjetaId) || [] : Object.values(E.repasos).filter((r) => r.tarjeta_id === tarjetaId));
   const estado = (E, t) => Nucleo.estadoDe(t, repasosDe(E, t.id));
 
   const NUMEROS = ['actualizado', 'creada', 'borrado_en', 'fecha', 'cuando', 'hecho', 'ocurrencia', 'tamano'];
@@ -74,6 +105,7 @@
         if (AGREGAR[tabla]) {
           if (E[tabla][f.id]) continue;
           E[tabla][f.id] = f;
+          if (tabla === 'repasos') alIndice(E, f, false);
           if (tabla === 'repasos') { r.repasosBajados++; if (f.dispositivo !== opc.dispositivo) r.repasosDeOtro++; }
           else r.avisosBajados++;
           continue;
@@ -117,7 +149,7 @@
       if (!ids.length) continue;
       if (tabla === 'tarjetas') {
         const reps2 = Object.values(E.repasos).filter((x) => ids.includes(x.tarjeta_id)).map((x) => x.id);
-        if (reps2.length) { await cli.borrar('repasos', reps2); for (const id of reps2) delete E.repasos[id]; }
+        if (reps2.length) { await cli.borrar('repasos', reps2); for (const id of reps2) delete E.repasos[id]; olvidarIndice(E); }
       }
       if (cli.alBorrar) await cli.alBorrar(tabla, ids.map((id) => E[tabla][id]));      // (archivos: también del almacenamiento)
       await cli.borrar(tabla, ids);
@@ -187,5 +219,5 @@
     };
   }
 
-  return { TABLAS, OPCIONALES, AGREGAR, vacio, asegurar, cambiar, agregar, repasar, repasosDe, estado, sincronizar, clienteSupabase, servidorDePrueba };
+  return { TABLAS, OPCIONALES, AGREGAR, vacio, asegurar, cambiar, agregar, repasar, repasosDe, estado, revisarIndice, sincronizar, clienteSupabase, servidorDePrueba };
 });

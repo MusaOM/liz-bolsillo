@@ -68,6 +68,7 @@
   // ---------- Guardar aquí y sincronizar ----------
   let tGuardar = 0, tSincro = 0;
   function guardarLocal() {
+    olvidarCalculos();          // (cambió algo: lo que toca hoy y el ánimo se vuelven a calcular en el próximo pintado)
     if (DEMO) return;
     clearTimeout(tGuardar);
     tGuardar = setTimeout(() => Almacen.guardar(K + 'E', E).catch((e) => console.warn('No pude guardar', e)), 250);
@@ -77,7 +78,9 @@
   // bloquea el iPhone justo después, iOS congela la app y el servidor nunca se enteraba (y el aviso no llegaba).
   function subirYa() { clearTimeout(tSincro); guardarLocal(); return sincronizar('ya'); }
   const porSubir = () => E.pendientes.length + Sincro.TABLAS.reduce((s, t) => s + (E.sucios[t] || []).length, 0) + (E.pendAvisos || []).length;
-  function cambio() { guardarLocal(); pedirSincro(); pintar(); }
+  // (19-oct-2026) Al cambiar un dato se repinta SUAVE (sin la animación de entrada de toda la pantalla, y en la charla sin rehacer los
+  // mensajes): antes cada cambio repintaba todo desde cero
+  function cambio() { guardarLocal(); pedirSincro(); pintarSuave(true); }
   // (prueba 17) Una sincronización nunca se queda "pegada": si iOS cortó la conexión con la app en segundo plano, una promesa podía no
   // terminar nunca y "sincronizando" quedaba en true para siempre (ya no se sincronizaba nada hasta cerrar la app). Tope: 40 s.
   let sincroDesde = 0;
@@ -111,6 +114,7 @@
       if (mazoPendiente && E.mazos[mazoPendiente] && !E.mazos[mazoPendiente].borrado_en && vista === 'mazos') { mazoAbierto = mazoPendiente; mazoPendiente = null; pintar(); }
       if (motivo === 'abrir') setTimeout(revisarExamenPasado, 1200);
       if (motivo === 'abrir') setTimeout(revisarAnimoDia, 1800);            // (21-oct-2026: ya se sabe si lo marcó en la compu)
+      if (motivo === 'abrir') setTimeout(revisarCartaAniversario, 2600);    // (19-oct-2026: el aniversario, con la carta ya al día)
       if (r.cambiosDe.animo && $('#hoja:not([hidden]) .caritas') && Animo.deHoy(E).length) cerrarHoja(null);   // (lo marcó en la compu)
     } catch (e) {
       ultimoError = String(e && e.message || e);
@@ -171,7 +175,8 @@
         if (r.data) imgs[n.replace(/\.webp$/, '')] = await aDataURL(r.data);
       }
       if (Object.keys(imgs).length) {
-        liz2d = imgs;
+        soltar(liz2d);
+        liz2d = cortas(imgs);
         await Almacen.guardar(K + 'liz2d', imgs);
         perfil.liz2dV = l2.v;
         pintarFijas();
@@ -187,7 +192,8 @@
         if (r.data) imgs[animo] = await aDataURL(r.data);
       }
       if (Object.keys(imgs).length) {
-        animos = imgs;
+        soltar(animos);
+        animos = cortas(imgs);
         await Almacen.guardar(K + 'animos', imgs);
         perfil.animosV = an.v;
         pintarSuave();
@@ -202,7 +208,8 @@
         if (r.data) clips[g] = { url: await aDataURL(r.data), ms: Number(ge.duracion && ge.duracion[g]) || 2000 };
       }
       if (Object.keys(clips).length) {
-        gestos = clips;
+        soltar(gestos);
+        gestos = clipsCortos(clips);
         await Almacen.guardar(K + 'gestos', clips);
         perfil.gestosV = ge.v;
       }
@@ -210,12 +217,39 @@
     // (21-oct-2026) Lo que manda la PC en privado: las frases de cariño, la dedicatoria, quién la creó y a quién sugerir si necesita apoyo
     const lc = data.datos && data.datos.lizCelular;
     // (prueba 17) + las FECHAS ESPECIALES: antes no se copiaban aquí, así que en el iPhone de verdad nunca salía el saludo especial (solo en ?demo)
+    // (19-oct-2026) + la CARTA (el poema de su creadora, privado: solo llega aquí, por la nube privada) y el nombre de su dueño
     if (lc) perfil.lizc = { frases: lc.frasesCarino || null, dedicatoria: lc.dedicatoria || '', creadora: lc.creadora || '', apoyo: lc.apoyo || '', masculino: lc.masculino !== false,
-      fechas: Array.isArray(lc.fechas) ? lc.fechas : [] };
+      fechas: Array.isArray(lc.fechas) ? lc.fechas : [], carta: lc.carta && self.LizCarta && LizCarta.valida(lc.carta) ? lc.carta : null, dueno: lc.dueno || '' };
     Almacen.guardar(K + 'perfil', perfil);
   }
   const aDataURL = (blob) => new Promise((ok, mal) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = mal; f.readAsDataURL(blob); });
-  function ponerFoto(url) { document.documentElement.style.setProperty('--liz', 'url("' + url + '")'); document.body.classList.remove('sin-foto'); }
+  // (19-oct-2026, "el celular se siente pegado") Las fotos de Liz se GUARDAN en el celular como texto (data:…;base64, decenas o cientos de
+  // KB cada una) y antes iban así, ENTERAS, dentro del HTML de cada pantalla: la charla con 60 mensajes llevaba 60 copias (~2 MB de texto)
+  // que el iPhone tenía que leer en cada pintado. Ahora cada foto se convierte UNA vez en una dirección corta (blob:…) y esa va en el HTML.
+  function urlCorta(u) {
+    if (typeof u !== 'string' || !u.startsWith('data:') || !window.URL || !URL.createObjectURL) return u;
+    try {
+      const coma = u.indexOf(','), cab = u.slice(5, coma), datos = u.slice(coma + 1);
+      const bin = /;base64/i.test(cab) ? atob(datos) : decodeURIComponent(datos);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return URL.createObjectURL(new Blob([bytes], { type: cab.split(';')[0] || 'application/octet-stream' }));
+    } catch (e) { return u; }
+  }
+  const cortas = (m) => { const o = {}; for (const [k, v] of Object.entries(m || {})) o[k] = urlCorta(v); return o; };
+  const clipsCortos = (m) => { const o = {}; for (const [k, v] of Object.entries(m || {})) if (v) o[k] = Object.assign({}, v, { url: urlCorta(v.url) }); return o; };
+  // Las direcciones de antes se sueltan (memoria) un rato después, cuando ya no las usa ninguna pantalla
+  function soltar(m) {
+    const l = Object.values(m || {}).map((v) => (typeof v === 'string' ? v : v && v.url)).filter((u) => typeof u === 'string' && u.startsWith('blob:'));
+    if (l.length) setTimeout(() => { for (const u of l) URL.revokeObjectURL(u); }, 15000);
+  }
+  let fotoPerfil = '';
+  function ponerFoto(url) {
+    const corta = urlCorta(url);
+    if (fotoPerfil && fotoPerfil !== corta) soltar({ f: fotoPerfil });
+    fotoPerfil = corta;
+    document.documentElement.style.setProperty('--liz', 'url("' + corta + '")'); document.body.classList.remove('sin-foto');
+  }
 
   // ---------- (Liz 1.0 · prueba 17, al final) VERSIÓN NUEVA: la app cambia SOLA ----------
   // Los archivos se sirven primero desde lo guardado (así abre sin internet). Antes, al publicar una versión nueva, la primera vez que se
@@ -256,9 +290,9 @@
       perfil = (await Almacen.leer(K + 'perfil')) || perfil;
       const img = await Almacen.leer(K + 'liz-img');
       if (img) ponerFoto(img);
-      liz2d = (await Almacen.leer(K + 'liz2d')) || {};
-      animos = (await Almacen.leer(K + 'animos')) || {};
-      gestos = (await Almacen.leer(K + 'gestos')) || {};
+      liz2d = cortas(await Almacen.leer(K + 'liz2d'));          // (19-oct-2026: direcciones cortas, ver urlCorta)
+      animos = cortas(await Almacen.leer(K + 'animos'));
+      gestos = clipsCortos(await Almacen.leer(K + 'gestos'));
       charla = (await Almacen.leer(K + 'charla')) || [];
       pintarFijas();
     } catch (e) { console.warn('Almacén', e); }
@@ -309,6 +343,8 @@
     setTimeout(revisarAnimoDia, 7000);
     setTimeout(revisarCarino, 9000);
     setInterval(revisarCarino, 10 * MIN);
+    setTimeout(revisarCartaAniversario, 6000);                 // (19-oct-2026: también sin internet, con lo guardado; y si el día empieza con la app abierta)
+    setInterval(revisarCartaAniversario, 10 * MIN);
     setInterval(() => sincronizar('auto'), 5 * MIN);
     setInterval(() => { if (vista === 'hoy' || vista === 'agenda' || vista === 'recordatorios') pintarSuave(); }, 60000);
   }
@@ -371,6 +407,7 @@
   function pintarVista(v) {
     try { PINTA[vista](v); } catch (e) {
       console.error('Pantalla ' + vista + ':', e);
+      v.__partes = null;
       v.innerHTML = '<div class="panel" style="padding:18px;text-align:center"><p style="margin:0 0 6px;font-weight:800">Ups, esta pantalla no se pudo dibujar.</p>' +
         '<p class="suave" style="margin:0 0 12px;font-size:13px">' + esc(String((e && e.message) || e).slice(0, 160)) + '</p>' +
         '<button class="bt prin" data-a="ir" data-v="' + esc(vista) + '">Intentar de nuevo</button> <button class="bt" data-a="ir" data-v="hoy">Ir a Hoy</button></div>';
@@ -378,13 +415,11 @@
   }
   function pintar() {
     const v = $('#vista');
+    olvidarCalculos();
+    v.__partes = null;                                                                // (se dibuja entera: ver ponerHTML)
     v.classList.remove('vista'); void v.offsetWidth; v.classList.add('vista');      // (la animación de entrada, suave)
     pintarVista(v);
-    // (21-oct-2026) Arriba, el nombre de la pantalla, chiquito y a la izquierda (sin la foto redonda); en la charla no hace falta (ahí
-    // está Liz saludando con su globito)
-    const titulo = vista === 'mazos' && mazoAbierto && E.mazos[mazoAbierto] ? 'Mazo' : TITULOS[vista];
-    $('#tituloVista').textContent = vista === 'charla' ? '' : titulo;
-    document.title = 'LIZ · ' + titulo;
+    pintarTitulo();
     $('#escribirLiz').hidden = vista !== 'charla';
     document.body.classList.toggle('enCharla', vista === 'charla');      // (la barra de arriba fija, solo en la charla)
     if (vista !== 'charla') ajustarTeclado();
@@ -393,41 +428,75 @@
     pintarMenu();
     if (vista === 'charla') abajoCharla();
   }
-  // Repintar sin la animación de entrada (cuando solo cambió la hora o llegó algo)
-  function pintarSuave() {
-    if (document.querySelector('#hoja:not([hidden])') || respondiendo || (vista === 'repasar' && sesion && sesion.escrito)) return;
+  // (21-oct-2026) Arriba, el nombre de la pantalla, chiquito y a la izquierda (sin la foto redonda); en la charla no hace falta (ahí
+  // está Liz saludando con su globito)
+  function pintarTitulo() {
+    const titulo = vista === 'mazos' && mazoAbierto && E.mazos[mazoAbierto] ? 'Mazo' : TITULOS[vista];
+    const t = vista === 'charla' ? '' : titulo;
+    if ($('#tituloVista').textContent !== t) $('#tituloVista').textContent = t;
+    document.title = 'LIZ · ' + titulo;
+  }
+  // Repintar sin la animación de entrada (cuando solo cambió la hora o llegó algo). forzar (lo usa cambio(), cuando él cambió algo): también
+  // con una hoja abierta (la pantalla de atrás queda al día) o mientras escribe una respuesta (como antes con pintar(): lo escrito se conserva)
+  function pintarSuave(forzar) {
+    if (!forzar && (document.querySelector('#hoja:not([hidden])') || respondiendo || (vista === 'repasar' && sesion && sesion.escrito))) return;
+    olvidarCalculos();
     if (vista === 'charla') { pintarCarita(); pintarMenu(); return; }    // (la charla no se repinta sola: se perdería lo que escribe)
     const v = $('#vista');
     v.classList.remove('vista');
     pintarVista(v);
+    pintarTitulo();
     pintarCarita();
     pintarMenu();
   }
+  // (19-oct-2026, "el celular se siente pegado") Repintar SIN tocar lo que no cambió: se arma el HTML nuevo y se reemplazan SOLO las partes
+  // de primer nivel que cambiaron (si nada cambió, no se toca nada). Así, al repintar cada minuto (por la hora) o al sincronizar, la foto de
+  // Liz y su globito no vuelven a "aparecer" (sus animaciones no se reinician) y el iPhone no redibuja la pantalla entera. Lo usan las
+  // pantallas que se repintan solas (Hoy, Agenda, Más). pintar() (al cambiar de pantalla) siempre dibuja todo de nuevo.
+  function ponerHTML(v, html) {
+    const plantilla = document.createElement('template');
+    plantilla.innerHTML = html;
+    const nuevos = [...plantilla.content.childNodes];
+    const partes = nuevos.map((n) => (n.nodeType === 1 ? n.outerHTML : n.textContent));
+    const antes = v.__partes;
+    if (antes && v.__partesDe === vista && antes.length === partes.length && v.childNodes.length === partes.length) {
+      const viejos = [...v.childNodes];
+      partes.forEach((p, i) => { if (p !== antes[i]) v.replaceChild(nuevos[i], viejos[i]); });
+    } else {
+      v.textContent = '';
+      v.append(...nuevos);
+    }
+    v.__partes = partes;
+    v.__partesDe = vista;
+  }
   // Un enlace a una pantalla (lo usan los avisos al tocarlos): #hoy, #repasar, #charla, #agenda, #recordatorios, #archivos, #mazo=<id>
   function irPorEnlace(h) {
-    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro)$|^mazo=([\w-]+)$/);
+    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro|carta)$|^mazo=([\w-]+)$/);
     if (!m) return false;
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    if (m[1] === 'carta') { abrirCarta(); return true; }        // (19-oct-2026) Acerca de Liz, justo en la carta
     // (21-oct-2026) Si el mazo todavía no llegó (el aviso "Ya te hice N tarjetas" puede llegar antes que la sincronización), se abre al llegar
     if (m[2]) { if (!E.mazos[m[2]]) { mazoPendiente = m[2]; ir('mazos'); return true; } vista = 'mazos'; ir('mazos'); mazoAbierto = m[2]; pintar(); return true; }
     ir(m[1]);
     return true;
   }
   function pintarMenu() {
-    const n = Org.paraRepasar(E, { soloHoy: true }).length;
+    const n = tocanHoy().length;
     const b = document.querySelector('#menu [data-v=estudiar]');
     let p = b.querySelector('.punto');
     if (n) { if (!p) { p = document.createElement('i'); p.className = 'punto'; b.appendChild(p); } p.textContent = n > 99 ? '99+' : n; }
     else if (p) p.remove();
     // (20-oct-2026) Un puntito en la pestaña Liz si ella escribió algo en la charla (la pregunta después de un examen)
     if (vista === 'charla') avisoCharla = false;
-    try { localStorage.setItem('liz-aviso-charla', avisoCharla ? '1' : '0'); } catch (e) {}
+    if (avisoGuardado !== avisoCharla) { avisoGuardado = avisoCharla; try { localStorage.setItem('liz-aviso-charla', avisoCharla ? '1' : '0'); } catch (e) {} }
     const bc = document.querySelector('#menu [data-v=charla]');
     let pc = bc && bc.querySelector('.punto');
     if (bc && avisoCharla && !pc) { pc = document.createElement('i'); pc.className = 'punto'; pc.textContent = '1'; bc.appendChild(pc); }
     else if (pc && !avisoCharla) pc.remove();
-    if (navigator.setAppBadge) (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
+    // (19-oct-2026: solo si cambió; antes se escribía en cada pintado)
+    if (navigator.setAppBadge && n !== insigniaPuesta) { insigniaPuesta = n; (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {}); }
   }
+  let avisoGuardado = null, insigniaPuesta = null;
   function hace(ms) {
     const s = Math.round((Date.now() - ms) / 1000);
     if (s < 60) return 'recién';
@@ -463,7 +532,7 @@
   }
   // ---------- (Liz 1.0 · prueba 14) FECHAS ESPECIALES y el HORARIO: lo que Liz dice según el momento ----------
   // Las fechas llegan PRIVADAS desde la compu (perfiles/<perfil>/fechas-especiales.json → perfil.lizc.fechas): nunca están en esta página.
-  // Ese día, su saludo de Hoy y de la charla es el de la fecha (el aviso "LIZ 💜" lo manda el servidor: supabase/avisos.sql).
+  // Ese día, su saludo de Hoy y de la charla es el de la fecha (el aviso "LIZ" lo manda el servidor: supabase/avisos.sql).
   let fechasDemo = null;
   const fechasEsp = () => (perfil.lizc && Array.isArray(perfil.lizc.fechas) ? perfil.lizc.fechas : fechasDemo || []);
   function tiempoDe(f, ms) { const n = N.enCR(ms).y - Number(String(f.fecha).slice(0, 4)); return n === 1 ? '1 año' : n + ' años'; }
@@ -523,21 +592,35 @@
   // ---------- (20-oct-2026) Liz: la FOTO de su cara (avatar 3D, privada) con su ánimo de ahora ----------
   // contenta (lo normal), feliz (racha o muchos aciertos), pensativa (muchas tarjetas), tierna (falló mucho), dormida (de noche o
   // si no hay nada), sorprendida (examen cerca). Sin fotos de ánimo todavía: la foto de siempre (--liz) o la placa de Petri.
-  function animoHoy() {
-    if (animoForzado) return animoForzado;
+  // (19-oct-2026, "el celular se siente pegado") Lo que CUESTA calcular —las tarjetas que tocan hoy y el ánimo de Liz— se calcula UNA vez
+  // por pintado y se reusa (antes: una vez por cada mensaje de la charla, por cada mazo y por cada parte de la pantalla; con 500 tarjetas
+  // la charla con 60 mensajes recalculaba el repaso 60 veces). Se olvida al pintar de nuevo, cuando cambia algo (guardarLocal) o a los 20 s.
+  let calc = null;
+  const olvidarCalculos = () => { calc = null; };
+  function calculos() {
+    const ahora = Date.now();
+    if (calc && ahora - calc.ms < 20000) return calc;
+    if (Sincro.revisarIndice) Sincro.revisarIndice(E);
+    const tocan = Org.paraRepasar(E, { soloHoy: true }, ahora);
+    calc = { ms: ahora, tocan, animo: null };
+    calc.animo = calcularAnimo(tocan.length, ahora);
+    return calc;
+  }
+  const tocanHoy = () => calculos().tocan;
+  function animoHoy() { return animoForzado || calculos().animo; }
+  function calcularAnimo(tocan, ahora) {
     // (21-oct-2026) Si él marcó cómo se siente hoy, Liz lo acompaña: tierna si está triste, estresado, ansioso o cansado; pensativa
     // (tranquila, sin bromas) si está enojado; feliz si está feliz (de noche, igual medio dormida)
     const suyo = Animo ? Animo.animoLiz(Animo.deHoy(E)) : null;
     if (suyo && suyo !== 'feliz') return suyo;
-    const ahora = Date.now(), h = N.enCR(ahora).h;
+    const h = N.enCR(ahora).h;
     if (suyo === 'feliz' && !(h >= 22 || h < 5)) return 'feliz';
+    if (h >= 22 || h < 5) return 'dormida';
     const reps = Object.values(E.repasos);
     const hoyR = reps.filter((r) => r.fecha >= N.inicioDiaCR(ahora));
     const malHoy = hoyR.filter((r) => r.resultado !== 'bien').length;
-    const tocan = Org.paraRepasar(E, { soloHoy: true }).length;
     const ex = Ag.proximosExamenes(E, ahora)[0];
     const agendaHoy = Ag.delDia(E, ahora).filter((x) => !x.hecho && x.ms > ahora).length;
-    if (h >= 22 || h < 5) return 'dormida';
     if (ex && ex.cuando - ahora <= 3 * DIA) return 'sorprendida';
     if (hoyR.length >= 5 && malHoy / hoyR.length >= 0.5) return 'tierna';
     if (N.racha(reps) >= 3 || hoyR.length - malHoy >= 10) return 'feliz';
@@ -612,13 +695,15 @@
     const el = $('#entrar .escenaEntrar');
     if (el) el.innerHTML = '<div class="aura"></div>' + lizImg('saludo', 'g', 'respira');
   }
-  const ICONO = { evento: '📅', recordatorio: '⏰', examen: '📝', parcial: '📝', entrega: '📦', quiz: '📝', clase: '🎓', especial: '💜' };
+  // (19-oct-2026) La fecha especial: un ícono fino de línea (un corazón dibujado), no un emoji
+  const ICONO_ESPECIAL = '<svg class="icoLinea" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 19.6s-6.9-4.3-6.9-9.6A3.9 3.9 0 0 1 12 7.4a3.9 3.9 0 0 1 6.9 2.6c0 5.3-6.9 9.6-6.9 9.6z"/></svg>';
+  const ICONO = { evento: '📅', recordatorio: '⏰', examen: '📝', parcial: '📝', entrega: '📦', quiz: '📝', clase: '🎓', especial: ICONO_ESPECIAL };
   const COLOR = { evento: 'celeste', recordatorio: 'oro', examen: 'rosa', parcial: 'rosa', entrega: 'rosa', quiz: 'rosa', clase: 'verde', especial: 'rosa' };
   const tipoDe = (x) => (x.tabla === 'examenes' ? 'examen' : x.tipo);
   function filaAgenda(x, conDia, linea, conBorrar) {
     const sub = [];
     // (prueba 14) Una fecha especial: solo se ve (no se edita aquí). Una clase: con su hora de fin y su aula; tocarla abre "Mi horario"
-    if (x.tabla === 'especial') return '<li><div class="item especialFila"><div class="ico rosa">💜</div><span class="txt"><b>' + esc(x.titulo) + '</b><small>Fecha especial</small></span></div></li>';
+    if (x.tabla === 'especial') return '<li><div class="item especialFila"><div class="ico rosa">' + ICONO_ESPECIAL + '</div><span class="txt"><b>' + esc(x.titulo) + '</b><small>Fecha especial</small></span></div></li>';
     const hora = N.horaCR(x.ms) + (x.fin ? '–' + N.horaCR(x.fin) : '');
     if (x.tipo === 'clase') {
       if (!linea) sub.push('<span class="hora">' + hora + '</span>');
@@ -644,7 +729,7 @@
   // ---------- HOY: la foto de Liz grande (con su ánimo), su globito debajo, y lo del día ----------
   function pintarHoy(v) {
     const ahora = Date.now();
-    const tocan = Org.paraRepasar(E, { soloHoy: true });
+    const tocan = tocanHoy();
     const total = Org.vivos(E.tarjetas).length;
     const reps = Object.values(E.repasos);
     const racha = N.racha(reps);
@@ -663,7 +748,7 @@
     // (prueba 14) Fecha especial, en clase, después de clases o con un rato libre: su globito lo dice; y los pomodoros de hoy y la semana
     const mom = carino ? null : momentoLiz(ahora, tocan.length);
     const pomo = Ag.pomodoros(E, ahora), pomoVivo = pomoEstado();
-    v.innerHTML =
+    ponerHTML(v,      // (19-oct-2026: solo cambia lo que cambió; ver ponerHTML)
       '<div class="heroe"><div class="placa"></div><div class="placa chica"></div><span class="animo">' + TEXTO_ANIMO[animo] + '</span>' +
       '<div class="marcoFoto respira"><div class="aura"></div>' + fotoLiz(animo, 'grande') + '</div>' +
       globoHoy(frasesDeHoy({ carino, mom, tocan, msg, racha })) + '</div>' +
@@ -683,7 +768,7 @@
       '<h3>Hoy, ' + esc(N.fechaTxt(ahora, { weekday: 'long', month: undefined, day: 'numeric' })) + '</h3>' +
       (hoyAg.length ? '<div class="panel tiempo"><ul class="lista">' + hoyAg.map((x) => filaAgenda(x, false, true)).join('') + '</ul></div>' : '<p class="suave" style="margin:0 6px">Nada en tu agenda hoy. 🌙</p>') +
       (exs.length > 1 ? '<h3>Se vienen</h3><div class="panel"><ul class="lista">' + exs.slice(1, 4).map((x) => filaAgenda({ tabla: 'examenes', id: x.id, ms: x.cuando, titulo: N.nombreExamen(x).replace(/^(el|la) /, ''), tipo: x.que, fila: x }, true)).join('') + '</ul></div>' : '') +
-      (!total ? '<button class="bt prin grande" style="margin-top:14px" data-a="nuevaTarjeta">➕ Crear mi primera tarjeta</button>' : '');
+      (!total ? '<button class="bt prin grande" style="margin-top:14px" data-a="nuevaTarjeta">➕ Crear mi primera tarjeta</button>' : ''));
   }
 
   // ---------- (Liz 1.0 · prueba 15) LA BURBUJA DE HOY: UNA sola frase ----------
@@ -865,7 +950,7 @@
   let respondiendo = false;
   function pintarRepasar(v) {
     if (!sesion) {
-      const hoy = Org.paraRepasar(E, { soloHoy: true }).length, favs = Org.paraRepasar(E, { favoritas: true }).length;
+      const hoy = tocanHoy().length, favs = Org.paraRepasar(E, { favoritas: true }).length;
       const difs = Org.paraRepasar(E, { dificiles: true }).length, todas = Org.vivos(E.tarjetas).length;
       const op = (a, ic, color, t, n, sub2) => '<li><button class="item" data-a="' + a + '"' + (n ? '' : ' disabled style="opacity:.45"') + '><span class="ico ' + color + '">' + ic + '</span><span class="txt"><b>' + t + '</b>' +
         (sub2 ? '<small>' + sub2 + '</small>' : '') + '</span><span class="num">' + n + '</span><span class="chev">›</span></button></li>';
@@ -1058,7 +1143,7 @@
       sesion.txtFin = F.frase(perfecto ? 'finPerfecto' : 'fin', { bien: sesion.bien, total: sesion.primeras, nombre: perfil.nombre });
       if (sesion.bien / sesion.primeras >= 0.7) { setTimeout(() => confeti(40), 200); sonar('fin'); }
     }
-    const quedan = Org.paraRepasar(E, { soloHoy: true }).length;
+    const quedan = tocanHoy().length;
     const bueno = sesion.bien / sesion.primeras >= 0.6;
     v.innerHTML = '<div class="heroeFin"><div class="aura"></div><div class="placa"></div>' + lizImg(bueno ? 'feliz' : 'animo', 'g', 'salta') +
       '<div class="comic cola-der">' + esc(sesion.txtFin) + '</div><div class="degrade"></div></div>' +
@@ -1125,7 +1210,7 @@
     const hoy0 = N.inicioDiaCR(Date.now());
     const atrasados = Ag.rango(E, hoy0 - 60 * DIA, hoy0).filter((x) => x.tabla === 'recordatorios' && !x.hecho && !x.repite && x.ms < ini);
     const filaRec = (x, conDia) => filaAgenda(x, conDia, false, true);
-    v.innerHTML = escena('saludo', fija('pAg', 'pAgenda')) + '<div class="segFila">' + segAgenda(ag.modo) + '<button class="horarioBt toque" data-a="miHorario">🎓 Mi horario</button></div>' +
+    ponerHTML(v, escena('saludo', fija('pAg', 'pAgenda')) + '<div class="segFila">' + segAgenda(ag.modo) + '<button class="horarioBt toque" data-a="miHorario">🎓 Mi horario</button></div>' +
       '<div class="mesCab"><button data-a="agendaMover" data-d="-1" aria-label="Antes">‹</button><strong>' + esc(cab) + '</strong><button data-a="agendaMover" data-d="1" aria-label="Después">›</button></div>' +
       '<div class="leyenda"><span><i class="tipoPunto t-examen"></i>Examen</span><span><i class="tipoPunto t-evento"></i>Evento</span><span><i class="tipoPunto t-recordatorio"></i>Recordatorio</span>' +
         (hayClases && ag.modo === 'semana' ? '<span><i class="tipoPunto t-clase"></i>Clase</span>' : '') + (fechasEsp().length ? '<span><i class="tipoPunto t-especial"></i>Especial</span>' : '') + '</div>' +
@@ -1136,12 +1221,12 @@
       (atrasados.length ? '<p class="suave subRec">Sin hacer de días anteriores</p><div class="panel"><ul class="lista">' + atrasados.map((x) => filaRec(x, true)).join('') + '</ul></div>' : '') +
       (recs.length ? '<div class="panel"><ul class="lista">' + recs.map((x) => filaRec(x, ag.modo === 'semana')).join('') + '</ul></div>'
         : '<p class="suave nadaDia">' + (ag.modo === 'mes' ? 'No hay recordatorios este día.' : 'No hay recordatorios esta semana.') + ' Toca ＋ para crear uno.</p>') +
-      '<div class="espacioFab"></div><button class="fab" data-a="nuevoAgenda" aria-label="Agregar">＋</button>';
+      '<div class="espacioFab"></div><button class="fab" data-a="nuevoAgenda" aria-label="Agregar">＋</button>');
   }
 
   // (21-oct-2026, Liz 1.3) Estudiar: "Repasar · Mazos", como el selector de la Agenda (cambia al instante, sin salir de la pestaña)
   function segEstudiar(on) {
-    const n = Org.paraRepasar(E, { soloHoy: true }).length;
+    const n = tocanHoy().length;
     const s = pomoEstado();
     return '<div class="seg estudiar"><button class="' + (on === 'repasar' ? 'on' : '') + '" data-a="modoEstudio" data-m="repasar">Repasar' +
       (n ? ' <span class="punto-n">' + n + '</span>' : '') + '</button><button class="' + (on === 'mazos' ? 'on' : '') + '" data-a="modoEstudio" data-m="mazos">Mazos</button></div>' +
@@ -1193,11 +1278,18 @@
 
   // ---------- MAZOS ----------
   const COLORES_MATERIA = ['#a98bff', '#4cc9f0', '#7cf29a', '#ffd166', '#cdb4ff', '#6f5cae'];   // (sin rosados: los de la PC)
-  function filaMazo(m) {
-    const ts = Org.vivos(E.tarjetas).filter((t) => t.mazo_id === m.id);
-    const hoy = Org.paraRepasar(E, { mazo: m.id, soloHoy: true }).length;
+  // (19-oct-2026) Las cuentas de cada mazo (tarjetas y las de hoy) se hacen UNA vez para todos (cuentasMazos), no una vez por mazo
+  function cuentasMazos() {
+    const tarjetas = {}, hoy = {};
+    for (const t of Org.vivos(E.tarjetas)) tarjetas[t.mazo_id] = (tarjetas[t.mazo_id] || 0) + 1;
+    for (const x of tocanHoy()) hoy[x.t.mazo_id] = (hoy[x.t.mazo_id] || 0) + 1;
+    return { tarjetas, hoy };
+  }
+  function filaMazo(m, c) {
+    c = c || cuentasMazos();
+    const n = c.tarjetas[m.id] || 0, hoy = c.hoy[m.id] || 0;
     return '<li><button class="item" data-a="abrirMazo" data-id="' + esc(m.id) + '"><span class="ico">' + (m.archivo ? '📄' : '🗂️') + '</span><span class="txt"><b>' + esc(m.nombre) +
-      '</b><small>' + ts.length + ' tarjetas' + (m.archivo ? ' · ' + esc(m.archivo) : '') + '</small></span>' +
+      '</b><small>' + n + ' tarjetas' + (m.archivo ? ' · ' + esc(m.archivo) : '') + '</small></span>' +
       (hoy ? '<span class="punto-n">' + hoy + '</span>' : '') + '<span class="chev">›</span></button></li>';
   }
   function filaTarjeta(t) {
@@ -1227,6 +1319,7 @@
     const huerfanos = Org.vivos(E.mazos).filter((m) => (!E.materias[m.materia_id] || E.materias[m.materia_id].borrado_en) && !Org.archivadoX(m));
     // (21-oct-2026: las rondas de favoritas y difíciles viven en Repasar; los archivados, en Más → Archivados)
     const hay = arbol.length || huerfanos.length;
+    const cm = cuentasMazos();
     v.innerHTML = segEstudiar('mazos') + (hay ? escena('microscopio', fija('pMaz', 'pMazos')) : '') +
       // (21-oct-2026, Liz 1.3) Las DOS formas de crear tarjetas, juntas arriba: pegar un texto o subir un archivo (PDF, Word, PowerPoint o fotos)
       '<div class="crear"><button class="subir mitad toque" data-a="pegarTexto"><span class="e">📋</span><span class="txt"><b>Pegar texto</b><span>Te hago tarjetas con lo que pegues</span></span></button>' +
@@ -1236,15 +1329,18 @@
       '<div id="resBusca"></div><div id="arbol">' +
       (arbol.length || huerfanos.length ? arbol.map((x, i) => '<div class="materiaCab" style="color:' + COLORES_MATERIA[i % COLORES_MATERIA.length] + '"><span class="bola"></span><b style="color:var(--t-texto)">' +
         esc(x.materia.nombre) + '</b><button class="bt chico" data-a="menuMateria" data-id="' + esc(x.materia.id) + '" aria-label="Opciones de la materia">⋯</button></div>' +
-        '<div class="panel"><ul class="lista">' + (x.mazos.length ? x.mazos.map((m) => filaMazo(m.mazo)).join('') : '<li class="suave" style="padding:12px 16px">Sin mazos</li>') + '</ul></div>').join('') +
-        (huerfanos.length ? '<div class="materiaCab"><span class="bola"></span><b>Sin materia</b></div><div class="panel"><ul class="lista">' + huerfanos.map(filaMazo).join('') + '</ul></div>' : '')
+        '<div class="panel"><ul class="lista">' + (x.mazos.length ? x.mazos.map((m) => filaMazo(m.mazo, cm)).join('') : '<li class="suave" style="padding:12px 16px">Sin mazos</li>') + '</ul></div>').join('') +
+        (huerfanos.length ? '<div class="materiaCab"><span class="bola"></span><b>Sin materia</b></div><div class="panel"><ul class="lista">' + huerfanos.map((m) => filaMazo(m, cm)).join('') + '</ul></div>' : '')
         : vacio('dormida', fija('vMaz', 'vMazos'))) +
       '<div class="acciones" style="grid-template-columns:1fr 1fr 1fr"><button class="bt chico" data-a="nuevaMateria">＋ Materia</button><button class="bt chico" data-a="nuevoMazo">＋ Mazo</button><button class="bt chico" data-a="nuevaTarjeta">＋ Tarjeta</button></div></div>';
     const inp = $('#buscar');
-    inp.addEventListener('input', () => { buscando = inp.value; pintarBusqueda(); });
+    // (19-oct-2026) Busca 150 ms después de la última letra (antes, en CADA letra se recorrían todas las tarjetas)
+    let tBusca = 0;
+    inp.addEventListener('input', () => { buscando = inp.value; clearTimeout(tBusca); tBusca = setTimeout(pintarBusqueda, 150); });
     pintarBusqueda();
   }
   function pintarBusqueda() {
+    if (!$('#arbol')) return;            // (ya se fue de Mazos)
     const r = buscando.trim() ? Org.buscar(E, buscando) : null;
     $('#arbol').hidden = !!r;
     $('#resBusca').innerHTML = r ? (r.length ? '<h3>' + r.length + ' encontradas</h3><div class="panel"><ul class="lista">' + r.slice(0, 80).map(filaTarjeta).join('') + '</ul></div>'
@@ -1269,8 +1365,9 @@
 
   // ---------- PROGRESO ----------
   function duracion(ms) { const m = Math.round(ms / MIN); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : ''); }
-  function lasQueCuestan() {
-    return Org.vivos(E.tarjetas).filter((t) => Org.activa(E, t)).map((t) => ({ t, e: Sincro.estado(E, t) })).map((x) => Object.assign(x, { s: x.e.fallos * 2 + x.e.medios - x.e.aciertos }))
+  // (estados: el estado de cada tarjeta ya calculado en Progreso, para no calcularlo dos veces)
+  function lasQueCuestan(estados) {
+    return Org.vivos(E.tarjetas).filter((t) => Org.activa(E, t)).map((t) => ({ t, e: (estados && estados.get(t.id)) || Sincro.estado(E, t) })).map((x) => Object.assign(x, { s: x.e.fallos * 2 + x.e.medios - x.e.aciertos }))
       .filter((x) => x.e.fallos > 0 && x.s > 0).sort((a, b) => b.s - a.s).slice(0, 5);
   }
   function pintarProgreso(v) {
@@ -1283,7 +1380,8 @@
     const semana = N.tiempoPorMateria(reps.filter((r) => r.fecha >= lunes), materiaDeTarjeta);
     const siempre = N.tiempoPorMateria(reps, materiaDeTarjeta);
     const maxS = Math.max(1, ...Object.values(siempre));
-    const cuesta = lasQueCuestan();
+    const estados = new Map(Org.vivos(E.tarjetas).map((t) => [t.id, Sincro.estado(E, t)]));
+    const cuesta = lasQueCuestan(estados);
     const porMat = {};
     for (const r of reps) { const m = materiaDeTarjeta(r.tarjeta_id); const p = (porMat[m] = porMat[m] || { mal: 0, total: 0 }); p.total++; if (r.resultado !== 'bien') p.mal++; }
     const matDificil = Object.entries(porMat).filter(([, p]) => p.total >= 5).sort((a, b) => b[1].mal / b[1].total - a[1].mal / a[1].total)[0];
@@ -1293,7 +1391,7 @@
     for (const t of Org.vivos(E.tarjetas)) {
       if (Org.sabida(t)) cajas[5]++;
       else if (Org.archivada(E, t)) archivadas++;
-      else cajas[Math.min(5, Math.max(1, Sincro.estado(E, t).caja)) - 1]++;
+      else cajas[Math.min(5, Math.max(1, estados.get(t.id).caja)) - 1]++;
     }
     const maxC = Math.max(1, ...cajas);
     const racha = N.racha(reps);
@@ -1356,7 +1454,9 @@
       '<div class="nombreLiz">LIZ</div><div class="verLiz">' + esc(V.texto) + '</div>' +
       // (21-oct-2026) La autora, con su nombre completo; la dedicatoria (privada, llega de la PC) se queda igual
       '<p class="autoraLiz">Creada por <b>' + esc(V.autora) + '</b></p>' +
-      '<p class="dedica">' + esc(lc.dedicatoria || 'Creada con mucho cariño 💜') + '</p><p class="queEs">Tu compañera de estudio y microbióloga junior.</p></div>' +
+      '<p class="dedica">' + esc(lc.dedicatoria || 'Creada con mucho cariño') + '</p><p class="queEs">Tu compañera de estudio y microbióloga junior.</p></div>' +
+      // (19-oct-2026) La CARTA: justo debajo de Liz, quién la creó y la dedicatoria (js/carta.js arma la sección; el texto llega privado)
+      (lc.carta && self.LizCarta ? LizCarta.html(lc.carta, { para: lc.dueno || perfil.nombre || '', de: lc.creadora || '', id: 'secCarta' }) : '') +
       // (Liz 1.0 · prueba 14) Lo nuevo de esta actualización y "Tu privacidad" (version.js: lo mismo que en la compu)
       (V.loNuevoCelular ? '<h3 id="secNuevo">🆕 Lo nuevo en esta versión</h3><div class="panel"><ul class="nuevo">' + V.loNuevoCelular.cosas.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' : '') +
       '<h3>✨ Lo que trae Liz ' + esc(V.liz) + '</h3><div class="panel"><ul class="nuevo">' + V.novedades.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' +
@@ -1369,6 +1469,33 @@
       '<p class="derechos">' + esc(V.derechos) + '</p>';
     $('#fotoSecreto', v).onclick = tocarSecreto;
   }
+  // (19-oct-2026) Abrir "Acerca de Liz" justo en la CARTA (el enlace #carta y el botón del mensaje del aniversario)
+  function abrirCarta() {
+    ir('acerca');
+    const bajar = () => { const s = $('#secCarta'), a = $('#app'); if (s && a) a.scrollTo({ top: Math.max(0, s.getBoundingClientRect().top - a.getBoundingClientRect().top + a.scrollTop - 14), behavior: 'auto' }); };
+    setTimeout(bajar, 80);
+    setTimeout(bajar, 500);
+  }
+  // (19-oct-2026) EL ANIVERSARIO (la fecha especial "aniversario" de fechas-especiales.json, privada): ese día, además del aviso "LIZ" que
+  // manda el servidor, Liz deja UN mensaje en la charla con un botón que abre la carta. Una sola vez por año (queda anotado en "avisos",
+  // que se sincroniza). Fuera de esa fecha, Liz no la menciona sola.
+  function revisarCartaAniversario() {
+    const lc = perfil.lizc || {};
+    if (!lc.carta || !E.usuario) return false;
+    const ahora = Date.now(), hoy = fechasDelDia(ahora);
+    const f = hoy.find((x) => x.id === 'aniversario') || hoy.find((x) => x.sorpresa);
+    if (!f || N.enCR(ahora).h < (Number(f.hora) || 0)) return false;
+    const clave = 'carta:' + N.enCR(ahora).y;
+    if (Object.values(E.avisos || {}).some((a) => a && a.clave === clave)) return false;
+    Sincro.agregar(E, 'avisos', { clave, ocurrencia: ahora, dispositivo: DISP, presente: true, fecha: ahora });
+    guardarLocal();
+    pedirSincro();
+    agregarMsg({ quien: 'liz', animo: 'tierna', texto: (lc.creadora || 'Alguien') + ' te dejó algo. Está en Acerca de Liz → Para ' + (lc.dueno || perfil.nombre || ''),
+      extra: { html: '<button class="bt chico prin" data-a="abrirCarta">Abrir</button>' } });
+    avisoCharla = vista !== 'charla';
+    pintarMenu();
+    return true;
+  }
   function tocarSecreto() {
     const ahora = Date.now();
     secretoToques = secretoToques.filter((t) => ahora - t < 2500).concat(ahora);
@@ -1380,7 +1507,7 @@
     if (!s) return;
     try { localStorage.setItem('liz-secreto-vistos', String(s.vistos)); localStorage.setItem('liz-secreto-ultimo', s.t); } catch (e) {}
     const g = $('#secretoGlobo');
-    g.innerHTML = esc(s.t) + '<small>— un secreto de ' + esc(creadoraCel()) + ' 💜</small>';
+    g.innerHTML = esc(s.t) + '<small>— un secreto de ' + esc(creadoraCel()) + '</small>';
     g.hidden = false;
     g.classList.remove('pop');
     void g.offsetWidth;
@@ -1414,7 +1541,7 @@
     // sonido, reducir movimiento, sincronización y, al final, la cuenta: su correo, o "Modo de prueba" en ?demo) y ACERCA DE LIZ sola,
     // con la carita de Liz en un círculo como ícono. Ya no existe "Tu Liz y tu cuenta". Debajo, la versión y "Cerrar sesión".
     const cara = '<span class="ico icoLiz">' + fotoLiz('contenta') + '</span>';
-    v.innerHTML = escena('saludo', fija('pMas', 'pMas')) +
+    ponerHTML(v, escena('saludo', fija('pMas', 'pMas')) +
       grupo('Más opciones',
         fila('ir', '📈', 'verde', 'Progreso', '', aV('progreso')) +
         fila('ir', '📚', 'celeste', 'Archivos', esperando ? esperando + ' esperando' : '', aV('archivos')) +
@@ -1433,7 +1560,7 @@
         '<li><div class="item"><span class="ico">✉️</span><span class="txt"><b>Cuenta</b></span><span class="dato correo">' + esc(DEMO ? 'Modo de prueba' : perfil.correo || '—') + '</span></div></li>') +
       '<div class="panel compacta soloAcerca"><ul class="lista"><li><button class="item" data-a="ir" data-v="acerca">' + cara + '<span class="txt"><b>Acerca de Liz</b></span><span class="chev">›</span></button></li></ul></div>' +
       '<p class="versionLiz">' + esc(V.larga) + ' · © ' + esc(V.fecha.slice(0, 4)) + ' ' + esc(V.autora) + '</p>' +
-      (sinSesion ? '<button class="bt salirBt" data-a="volverEntrar">🔑 Volver a entrar</button>' : '<button class="bt salirBt" data-a="salir">Cerrar sesión</button>');
+      (sinSesion ? '<button class="bt salirBt" data-a="volverEntrar">🔑 Volver a entrar</button>' : '<button class="bt salirBt" data-a="salir">Cerrar sesión</button>'));
   }
   function pintarPapelera(v) {
     const l = Org.papelera(E);
@@ -1865,11 +1992,14 @@
   const RAPIDOS = [['hoy', '📅 ¿Qué me toca hoy?'], ['explica', '🔬 Explícame algo'], ['animo', '💪 Ánimo para el examen'], ['pegar', '📋 Hazme tarjetas de esto']];
   let pensandoCharla = false;
   const horaMsg = (ms) => N.horaCR(ms);
-  function burbuja(m) {
+  // (19-oct-2026) La foto de Liz se arma UNA vez y se pasa (antes cada mensaje volvía a calcular su ánimo); "nuevo" = el mensaje que
+  // acaba de llegar: SOLO ese entra con su animación (antes, al repintar, los 60 volvían a "aparecer" a la vez)
+  function burbuja(m, foto, nuevo) {
     const extra = m.extra ? '<span class="extra">' + m.extra.html + '</span>' : '';
+    const cl = nuevo ? ' nuevo' : '';
     return m.quien === 'liz'
-      ? '<div class="msg liz">' + fotoLiz(animoHoy()) + '<div class="burbuja">' + esc(m.texto) + extra + '<span class="hora">' + horaMsg(m.fecha) + '</span></div></div>'
-      : '<div class="msg el"><div class="burbuja">' + esc(m.texto) + '<span class="hora">' + horaMsg(m.fecha) + '</span></div></div>';
+      ? '<div class="msg liz' + cl + '">' + (foto || fotoLiz(animoHoy())) + '<div class="burbuja">' + esc(m.texto) + extra + '<span class="hora">' + horaMsg(m.fecha) + '</span></div></div>'
+      : '<div class="msg el' + cl + '"><div class="burbuja">' + esc(m.texto) + '<span class="hora">' + horaMsg(m.fecha) + '</span></div></div>';
   }
   function pintarCharla(v) {
     const h = N.enCR(Date.now()).h;
@@ -1879,10 +2009,11 @@
     // (prueba 14) Una fecha especial o después de clases, el saludo de la charla es ese (si no está en clase: entonces el de siempre)
     const mom = momentoLiz(Date.now(), 0);
     if (mom && (mom.tipo === 'especial' || mom.tipo === 'tras')) fijas.charla = { k: h + perfil.nombre + an, txt: mom.t };
+    const foto = fotoLiz(an);
     v.innerHTML = '<div class="charla"><div class="bienvenida"><div class="marcoLiz"><div class="aura"></div>' + lizImg('saludo', 'c', 'respira') + '</div>' +
       '<div class="comic cola-izq"><span class="txt">' + esc(fijas.charla.txt) + '</span></div></div>' +
       '<div class="rapidos">' + RAPIDOS.map(([k, t]) => '<button class="chip toque" data-a="rapido" data-k="' + k + '">' + t + '</button>').join('') + '</div>' +
-      '<div id="mensajes">' + charla.slice(-60).map(burbuja).join('') + (pensandoCharla ? '<div class="msg liz" id="pensandoMsg">' + fotoLiz(animoHoy()) + '<div class="burbuja">' + PENSANDO + '</div></div>' : '') + '</div></div>';
+      '<div class="bordeMsg" aria-hidden="true"></div><div id="mensajes">' + charla.slice(-60).map((m) => burbuja(m, foto)).join('') + (pensandoCharla ? '<div class="msg liz" id="pensandoMsg">' + foto + '<div class="burbuja">' + PENSANDO + '</div></div>' : '') + '</div></div>';
   }
   // (21-oct-2026) Los mensajes se mueven DENTRO de #mensajes (la parte de arriba y la barra de escribir quedan fijas)
   function abajoCharla(suave) {
@@ -1911,7 +2042,11 @@
     void chica;
     document.body.classList.remove('charlaChica');
   }
-  document.addEventListener('scroll', (ev) => { if (ev.target && ev.target.id === 'mensajes') compactarCharla(); }, true);
+  // (19-oct-2026) Al desplazar la charla: como mucho una vez por cuadro (antes se medía la lista en CADA evento de desplazamiento)
+  let pedidoCompactar = 0;
+  document.addEventListener('scroll', (ev) => {
+    if (ev.target && ev.target.id === 'mensajes' && !pedidoCompactar) pedidoCompactar = requestAnimationFrame(() => { pedidoCompactar = 0; compactarCharla(); });
+  }, { capture: true, passive: true });
   if (window.ResizeObserver) {
     const ro = new ResizeObserver(() => { const m = $('#mensajes'); if (m && alFinal) m.scrollTop = m.scrollHeight; });
     new MutationObserver(() => { const m = $('#mensajes'); if (m && !m.dataset.visto) { m.dataset.visto = 1; ro.disconnect(); ro.observe(m); alFinal = true; } })
@@ -1923,7 +2058,7 @@
     charla = charla.concat(m).slice(-120);
     if (!DEMO) Almacen.guardar(K + 'charla', charla).catch(() => {});
     const caja = $('#mensajes');
-    if (vista === 'charla' && caja) { const p = $('#pensandoMsg'); if (p) p.remove(); caja.insertAdjacentHTML('beforeend', burbuja(m)); abajoCharla(); }
+    if (vista === 'charla' && caja) { const p = $('#pensandoMsg'); if (p) p.remove(); caja.insertAdjacentHTML('beforeend', burbuja(m, null, true)); abajoCharla(); }
     // A la nube (para que la PC lo sepa). (prueba 17) Si no se pudo (sin internet), queda marcado y sube en la próxima sincronización:
     // antes se perdía y la Liz de la compu nunca se enteraba de lo que hablaron sin internet.
     if (!DEMO) { m.pend = true; subirCharlaPendiente(); }
@@ -1945,13 +2080,13 @@
     const caja = $('#mensajes');
     if (!caja) return;
     const p = $('#pensandoMsg');
-    if (si && !p) { caja.insertAdjacentHTML('beforeend', '<div class="msg liz" id="pensandoMsg">' + fotoLiz(animoHoy()) + '<div class="burbuja">' + PENSANDO + '</div></div>'); abajoCharla(); gestoLiz('pensar'); }
+    if (si && !p) { caja.insertAdjacentHTML('beforeend', '<div class="msg liz nuevo" id="pensandoMsg">' + fotoLiz(animoHoy()) + '<div class="burbuja">' + PENSANDO + '</div></div>'); abajoCharla(); gestoLiz('pensar'); }
     if (!si && p) p.remove();
   }
   // Lo que la app sabe de su estudio ahora (va al cerebro como contexto)
   function contextoTexto() {
     const ahora = Date.now();
-    const tocan = Org.paraRepasar(E, { soloHoy: true });
+    const tocan = tocanHoy();
     const porMazo = {};
     for (const x of tocan) { const n = nombreMazo((x.t || E.tarjetas[x]).mazo_id); porMazo[n] = (porMazo[n] || 0) + 1; }
     const exs = Ag.proximosExamenes(E, ahora).slice(0, 4).map((x) => N.nombreExamen(x) + ' el ' + N.fechaTxt(x.cuando) + ' a las ' + N.horaCR(x.cuando));
@@ -2213,6 +2348,7 @@
     borrarRec: (d) => { if (!E.recordatorios[d.id]) return; Ag.borrar(E, 'recordatorios', d.id, DISP); avisar('A la papelera (lo recuperas en 30 días).'); cambio(); },
     irRecordatorios: () => { cerrarHoja(true); ir('recordatorios'); },
     globoSig: (d, b) => globoSiguiente(b),      // (prueba 15) la burbuja de Hoy: la siguiente frase
+    abrirCarta: () => abrirCarta(),             // (19-oct-2026) el botón del mensaje del aniversario
     // Pomodoro (prueba 14)
     pomoEmpezar: () => pomoEmpezar(), pomoPausar: () => pomoPausar(), pomoParar: () => pomoParar(), pomoSaltar: () => pomoSaltarDescanso(), pomoTiempos: () => hojaPomoTiempos(),
     // Mi horario (prueba 14)
@@ -2379,9 +2515,13 @@
     compactarCharla();
     if (cambio && abierto) abajoCharla(false);
   }
-  if (window.visualViewport) { visualViewport.addEventListener('resize', ajustarTeclado); visualViewport.addEventListener('scroll', ajustarTeclado); }
-  textoLiz.addEventListener('focus', () => setTimeout(ajustarTeclado, 350));
-  textoLiz.addEventListener('blur', () => setTimeout(ajustarTeclado, 350));
+  // (19-oct-2026, "el celular se siente pegado") Solo cuando el teclado CAMBIA de tamaño (resize; antes también con cada "scroll" de la vista,
+  // que iOS manda muchísimas veces), y como mucho una vez por cuadro (requestAnimationFrame)
+  let pedidoTeclado = 0;
+  const pedirTeclado = () => { if (!pedidoTeclado) pedidoTeclado = requestAnimationFrame(() => { pedidoTeclado = 0; ajustarTeclado(); }); };
+  if (window.visualViewport) visualViewport.addEventListener('resize', pedirTeclado);
+  textoLiz.addEventListener('focus', () => setTimeout(pedirTeclado, 350));
+  textoLiz.addEventListener('blur', () => setTimeout(pedirTeclado, 350));
   // (21-oct-2026, Liz 1.3) Que TODO vuelva a su lugar si iOS dejó la página corrida (pasaba a veces al cerrar el teclado: toda la app
   // subida y un espacio negro debajo del menú). La página no se puede desplazar (CSS); aquí se quita cualquier desfase que quede.
   // Mientras se escribe en un cuadro no se toca (iOS mueve la vista para mostrar el cuadro y eso está bien).
@@ -2405,11 +2545,8 @@
   function faltaAbajo() { if (!esInstalada()) return 0; const f = Math.round(altoPantalla() - innerHeight); return f > 2 && f < 160 ? f : 0; }
   function medirHueco(curar) {
     if (escribiendo() || tecladoAbierto) return;                                     // (con el teclado abierto, la vista es corta a propósito)
-    if (curar && faltaAbajo()) {
-      const app = $('#app'), y = app.scrollTop;
-      app.style.display = 'none'; void app.offsetHeight; app.style.display = ''; app.scrollTop = y;
-      setTimeout(() => medirHueco(false), 120);
-    }
+    // (19-oct-2026) Ya no se esconde y vuelve a mostrar #app para "reacomodar" (obligaba a redibujar toda la app): solo se vuelve a medir
+    if (curar && faltaAbajo()) setTimeout(() => medirHueco(false), 120);
     const h = faltaAbajo();
     if (h === hueco) return;
     hueco = h;
@@ -2427,9 +2564,26 @@
   // Subir al principio de la pantalla (cada pantalla se desplaza dentro de #app, no la página)
   function arribaDeTodo() { const a = $('#app'); if (a) a.scrollTop = 0; document.body.classList.remove('desplazado'); }
   // (21-oct-2026) El degradado de arriba solo aparece si la pantalla está desplazada (quieta, el fondo sigue de corrido hasta arriba)
-  $('#app').addEventListener('scroll', () => document.body.classList.toggle('desplazado', $('#app').scrollTop > 4), { passive: true });
-  const crecer = () => { textoLiz.style.height = 'auto'; textoLiz.style.height = Math.min(140, textoLiz.scrollHeight) + 'px'; ajustarTeclado(); };      // (la lista termina arriba de la barra, aunque crezca)
+  let pedidoDesplazado = 0;
+  $('#app').addEventListener('scroll', () => {
+    if (!pedidoDesplazado) pedidoDesplazado = requestAnimationFrame(() => { pedidoDesplazado = 0; document.body.classList.toggle('desplazado', $('#app').scrollTop > 4); });
+  }, { passive: true });
+  // (19-oct-2026) Al escribir, SOLO se ajusta el alto del cuadro (antes cada tecla recalculaba el teclado, la barra y dónde termina la lista).
+  // Solo se "encoge" si se borró texto; si el cuadro de verdad cambió de alto, la barra crece y entonces (no en cada tecla) se vuelve a
+  // medir dónde termina la lista (ResizeObserver, abajo).
+  let largoTexto = 0;
+  const crecer = () => {
+    const n = textoLiz.value.length;
+    if (n < largoTexto || !n) textoLiz.style.height = 'auto';
+    largoTexto = n;
+    const alto = Math.min(140, textoLiz.scrollHeight) + 'px';
+    if (textoLiz.style.height !== alto) textoLiz.style.height = alto;
+  };
   textoLiz.addEventListener('input', crecer);
+  if (window.ResizeObserver) {
+    let pedidoBarra = 0;
+    new ResizeObserver(() => { if (!pedidoBarra) pedidoBarra = requestAnimationFrame(() => { pedidoBarra = 0; medirCharla(); }); }).observe($('#escribirLiz'));
+  }
   textoLiz.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); $('#formLiz').requestSubmit(); } });
   $('#formLiz').addEventListener('submit', (ev) => {
     ev.preventDefault();
@@ -2599,8 +2753,25 @@
     const n = (v, d, a, b) => Math.min(b, Math.max(a, Math.round(Number(v) || d)));
     return { estudio: n(t.estudio, 25, 5, 90), descanso: n(t.descanso, 5, 1, 30), largo: n(t.largo, 15, 5, 45), cada: n(t.cada, 4, 2, 8) };
   }
-  function pomoEstado() { try { const s = JSON.parse(localStorage.getItem(POMO_K) || 'null'); return s && s.fase ? s : null; } catch (e) { return null; } }
-  function pomoGuardar(s) { try { if (s) localStorage.setItem(POMO_K, JSON.stringify(s)); else localStorage.removeItem(POMO_K); } catch (e) {} }
+  // (19-oct-2026) El estado se lee del celular UNA vez y queda en memoria (antes se leía y se descifraba cada segundo); se entrega una copia
+  let pomoMem;
+  function pomoEstado() {
+    if (pomoMem === undefined) { try { const s = JSON.parse(localStorage.getItem(POMO_K) || 'null'); pomoMem = s && s.fase ? s : null; } catch (e) { pomoMem = null; } }
+    return pomoMem ? Object.assign({}, pomoMem, { recs: (pomoMem.recs || []).slice() }) : null;
+  }
+  function pomoGuardar(s) {
+    pomoMem = s && s.fase ? Object.assign({}, s, { recs: (s.recs || []).slice() }) : null;
+    try { if (s) localStorage.setItem(POMO_K, JSON.stringify(s)); else localStorage.removeItem(POMO_K); } catch (e) {}
+    pomoAcomodarReloj();
+  }
+  // El reloj de cada segundo corre SOLO si hay un bloque de estudio o de descanso andando (en pausa, terminado o sin pomodoro: nada)
+  let pomoReloj = 0;
+  function pomoAcomodarReloj() {
+    const s = pomoMem;
+    const andando = !!s && s.pausa == null && (s.fase === 'estudio' || s.fase === 'descanso');
+    if (andando && !pomoReloj) pomoReloj = setInterval(pomoRevisar, 1000);
+    else if (!andando && pomoReloj) { clearInterval(pomoReloj); pomoReloj = 0; }
+  }
   const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
   function pomoQueda(s, ahora) { if (s.pausa != null) return s.pausa; return s.fase === 'estudio' ? s.fin - ahora : s.fase === 'descanso' ? s.finDesc - ahora : 0; }
   function pomoTxt(s) { const q = mmss(pomoQueda(s, Date.now())); return s.fase === 'estudio' ? q + (s.pausa != null ? ' en pausa' : ' estudiando') : s.fase === 'descanso' ? q + ' de descanso' : 'listo para otro'; }
@@ -2680,7 +2851,8 @@
     const t = pomoTiempos(), tot = s.fase === 'estudio' ? (s.minutos || t.estudio) * MIN : s.fase === 'descanso' ? (s.largo ? t.largo : t.descanso) * MIN : 1;
     return s.fase === 'espera' ? 1 : Math.min(1, Math.max(0, 1 - pomoQueda(s, ahora) / tot));
   }
-  setInterval(pomoRevisar, 1000);
+  pomoEstado();
+  pomoAcomodarReloj();
   function pintarPomodoro(v) {
     const s = pomoEstado(), t = pomoTiempos(), p = Ag.pomodoros(E), ahora = Date.now();
     const fase = !s ? 'listo' : s.fase;
@@ -2783,7 +2955,7 @@
     }
     if (tipo === 'probarAviso') return { error: 'en el modo de prueba no hay avisos' };
     const ultimo = lim((b.mensajes || []).slice(-1)[0].texto);
-    const tocan = Org.paraRepasar(E, { soloHoy: true }).length, ex = Ag.proximosExamenes(E, Date.now())[0];
+    const tocan = tocanHoy().length, ex = Ag.proximosExamenes(E, Date.now())[0];
     if (/toca hoy/.test(ultimo)) return { dice: 'Hoy te tocan ' + tocan + ' tarjetas, casi todas de Tinciones. Y ojo: ' + (ex ? N.nombreExamen(ex) + ' es ' + enDias(ex.cuando) : 'no tienes exámenes cerca') + '. ¿Empezamos con unas 5 ahorita?' };
     if (/recuerda/.test(ultimo)) return { dice: 'Listo, te lo anoto para mañana a las 3 de la tarde. 📝', recordatorio: { texto: 'Sacar las placas de agar', fecha: N.diaCR(Date.now() + DIA), hora: '15:00', repite: null } };
     if (/dormida|cansada|como estas/.test(ultimo)) return { dice: b.animo === 'dormida' ? 'Medio dormida, la verdad… 😴 ¡pero para ti me despierto! ¿Repasamos unas poquitas o ya a dormir?' : '¡Bien despierta y contenta de verte! ¿Qué hacemos?' };
@@ -2847,14 +3019,18 @@
   }
 
   arrancar();
-  self.LizApp = { estado: () => E, sincronizar, avisar, ir, foto: ponerFoto, liz2d: (m) => { liz2d = m || {}; pintarFijas(); pintarSuave(); }, empezar: () => A.repasarHoy(), voltear: () => A.voltear(), accion: (n) => A[n]({}), formAgenda,   // (para las pruebas y las fotos)
-    animos: (m) => { animos = m || {}; pintar(); }, gestos: (m) => { gestos = m || {}; }, gesto: (n) => { gestoHasta = 0; return gestoLiz(n); }, animo: (a) => { animoForzado = a || null; pintar(); }, enviar: enviarCharla, escribir: (t) => { A.escribirResp(); setTimeout(() => revisarEscrito(t), 100); },
+  self.LizApp = { estado: () => E, sincronizar, avisar, ir, foto: ponerFoto, liz2d: (m) => { liz2d = cortas(m); pintarFijas(); pintarSuave(); }, empezar: () => A.repasarHoy(), voltear: () => A.voltear(), accion: (n) => A[n]({}), formAgenda,   // (para las pruebas y las fotos)
+    animos: (m) => { animos = cortas(m); pintar(); }, gestos: (m) => { gestos = clipsCortos(m); }, gesto: (n) => { gestoHasta = 0; return gestoLiz(n); }, animo: (a) => { animoForzado = a || null; pintar(); }, enviar: enviarCharla, escribir: (t) => { A.escribirResp(); setTimeout(() => revisarEscrito(t), 100); },
     pegar: hojaPegar, hacerTarjetas: hacerTarjetasDeTexto,
     teclado: (px) => { tecladoSimulado = px || null; ajustarTeclado(); },      // (para las capturas: simula el teclado abierto)
     loNuevo: () => revisarLoNuevo(true),      // (para las fotos)
     avisosEncendidos: () => { avisosDemo = true; hojaAvisos(); },
     fechasDemo: (l) => { fechasDemo = l; pintarSuave(); },
+    // (19-oct-2026) para las pruebas y las fotos de la carta (SOLO en ?demo: un poema de prueba que trae la herramienta, nunca el de verdad)
+    cartaDemo: (c, para, de) => { if (!DEMO || !c) return false; perfil.lizc = Object.assign({}, perfil.lizc || {}, { carta: c, dueno: para || '', creadora: de || '' }); if (vista === 'acerca') pintar(); return true; },
+    revisarCarta: () => revisarCartaAniversario(),
     pomo: () => pomoEstado(),
+    pomoPoner: (s) => { pomoGuardar(s); pomoRevisar(); },      // (19-oct-2026: para las pruebas: "adelantar el reloj" del pomodoro; el estado vive en memoria)
     pantalla: (curar) => { medirHueco(curar); return { pantalla: altoPantalla(), vista: innerHeight, rayita: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--abajo')) || 0, hueco }; },   // (para las pruebas: ¿iOS midió la vista más corta?)
     // (21-oct-2026) ánimo, frases de cariño y el secreto (pruebas y capturas)
     enlace: (h) => irPorEnlace(h),      // (los avisos al tocarlos; para las pruebas)
