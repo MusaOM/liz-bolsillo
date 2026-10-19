@@ -36,7 +36,7 @@
   const ag = { modo: 'mes', ref: Date.now(), dia: N.inicioDiaCR(Date.now()) };
   let sincronizando = false, otraVez = false, ultimoError = '', sinSesion = false;
   const TITULOS = { hoy: 'Hoy', repasar: 'Estudiar', charla: 'Liz', agenda: 'Agenda', mazos: 'Estudiar', mas: 'Más', recordatorios: 'Agenda', archivos: 'Archivos',
-    progreso: 'Mi progreso', papelera: 'Papelera', acerca: 'Acerca de Liz', archivados: 'Archivados' };
+    progreso: 'Mi progreso', papelera: 'Papelera', acerca: 'Acerca de Liz', archivados: 'Archivados', pomodoro: 'Estudiar con Liz' };
   // (21-oct-2026) Cada cosa en UN solo lugar: Recordatorios vive en Agenda (pestaña "Recordatorios"); Archivados, en Más
   const DE_MAS = ['archivos', 'progreso', 'papelera', 'acerca', 'archivados'];
   const DE_AGENDA = ['recordatorios'];
@@ -247,10 +247,12 @@
     sincronizar('abrir');
   }
   function abrirApp() {
+    const yaUsada = !!E.ultimaSincro;          // (¿ya se había usado antes de abrir esta vez? → para "Lo nuevo")
     $('#entrar').hidden = true;
     $('#app').hidden = false;
     $('#menu').hidden = false;
     if (!irPorEnlace(location.hash)) pintar();
+    setTimeout(() => revisarLoNuevo(false, yaUsada), 3200);
     setTimeout(() => gestoLiz(deNoche() ? 'bostezo' : 'saludo'), 1900);     // (cuando ya se fue la pantalla de carga)
     // (21-oct-2026) "¿Cómo te sientes hoy?" (si no hay internet para saber si ya lo marcó en la compu) y, de vez en cuando, una frase de cariño
     setTimeout(revisarAnimoDia, 7000);
@@ -292,18 +294,27 @@
   // ---------- Navegar y pintar ----------
   function ir(v) {
     if (v === 'estudiar') v = sesion && !sesion.fin ? 'repasar' : modoEstudio();      // (una ronda a medias: vuelve a ella)
+    // (Liz 1.0 · prueba 14) Ya no hay pantalla "Recordatorios": todo enlace a ella (avisos, "Avisos" de Más) abre la Agenda en HOY y baja
+    // directo a su sección Recordatorios
+    let bajarARec = false;
+    if (v === 'recordatorios') { v = 'agenda'; bajarARec = true; ag.dia = N.inicioDiaCR(Date.now()); ag.ref = ag.dia; }
     if (DE_ESTUDIAR.includes(v)) { try { localStorage.setItem('liz-estudiar', v); } catch (e) {} }
     if (!PINTA[v]) v = 'hoy';
     vista = v;
     if (v !== 'mazos') { mazoAbierto = null; mazoPendiente = null; }
-    const tab = DE_MAS.includes(v) ? 'mas' : DE_AGENDA.includes(v) ? 'agenda' : DE_ESTUDIAR.includes(v) ? 'estudiar' : v;
+    const tab = DE_MAS.includes(v) ? 'mas' : DE_AGENDA.includes(v) ? 'agenda' : DE_ESTUDIAR.includes(v) || v === 'pomodoro' ? 'estudiar' : v;
     for (const b of document.querySelectorAll('#menu button')) b.classList.toggle('activo', b.dataset.v === tab);
     if (v !== 'charla') arribaDeTodo();
     enderezar();
     pintar();
+    if (bajarARec) { bajarARecordatorios(); setTimeout(bajarARecordatorios, 80); }      // (y otra vez cuando ya está dibujada del todo)
   }
-  const PINTA = { hoy: pintarHoy, repasar: pintarRepasar, charla: pintarCharla, agenda: pintarAgenda, mazos: pintarMazos, mas: pintarMas, recordatorios: pintarRecordatorios,
-    archivos: pintarArchivos, progreso: pintarProgreso, papelera: pintarPapelera, acerca: pintarAcerca, archivados: pintarArchivados };
+  function bajarARecordatorios() {
+    const s = $('#secRecordatorios'), a = $('#app');
+    if (s && a) a.scrollTo({ top: Math.max(0, s.getBoundingClientRect().top - a.getBoundingClientRect().top + a.scrollTop - 70), behavior: 'auto' });
+  }
+  const PINTA = { hoy: pintarHoy, repasar: pintarRepasar, charla: pintarCharla, agenda: pintarAgenda, mazos: pintarMazos, mas: pintarMas,
+    archivos: pintarArchivos, progreso: pintarProgreso, papelera: pintarPapelera, acerca: pintarAcerca, archivados: pintarArchivados, pomodoro: pintarPomodoro };
   function pintar() {
     const v = $('#vista');
     v.classList.remove('vista'); void v.offsetWidth; v.classList.add('vista');      // (la animación de entrada, suave)
@@ -333,7 +344,7 @@
   }
   // Un enlace a una pantalla (lo usan los avisos al tocarlos): #hoy, #repasar, #charla, #agenda, #recordatorios, #archivos, #mazo=<id>
   function irPorEnlace(h) {
-    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados)$|^mazo=([\w-]+)$/);
+    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro)$|^mazo=([\w-]+)$/);
     if (!m) return false;
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     // (21-oct-2026) Si el mazo todavía no llegó (el aviso "Ya te hice N tarjetas" puede llegar antes que la sincronización), se abre al llegar
@@ -349,6 +360,7 @@
     else if (p) p.remove();
     // (20-oct-2026) Un puntito en la pestaña Liz si ella escribió algo en la charla (la pregunta después de un examen)
     if (vista === 'charla') avisoCharla = false;
+    try { localStorage.setItem('liz-aviso-charla', avisoCharla ? '1' : '0'); } catch (e) {}
     const bc = document.querySelector('#menu [data-v=charla]');
     let pc = bc && bc.querySelector('.punto');
     if (bc && avisoCharla && !pc) { pc = document.createElement('i'); pc.className = 'punto'; pc.textContent = '1'; bc.appendChild(pc); }
@@ -387,6 +399,44 @@
     const k = tipo + JSON.stringify(datos || {});
     if (!fijas[clave] || fijas[clave].k !== k) fijas[clave] = { k, txt: F.frase(tipo, datos) };
     return fijas[clave].txt;
+  }
+  // ---------- (Liz 1.0 · prueba 14) FECHAS ESPECIALES y el HORARIO: lo que Liz dice según el momento ----------
+  // Las fechas llegan PRIVADAS desde la compu (perfiles/<perfil>/fechas-especiales.json → perfil.lizc.fechas): nunca están en esta página.
+  // Ese día, su saludo de Hoy y de la charla es el de la fecha (el aviso "LIZ 💜" lo manda el servidor: supabase/avisos.sql).
+  let fechasDemo = null;
+  const fechasEsp = () => (perfil.lizc && Array.isArray(perfil.lizc.fechas) ? perfil.lizc.fechas : fechasDemo || []);
+  function tiempoDe(f, ms) { const n = N.enCR(ms).y - Number(String(f.fecha).slice(0, 4)); return n === 1 ? '1 año' : n + ' años'; }
+  const llenarFecha = (t, f, ms) => String(t || '').replace(/\{tiempo\}/g, tiempoDe(f, ms));
+  const fechasDelDia = (ms) => fechasEsp().filter((f) => String(f.fecha).slice(5) === N.diaCR(ms).slice(5));
+  // Las fechas especiales entre "desde" y "hasta", como cosas de la agenda (se ven en el calendario; la sorpresa también, pero Liz no la dice antes)
+  function especialesEn(desde, hasta) {
+    const out = [];
+    for (const f of fechasEsp()) {
+      const [, mm, dd] = String(f.fecha).split('-').map(Number);
+      for (const y of new Set([N.enCR(desde).y, N.enCR(hasta).y])) {
+        const ms = N.deCR(y, mm - 1, dd, 0);
+        if (ms >= desde && ms < hasta) out.push({ tabla: 'especial', id: f.id, ms, titulo: llenarFecha(f.titulo, f, ms), tipo: 'especial', fila: f });
+      }
+    }
+    return out;
+  }
+  // Una frase que no cambia en cada repintado (la misma para la misma clase ese día)
+  const unaDe = (l, k) => l[Math.abs([...String(k)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7)) % l.length];
+  function momentoLiz(ahora, pendientes) {
+    const esp = fechasDelDia(ahora)[0];
+    if (esp) return { t: llenarFecha(esp.saludo, esp, ahora), tipo: 'especial' };
+    const cl = Ag.clasesDelDia(E, ahora);
+    if (!cl.length) return null;
+    const k = N.diaCR(ahora);
+    const ya = Ag.claseAhora(E, ahora);
+    if (ya) return { t: unaDe(['Estás en clase de ' + ya.titulo + ' hasta las ' + N.horaCR(ya.fin) + '. Aquí te espero 🤫', 'Shh, clase de ' + ya.titulo + '. Pon atención, que luego me cuentas 🔬'], k + ya.id), tipo: 'clase' };
+    const luego = cl.filter((c) => c.ms > ahora), ultima = cl.filter((c) => c.fin <= ahora).sort((a, b) => b.fin - a.fin)[0];
+    if (!luego.length && ultima && ahora - ultima.fin < 4 * H)
+      return { t: unaDe(['¿Qué tal la clase de ' + ultima.titulo + '? Cuéntame algo que aprendiste 🔬', '¡Terminaste tus clases! ¿Qué tal ' + ultima.titulo + '? Descansa un poquito y luego repasamos 💜',
+        '¿Cómo te fue en ' + ultima.titulo + '? Si quieres, me cuentas y lo convertimos en tarjetas 🧫'], k + ultima.id), tipo: 'tras', materia: ultima.titulo };
+    if (luego.length && luego[0].ms - ahora >= 40 * MIN && pendientes)
+      return { t: 'Tienes libre hasta las ' + N.horaCR(luego[0].ms) + ' (luego, ' + luego[0].titulo + '). ¿Unas tarjetitas mientras? 🧫', tipo: 'libre' };
+    return null;
   }
   function saludoFijo() {
     const h = N.enCR(Date.now()).h, parte = h < 5 ? 0 : h < 12 ? 1 : h < 19 ? 2 : h < 23 ? 3 : 0;
@@ -501,11 +551,21 @@
     const el = $('#entrar .escenaEntrar');
     if (el) el.innerHTML = '<div class="aura"></div>' + lizImg('saludo', 'g', 'respira');
   }
-  const ICONO = { evento: '📅', recordatorio: '⏰', examen: '📝', parcial: '📝', entrega: '📦', quiz: '📝' };
-  const COLOR = { evento: 'celeste', recordatorio: 'oro', examen: 'rosa', parcial: 'rosa', entrega: 'rosa', quiz: 'rosa' };
+  const ICONO = { evento: '📅', recordatorio: '⏰', examen: '📝', parcial: '📝', entrega: '📦', quiz: '📝', clase: '🎓', especial: '💜' };
+  const COLOR = { evento: 'celeste', recordatorio: 'oro', examen: 'rosa', parcial: 'rosa', entrega: 'rosa', quiz: 'rosa', clase: 'verde', especial: 'rosa' };
   const tipoDe = (x) => (x.tabla === 'examenes' ? 'examen' : x.tipo);
-  function filaAgenda(x, conDia, linea) {
+  function filaAgenda(x, conDia, linea, conBorrar) {
     const sub = [];
+    // (prueba 14) Una fecha especial: solo se ve (no se edita aquí). Una clase: con su hora de fin y su aula; tocarla abre "Mi horario"
+    if (x.tabla === 'especial') return '<li><div class="item especialFila"><div class="ico rosa">💜</div><span class="txt"><b>' + esc(x.titulo) + '</b><small>Fecha especial</small></span></div></li>';
+    const hora = N.horaCR(x.ms) + (x.fin ? '–' + N.horaCR(x.fin) : '');
+    if (x.tipo === 'clase') {
+      if (!linea) sub.push('<span class="hora">' + hora + '</span>');
+      if (conDia) sub.push(enDias(x.ms));
+      if (x.aula) sub.push(esc(x.aula));
+      return '<li><div class="item">' + (linea ? '<span class="hora">' + hora + '</span>' : '') + '<div class="ico verde">🎓</div>' +
+        '<button class="txt" style="text-align:left" data-a="editarClase" data-id="' + esc(x.id) + '"><b>Clase: ' + esc(x.titulo) + '</b><small>' + (sub.join(' · ') || '&nbsp;') + '</small></button></div></li>';
+    }
     if (!linea) sub.push('<span class="hora">' + N.horaCR(x.ms) + '</span>');
     if (conDia) sub.push(enDias(x.ms));
     if (x.materia && x.tabla !== 'examenes') sub.push(esc(x.materia));
@@ -515,7 +575,8 @@
     return '<li><div class="item' + (x.hecho ? ' hecho' : '') + '">' + (linea ? '<span class="hora">' + N.horaCR(x.ms) + '</span>' : '') +
       (x.tabla === 'recordatorios' ? '<button class="check' + (x.hecho ? ' on' : '') + '" data-a="hecho" data-id="' + esc(x.id) + '" aria-label="Hecho">✓</button>'
         : '<div class="ico ' + (COLOR[x.tipo] || 'celeste') + '">' + (ICONO[x.tipo] || '📅') + '</div>') +
-      '<button class="txt" style="text-align:left" data-a="editarAgenda" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '"><b>' + esc(titulo) + '</b><small>' + (sub.join(' · ') || '&nbsp;') + '</small></button></div></li>';
+      '<button class="txt" style="text-align:left" data-a="editarAgenda" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '"><b>' + esc(titulo) + '</b><small>' + (sub.join(' · ') || '&nbsp;') + '</small></button>' +
+      (conBorrar ? '<button class="borrarFila" data-a="borrarRec" data-id="' + esc(x.id) + '" aria-label="Borrar" data-tip="Borrar">🗑️</button>' : '') + '</div></li>';
   }
 
   // ---------- HOY: la foto de Liz grande (con su ánimo), su globito debajo, y lo del día ----------
@@ -530,19 +591,20 @@
       : tocan.length === 1 ? fija('hoy', 'hayUna') : fija('hoy', 'nadaHoy');
     // Su foto según su ánimo (animoHoy): feliz con racha, pensativa con muchas tarjetas, sorprendida con un examen cerca...
     const animo = animoHoy();
-    const hoyAg = Ag.delDia(E, ahora);
+    const hoyAg = especialesEn(N.inicioDiaCR(ahora), N.inicioDiaCR(ahora) + DIA).concat(Ag.delDia(E, ahora));      // (prueba 14: con la fecha especial de hoy)
     const exs = Ag.proximosExamenes(E, ahora).filter((x) => x.cuando < ahora + 30 * DIA);
     const ex = exs[0];
     const dEx = ex ? Math.round((N.inicioDiaCR(ex.cuando) - N.inicioDiaCR(ahora)) / DIA) : 0;
     // (21-oct-2026) Cómo se siente él hoy: en un día pesado, Liz lo dice con cariño y le ofrece solo unas poquitas tarjetas
-    const suyos = Animo.deHoy(E, ahora), sug = Animo.tarjetasSugeridas(suyos, tocan.length), linea = Animo.lineaHoy(suyos);
+    const suyos = Animo.deHoy(E, ahora), sug = Animo.tarjetasSugeridas(suyos, tocan.length);
     const carino = carinoActual && ahora < carinoActual.hasta ? carinoActual : null;
+    // (prueba 14) Fecha especial, en clase, después de clases o con un rato libre: su globito lo dice; y los pomodoros de hoy y la semana
+    const mom = carino ? null : momentoLiz(ahora, tocan.length);
+    const pomo = Ag.pomodoros(E, ahora), pomoVivo = pomoEstado();
     v.innerHTML =
       '<div class="heroe"><div class="placa"></div><div class="placa chica"></div><span class="animo">' + TEXTO_ANIMO[animo] + '</span>' +
       '<div class="marcoFoto respira"><div class="aura"></div>' + fotoLiz(animo, 'grande') + '</div>' +
-      (carino ? '<div class="comic cola-arriba' + (carino.corazones ? ' carino' : '') + '">' + esc(carino.t) + (carino.corazones ? '<small>💜</small>' : '') + '</div></div>'
-        // (21-oct-2026: "Tienes N tarjetas para hoy" ya lo dice el botón grande de abajo: el globito solo lo dice si no hay ninguna)
-        : '<div class="comic cola-arriba">' + esc(saludoFijo()) + (tocan.length ? '' : '<br>' + msg) + (linea ? '<small>💜 ' + esc(linea) + '</small>' : racha >= 2 ? '<small>🔥 ' + esc(fija('racha', 'racha', { n: racha })) + '</small>' : '') + '</div></div>') +
+      globoHoy(frasesDeHoy({ carino, mom, tocan, msg, racha })) + '</div>' +
       (tocan.length ? (sug < tocan.length
         ? '<button class="repasarYa" data-a="repasarSuave"><span class="n">' + sug + '</span><span class="t"><b>Solo ' + sug + ', con calma</b>de las ' + tocan.length + ' de hoy</span><span class="flecha">▶</span></button>'
         : '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + tocan.length + '</span><span class="t"><b>Repasar ahora</b>' +
@@ -553,11 +615,51 @@
       '<div class="pastillas">' + (suyos.length ? '<button class="pastilla toque animoP" data-a="animoHoy">' + suyos.map((k) => Animo.POR[k].e).join('') + ' <b>' + esc(nombresAnimo(suyos)) + '</b></button>'
         : '<button class="pastilla toque animoP" data-a="animoHoy">😊 <b>¿Cómo te sientes?</b></button>') +
       // (21-oct-2026) Sin repetir: la racha la dice Liz en su globito, las favoritas y difíciles están en Repasar, el total en Mazos
-      '<span class="pastilla">✅ <b>' + hoyN + '</b> hoy</span></div>' +
+      '<span class="pastilla">✅ <b>' + hoyN + '</b> hoy</span>' +
+      (pomoVivo ? '<button class="pastilla toque pomoP" data-a="ir" data-v="pomodoro">🍅 <b>' + esc(pomoTxt(pomoVivo)) + '</b></button>'
+        : pomo.semana ? '<button class="pastilla toque pomoP" data-a="ir" data-v="pomodoro">🍅 <b>' + pomo.hoy + '</b> hoy · ' + pomo.semana + ' semana</button>' : '') + '</div>' +
       '<h3>Hoy, ' + esc(N.fechaTxt(ahora, { weekday: 'long', month: undefined, day: 'numeric' })) + '</h3>' +
       (hoyAg.length ? '<div class="panel tiempo"><ul class="lista">' + hoyAg.map((x) => filaAgenda(x, false, true)).join('') + '</ul></div>' : '<p class="suave" style="margin:0 6px">Nada en tu agenda hoy. 🌙</p>') +
       (exs.length > 1 ? '<h3>Se vienen</h3><div class="panel"><ul class="lista">' + exs.slice(1, 4).map((x) => filaAgenda({ tabla: 'examenes', id: x.id, ms: x.cuando, titulo: N.nombreExamen(x).replace(/^(el|la) /, ''), tipo: x.que, fila: x }, true)).join('') + '</ul></div>' : '') +
       (!total ? '<button class="bt prin grande" style="margin-top:14px" data-a="nuevaTarjeta">➕ Crear mi primera tarjeta</button>' : '');
+  }
+
+  // ---------- (Liz 1.0 · prueba 15) LA BURBUJA DE HOY: UNA sola frase ----------
+  // Antes juntaba el saludo + el estado del repaso + la respuesta al ánimo y se hacía enorme. Ahora: las frases del momento en orden de
+  // importancia (frase de cariño o fecha especial → en clase / después de clase / rato libre → saludo → "no hay tarjetas" → la racha) y
+  // se ve UNA; al tocar la burbuja pasa a la siguiente con un fundido suave (los puntitos de abajo dicen cuántas hay). La respuesta al
+  // ánimo ya no va aquí: va a la charla (guardarAnimo). El "Tienes N tarjetas" lo dice el botón grande de abajo.
+  let globo = { k: '', i: 0 };
+  function frasesDeHoy(o) {
+    const l = [];
+    if (o.carino) l.push({ t: o.carino.t, clase: o.carino.corazones ? 'carino' : '', fin: o.carino.corazones ? '💜' : '' });
+    if (o.mom) l.push({ t: o.mom.t, clase: o.mom.tipo === 'especial' ? 'carino especial' : '', fin: o.mom.tipo === 'especial' ? '💜' : '' });
+    l.push({ t: saludoFijo() });
+    if (!o.tocan.length && o.msg) l.push({ html: o.msg });
+    if (o.racha >= 2) l.push({ t: '🔥 ' + fija('racha', 'racha', { n: o.racha }) });
+    return l;
+  }
+  const contenidoGlobo = (g, i, n) => (g.html != null ? g.html : esc(g.t)) + (g.fin ? '<small>' + g.fin + '</small>' : '') +
+    (n > 1 ? '<span class="puntosGlobo" aria-hidden="true">' + Array.from({ length: n }, (_, j) => '<i' + (j === i ? ' class="on"' : '') + '></i>').join('') + '</span>' : '');
+  function globoHoy(l) {
+    const k = l.map((x) => x.t || x.html).join('|');
+    if (globo.k !== k) globo = { k, i: 0, l };
+    globo.l = l;
+    const i = globo.i % l.length, g = l[i];
+    return '<div class="comic cola-arriba globoHoy ' + (g.clase || '') + '"' + (l.length > 1 ? ' data-a="globoSig" role="button" aria-label="Siguiente mensaje de Liz"' : '') + '>' + contenidoGlobo(g, i, l.length) + '</div>';
+  }
+  function globoSiguiente(b) {
+    const l = globo.l || [];
+    if (l.length < 2 || b.classList.contains('cambia')) return;
+    globo.i = (globo.i + 1) % l.length;
+    const g = l[globo.i];
+    b.classList.add('cambia');
+    setTimeout(() => {
+      b.className = 'comic cola-arriba globoHoy ' + (g.clase || '') + ' cambia';
+      b.innerHTML = contenidoGlobo(g, globo.i, l.length);
+      requestAnimationFrame(() => b.classList.remove('cambia'));
+    }, 180);
+    vibrar('bien');
   }
 
   // ---------- (21-oct-2026, Liz 1.1) DIARIO DE ÁNIMO, FRASES DE CARIÑO y CUIDADO ----------
@@ -582,7 +684,7 @@
       '<div class="comic cola-izq">' + esc(aMano ? '¿Cómo te sientes ahora?' : PREGUNTA_ANIMO[Math.floor(Math.random() * PREGUNTA_ANIMO.length)]) + '</div></div>' +
       '<div class="caritas">' + Animo.EMOCIONES.map((e) => '<button class="carita toque' + (sel.includes(e.k) ? ' si' : '') + '" data-k="' + e.k + '" style="--c:' + e.color + '"><span>' + e.e +
         '</span><small>' + esc(Animo.nombre(e.k, fem())) + '</small></button>').join('') + '</div>' +
-      '<p class="nota centro">Elige hasta 3. Es privado: solo lo vemos tú y yo. 🔒</p>' +
+      '<p class="nota centro">Elige hasta 3. Es privado: no se lo cuento a nadie. 🔒</p>' +
       '<div class="botones"><button class="bt prin grande" id="anListo"' + (sel.length ? '' : ' disabled') + '>Listo</button><button class="bt grande" id="anNo">Ahora no</button></div></div>');
     h.querySelectorAll('.carita').forEach((b) => {
       b.onclick = () => {
@@ -603,16 +705,38 @@
     Animo.guardar(E, lista, DISP, como);
     guardarLocal();
     pedirSincro();
-    const r = Animo.reaccion(lista, fem());
+    // (Liz 1.0 · prueba 15) Su respuesta ya NO va en la burbuja de Hoy: Liz la manda como mensaje en la charla (con un puntito en la pestaña
+    // "Liz" hasta que él la abra) y queda guardada en su diario de ánimo, junto a lo que marcó.
+    const r = Animo.respuestaAlMarcar(lista, fem());
     if (r && como === 'caritas') {
-      carinoActual = { t: r, hasta: Date.now() + 60000, corazones: false };
-      if (vista !== 'hoy') avisar(r);
+      agregarMsg({ quien: 'liz', texto: r, animo: Animo.animoLiz(lista) || 'tierna' });
+      Animo.anotarRespuesta(E, r, DISP);
+      guardarLocal(); pedirSincro();
+      avisoCharla = vista !== 'charla';
+      pintarMenu();
     }
     pintarSuave();
     pintarCarita();
     if (lista.includes('feliz') && !Animo.pesado(lista)) setTimeout(() => gestoLiz('celebrar'), 300);
   }
   // Una vez al día, al abrir (si ya lo marcó en la compu, no pregunta). Sin insistir: si cierra la hoja, no vuelve a salir hasta la próxima vez que abra.
+  // (Liz 1.0 · prueba 14) "LO NUEVO EN ESTA VERSIÓN": una sola vez después de actualizarse (version.js → loNuevo.id). En una instalación nueva
+  // no sale (se anota y listo). Si está repasando, charlando o hay otra hoja abierta, espera. La lista queda en Acerca de Liz.
+  function revisarLoNuevo(forzar, yaUsada) {
+    if (!V || !V.loNuevo) return;
+    let visto = null;
+    try { visto = localStorage.getItem('liz-lo-nuevo'); } catch (e) {}
+    const anotar = () => { try { localStorage.setItem('liz-lo-nuevo', V.loNuevo.id); } catch (e) {} };
+    if (!forzar) {
+      if (visto === V.loNuevo.id) return;
+      if (!visto && !yaUsada && !DEMO) return anotar();
+      if (sesion || vista === 'charla' || document.querySelector('#hoja:not([hidden])')) return void setTimeout(() => revisarLoNuevo(false, true), 20000);
+    }
+    anotar();
+    abrirHoja(escena('feliz', '¡Me actualicé! Mira lo nuevo 💜') + '<h2>🆕 Lo nuevo en esta versión</h2><div class="panel"><ul class="nuevo">' +
+      V.loNuevo.cosas.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div><div class="botones"><button class="bt prin grande" data-cerrar>¡Genial!</button></div>' +
+      '<button class="enlaceAgenda" data-a="verPrivacidad">🔒 Leer cómo cuido tu privacidad ›</button>');
+  }
   function revisarAnimoDia() {
     if (!Animo || preguntadoAnimo || !Animo.debePreguntar(E) || sesion || vista === 'charla' || document.querySelector('#hoja:not([hidden])')) return;
     const h = N.enCR(Date.now()).h;
@@ -900,12 +1024,12 @@
       const desfase = (N.enCR(N.deCR(c.y, c.m, 1)).dow + 6) % 7;
       const ini = N.deCR(c.y, c.m, 1 - desfase), fin = ini + 42 * DIA;
       const porDia = {};
-      for (const x of Ag.rango(E, ini, fin)) (porDia[N.diaCR(x.ms)] = porDia[N.diaCR(x.ms)] || []).push(x);
+      for (const x of Ag.rango(E, ini, fin).concat(especialesEn(ini, fin))) (porDia[N.diaCR(x.ms)] = porDia[N.diaCR(x.ms)] || []).push(x);
       cab = new Date(N.deCR(c.y, c.m, 15)).toLocaleDateString('es', { month: 'long', year: 'numeric', timeZone: N.ZONA }).replace(/^./, (x) => x.toUpperCase());
       cuerpo = '<div class="rejilla">' + DIAS.map((d) => '<div class="dn">' + d + '</div>').join('') +
         Array.from({ length: 42 }, (_, i) => {
           const ms = N.deCR(c.y, c.m, 1 - desfase + i), k = N.diaCR(ms), cc = N.enCR(ms), cosas = porDia[k] || [];
-          const tipos = ['examen', 'evento', 'recordatorio'].filter((t) => cosas.some((x) => tipoDe(x) === t));
+          const tipos = ['especial', 'examen', 'evento', 'recordatorio'].filter((t) => cosas.some((x) => tipoDe(x) === t));      // (las clases, en Semana: si no, todo el mes tendría puntitos)
           return '<button class="d' + (cc.m !== c.m ? ' fuera' : '') + (k === hoy ? ' hoy' : '') + (k === sel ? ' sel' : '') + '" data-a="elegirDia" data-ms="' + ms + '">' + cc.d +
             '<span class="pts">' + tipos.map((t) => '<i class="t-' + t + '"></i>').join('') + '</span></button>';
         }).join('') + '</div>';
@@ -913,45 +1037,56 @@
       const d0 = N.inicioDiaCR(ag.ref), lun = d0 - ((N.enCR(d0).dow + 6) % 7) * DIA;
       cab = 'Semana del ' + new Date(lun).toLocaleDateString('es', { day: 'numeric', month: 'long', timeZone: N.ZONA });
       cuerpo = '<div class="semana">' + Array.from({ length: 7 }, (_, i) => {
-        const ms = lun + i * DIA, k = N.diaCR(ms), cosas = Ag.delDia(E, ms);
+        const ms = lun + i * DIA, k = N.diaCR(ms), cosas = especialesEn(ms, ms + DIA).concat(Ag.delDia(E, ms));
+        // (prueba 14) Las clases con su propio color (verde azulado) y su hora de inicio y fin; la fecha especial, rosada
+        const MAXS = 4;
         return '<button class="dia' + (k === hoy ? ' hoy' : '') + (k === sel ? ' sel' : '') + '" data-a="elegirDia" data-ms="' + ms + '"><div class="f"><small>' +
           esc(new Date(ms).toLocaleDateString('es', { weekday: 'short', timeZone: N.ZONA }).replace('.', '')) + '</small><b>' + N.enCR(ms).d + '</b></div><div class="cosas">' +
-          (cosas.length ? cosas.slice(0, 3).map((x) => '<div><i class="tipoPunto t-' + tipoDe(x) + '"></i><span class="hora">' + N.horaCR(x.ms) + '</span> ' + esc(x.titulo) + '</div>').join('') +
-            (cosas.length > 3 ? '<div class="nada">y ' + (cosas.length - 3) + ' más</div>' : '') : '<div class="nada">—</div>') + '</div></button>';
+          (cosas.length ? cosas.slice(0, MAXS).map((x) => '<div class="' + (x.tipo === 'clase' ? 'esClase' : x.tipo === 'especial' ? 'esEspecial' : '') + '"><i class="tipoPunto t-' + tipoDe(x) + '"></i>' +
+            (x.tipo === 'especial' ? '' : '<span class="hora">' + N.horaCR(x.ms) + (x.fin ? '–' + N.horaCR(x.fin) : '') + '</span> ') + esc(x.titulo) + '</div>').join('') +
+            (cosas.length > MAXS ? '<div class="nada">y ' + (cosas.length - MAXS) + ' más</div>' : '') : '<div class="nada">—</div>') + '</div></button>';
       }).join('') + '</div>';
     }
-    const delDia = Ag.delDia(E, ag.dia);
-    v.innerHTML = escena('saludo', fija('pAg', 'pAgenda')) + segAgenda(ag.modo) +
+    // (Liz 1.0 · prueba 14) Debajo del calendario: lo del día elegido (eventos y exámenes) y la sección RECORDATORIOS (los de ese día en
+    // Mes, los de toda la semana en Semana), por hora, cada uno con ✓ hecho, tocar = editar y 🗑️ borrar. Arriba de todo, los que quedaron
+    // sin hacer de días anteriores (si hay), para que ninguno se pierda de vista.
+    const delDia = especialesEn(ag.dia, ag.dia + DIA).concat(Ag.delDia(E, ag.dia).filter((x) => x.tabla !== 'recordatorios'));
+    const hayClases = Ag.clases(E).length > 0;
+    const ini = ag.modo === 'mes' ? ag.dia : N.inicioDiaCR(ag.ref) - ((N.enCR(N.inicioDiaCR(ag.ref)).dow + 6) % 7) * DIA;
+    const recs = Ag.rango(E, ini, ini + (ag.modo === 'mes' ? 1 : 7) * DIA).filter((x) => x.tabla === 'recordatorios');
+    const hoy0 = N.inicioDiaCR(Date.now());
+    const atrasados = Ag.rango(E, hoy0 - 60 * DIA, hoy0).filter((x) => x.tabla === 'recordatorios' && !x.hecho && !x.repite && x.ms < ini);
+    const filaRec = (x, conDia) => filaAgenda(x, conDia, false, true);
+    v.innerHTML = escena('saludo', fija('pAg', 'pAgenda')) + '<div class="segFila">' + segAgenda(ag.modo) + '<button class="horarioBt toque" data-a="miHorario">🎓 Mi horario</button></div>' +
       '<div class="mesCab"><button data-a="agendaMover" data-d="-1" aria-label="Antes">‹</button><strong>' + esc(cab) + '</strong><button data-a="agendaMover" data-d="1" aria-label="Después">›</button></div>' +
-      '<div class="leyenda"><span><i class="tipoPunto t-examen"></i>Examen</span><span><i class="tipoPunto t-evento"></i>Evento</span><span><i class="tipoPunto t-recordatorio"></i>Recordatorio</span></div>' +
+      '<div class="leyenda"><span><i class="tipoPunto t-examen"></i>Examen</span><span><i class="tipoPunto t-evento"></i>Evento</span><span><i class="tipoPunto t-recordatorio"></i>Recordatorio</span>' +
+        (hayClases && ag.modo === 'semana' ? '<span><i class="tipoPunto t-clase"></i>Clase</span>' : '') + (fechasEsp().length ? '<span><i class="tipoPunto t-especial"></i>Especial</span>' : '') + '</div>' +
       cuerpo + '<h3>' + esc(N.fechaTxt(ag.dia)) + '</h3>' +
-      (delDia.length ? '<div class="panel"><ul class="lista">' + delDia.map((x) => filaAgenda(x)).join('') + '</ul></div>' : vacioMini('dormida', fija('vDia', 'vDia'))) +
+      (delDia.length ? '<div class="panel"><ul class="lista">' + delDia.map((x) => filaAgenda(x)).join('') + '</ul></div>'
+        : recs.length && ag.modo === 'mes' ? '<p class="suave nadaDia">Ni eventos ni exámenes este día.</p>' : vacioMini('dormida', fija('vDia', 'vDia'))) +
+      '<h3 id="secRecordatorios">⏰ Recordatorios <small>' + (ag.modo === 'mes' ? 'de este día' : 'de esta semana') + '</small></h3>' +
+      (atrasados.length ? '<p class="suave subRec">Sin hacer de días anteriores</p><div class="panel"><ul class="lista">' + atrasados.map((x) => filaRec(x, true)).join('') + '</ul></div>' : '') +
+      (recs.length ? '<div class="panel"><ul class="lista">' + recs.map((x) => filaRec(x, ag.modo === 'semana')).join('') + '</ul></div>'
+        : '<p class="suave nadaDia">' + (ag.modo === 'mes' ? 'No hay recordatorios este día.' : 'No hay recordatorios esta semana.') + ' Toca ＋ para crear uno.</p>') +
       '<div class="espacioFab"></div><button class="fab" data-a="nuevoAgenda" aria-label="Agregar">＋</button>';
   }
 
   // (21-oct-2026, Liz 1.3) Estudiar: "Repasar · Mazos", como el selector de la Agenda (cambia al instante, sin salir de la pestaña)
   function segEstudiar(on) {
     const n = Org.paraRepasar(E, { soloHoy: true }).length;
+    const s = pomoEstado();
     return '<div class="seg estudiar"><button class="' + (on === 'repasar' ? 'on' : '') + '" data-a="modoEstudio" data-m="repasar">Repasar' +
-      (n ? ' <span class="punto-n">' + n + '</span>' : '') + '</button><button class="' + (on === 'mazos' ? 'on' : '') + '" data-a="modoEstudio" data-m="mazos">Mazos</button></div>';
+      (n ? ' <span class="punto-n">' + n + '</span>' : '') + '</button><button class="' + (on === 'mazos' ? 'on' : '') + '" data-a="modoEstudio" data-m="mazos">Mazos</button></div>' +
+      // (prueba 14) El pomodoro: "Estudiar con Liz" (si hay uno en marcha, cuánto le queda)
+      '<button class="pomoBt toque" data-a="ir" data-v="pomodoro"><span class="e">🍅</span><span class="t"><b>Estudiar con Liz</b><small>' +
+      esc(s ? pomoTxt(s) : 'Pomodoro: ' + pomoTiempos().estudio + ' min de estudio + ' + pomoTiempos().descanso + ' de descanso') + '</small></span><span class="chev">›</span></button>';
   }
-  // (21-oct-2026) Mes · Semana · Recordatorios: los recordatorios viven en Agenda (antes también en Más)
+  // (Liz 1.0 · prueba 14) Solo "Mes · Semana": la pestaña Recordatorios se quitó (los recordatorios se ven en su sección, debajo del
+  // calendario, y se crean con ＋). ANTES, desde Recordatorios, tocar "Mes" o "Semana" no hacía nada: cambiaba el modo pero la pantalla
+  // seguía siendo Recordatorios (modoAgenda solo repintaba la vista actual). Ahora modoAgenda siempre vuelve a la Agenda.
   function segAgenda(on) {
-    const b = (k, t, a) => '<button class="' + (on === k ? 'on' : '') + '" data-a="' + a + '"' + (a === 'modoAgenda' ? ' data-m="' + k + '"' : ' data-v="recordatorios"') + '>' + t + '</button>';
-    const recHoy = Ag.listaRecordatorios(E).filter((x) => !x.hecho && x.vez < N.inicioDiaCR(Date.now()) + DIA).length;
-    return '<div class="seg tres">' + b('mes', 'Mes', 'modoAgenda') + b('semana', 'Semana', 'modoAgenda') +
-      b('recordatorios', 'Recordatorios' + (recHoy ? ' <span class="punto-n">' + recHoy + '</span>' : ''), 'ir') + '</div>';
-  }
-  // ---------- RECORDATORIOS ----------
-  function pintarRecordatorios(v) {
-    const ahora = Date.now(), fin0 = N.inicioDiaCR(ahora) + DIA;
-    const l = Ag.listaRecordatorios(E, ahora);
-    const hoy = l.filter((x) => !x.hecho && x.vez < fin0), prox = l.filter((x) => !x.hecho && x.vez >= fin0), hechos = l.filter((x) => x.hecho);
-    const fila = (x) => filaAgenda({ tabla: 'recordatorios', id: x.r.id, ms: x.vez, titulo: x.r.texto, tipo: 'recordatorio', materia: x.r.materia, repite: x.r.repite, hecho: x.hecho, fila: x.r }, true);
-    const grupo = (t, xs) => (xs.length ? '<h3>' + t + '</h3><div class="panel"><ul class="lista">' + xs.map(fila).join('') + '</ul></div>' : '');
-    v.innerHTML = escena(hechos.length && !hoy.length ? 'feliz' : 'saludo', fija('pRec', l.length ? 'pRecordatorios' : 'vRecordatorios')) + segAgenda('recordatorios') +
-      (l.length ? grupo('Para hoy', hoy) + grupo('Próximos', prox) + grupo('Hechos', hechos) : '') +
-      '<div class="espacioFab"></div><button class="fab" data-a="nuevoAgenda" data-tipo="recordatorios" aria-label="Nuevo recordatorio">＋</button>';
+    const b = (k, t) => '<button class="' + (on === k ? 'on' : '') + '" data-a="modoAgenda" data-m="' + k + '">' + t + '</button>';
+    return '<div class="seg">' + b('mes', 'Mes') + b('semana', 'Semana') + '</div>';
   }
 
   // ---------- ARCHIVOS ----------
@@ -1130,11 +1265,15 @@
     const mejor = Object.entries(m.porEmocion).filter(([, x]) => x.dias >= 2 && x.repasos >= 5).sort((a, b) => pct(b[1]) - pct(a[1]))[0];
     return '<h3>🌈 Cómo te has sentido</h3><div class="panel animoPanel">' +
       (m.marcados ? '' : '<p class="nota">Cuando me digas cómo te sientes cada día (toca 😊 en Hoy), aquí lo ves en colores.</p>') +
-      '<div class="semAn">' + semana + '</div><div class="mesAn">' + mes + '</div><div class="leyAn">' + ley + '<span><i class="punto"></i>estudiaste</span></div>' +
+      '<div class="semAn">' + semana + '</div>' +
+      // (prueba 15) Lo que Liz le contestó cada día al marcar (queda en su diario, junto a lo que marcó)
+      (s.dias.some((d) => d.respuesta) ? '<div class="respAn">' + s.dias.filter((d) => d.respuesta).reverse().slice(0, 3).map((d) => '<div class="r"><b>' +
+        (d.dia === hoyD ? 'Hoy' : DIAS[new Date(d.ms).getUTCDay()]) + ' ' + d.emociones.map((k) => Animo.POR[k].e).join('') + '</b><span>💜 ' + esc(d.respuesta) + '</span></div>').join('') + '</div>' : '') +
+      '<div class="mesAn">' + mes + '</div><div class="leyAn">' + ley + '<span><i class="punto"></i>estudiaste</span></div>' +
       (top ? '<div class="topAn"><span class="e">' + Animo.POR[top[0]].e + '</span><span>Lo que más sentiste este mes: <b>' + esc(Animo.nombre(top[0], fem())) + '</b> (' + top[1] + (top[1] === 1 ? ' día' : ' días') + ').<br>' +
         'Estudiaste ' + m.diasEstudio + ' de 30 días' + (m.repasos ? ', con ' + pct(m) + ' % bien' : '') + '.' +
         (mejor ? ' Los días que te sentías ' + esc(Animo.nombre(mejor[0], fem())) + ' acertaste más (' + pct(mejor[1]) + ' %).' : '') + '</span></div>' : '') +
-      '<p class="nota" style="padding-top:2px">🔒 Es privado: solo lo vemos tú y yo.</p></div>';
+      '<p class="nota" style="padding-top:2px">🔒 Es privado: no se lo cuento a nadie (más en Acerca de Liz → Tu privacidad).</p></div>';
   }
 
   // ---------- (21-oct-2026) ACERCA DE LIZ: quién es, su versión, lo nuevo, los créditos y un secreto (5 toques a su foto) ----------
@@ -1150,7 +1289,11 @@
       // (21-oct-2026) La autora, con su nombre completo; la dedicatoria (privada, llega de la PC) se queda igual
       '<p class="autoraLiz">Creada por <b>' + esc(V.autora) + '</b></p>' +
       '<p class="dedica">' + esc(lc.dedicatoria || 'Creada con mucho cariño 💜') + '</p><p class="queEs">Tu compañera de estudio y microbióloga junior.</p></div>' +
+      // (Liz 1.0 · prueba 14) Lo nuevo de esta actualización y "Tu privacidad" (version.js: lo mismo que en la compu)
+      (V.loNuevo ? '<h3 id="secNuevo">🆕 Lo nuevo en esta versión</h3><div class="panel"><ul class="nuevo">' + V.loNuevo.cosas.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' : '') +
       '<h3>✨ Lo que trae Liz ' + esc(V.liz) + '</h3><div class="panel"><ul class="nuevo">' + V.novedades.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' +
+      (V.privacidad ? '<h3 id="secPrivacidad">🔒 Tu privacidad</h3><div class="panel privacidad"><p class="intro">Lo que hablas conmigo es tuyo. Así lo cuido:</p>' +
+        V.privacidad.map(([t, ls]) => '<h4>' + esc(t) + '</h4>' + ls.map((l) => '<p>' + esc(l.replace('{creadora}', creadoraCel()).replace(/^./, (c) => c.toUpperCase())) + '</p>').join('')).join('') + '</div>' : '') +
       '<h3>🙏 Créditos y licencias</h3><div class="panel creditos">' + V.creditosCortos.map(([ic, q, l]) => '<div class="cred"><span class="ic">' + ic + '</span><span><b>' + esc(q) + '</b><small>' +
         esc(l.replace('{creadora}', cr)) + '</small></span></div>').join('') +
       '<details><summary>Ver la lista completa</summary>' + V.creditos.map(([q, t]) => (t ? '<p><b>' + esc(q) + '.</b> ' + esc(t.replace('{creadora}', cr)) + '</p>' : '<h4>' + esc(q) + '</h4>')).join('') + '</details></div>' +
@@ -1190,30 +1333,33 @@
     const esperando = Org.vivos(E.archivos).filter((a) => a.estado === 'esperando' || a.estado === 'leyendo').length;
     const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
     let avisosTxt = 'Apagados';
-    try { if (localStorage.getItem('liz-aviso-id')) { const h = +(localStorage.getItem('liz-aviso-hora') || 8); avisosTxt = 'Tarjetas a las ' + (h <= 12 ? h : h - 12) + ':00 ' + (h < 12 ? 'a. m.' : 'p. m.'); } } catch (e) {}
+    try { if (localStorage.getItem('liz-aviso-id') && 'Notification' in window && Notification.permission === 'granted') avisosTxt = 'Activados'; } catch (e) {}
     const fila = (a, ic, color, t, dato, datos, extra, id) => '<li' + (id ? ' id="' + id + '"' : '') + '><button class="item" data-a="' + a + '"' + (datos || '') + '><span class="ico ' + (color || '') + '">' + ic + '</span>' +
       '<span class="txt"><b>' + t + '</b></span>' + (dato ? '<span class="dato">' + dato + '</span>' : '') + (extra === undefined ? '<span class="chev">›</span>' : extra) + '</button></li>';
     const interruptor = (a, ic, color, t, on) => fila(a, ic, color, t, '', '', '<span class="interruptor' + (on ? ' on' : '') + '"></span>');
     const aV = (v2) => ' data-v="' + v2 + '"';
     const grupo = (t, filas) => '<h3>' + t + '</h3><div class="panel compacta"><ul class="lista">' + filas + '</ul></div>';
     const hoyAn = Animo.deHoy(E);
+    // (Liz 1.0 · prueba 14) "Más" en 3 partes (Catalina): MÁS OPCIONES (lo de estudio + el diario de ánimo), AJUSTES (avisos, vibración,
+    // sonido, reducir movimiento, sincronización y, al final, la cuenta: su correo, o "Modo de prueba" en ?demo) y ACERCA DE LIZ sola,
+    // con la carita de Liz en un círculo como ícono. Ya no existe "Tu Liz y tu cuenta". Debajo, la versión y "Cerrar sesión".
+    const cara = '<span class="ico icoLiz">' + fotoLiz('contenta') + '</span>';
     v.innerHTML = escena('saludo', fija('pMas', 'pMas')) +
-      grupo('Tu estudio',
+      grupo('Más opciones',
         fila('ir', '📈', 'verde', 'Progreso', '', aV('progreso')) +
         fila('ir', '📚', 'celeste', 'Archivos', esperando ? esperando + ' esperando' : '', aV('archivos')) +
         fila('ir', '📦', '', 'Archivados', arch ? String(arch) : '', aV('archivados')) +
-        fila('ir', '🗑️', '', 'Papelera', pap ? String(pap) : '', aV('papelera'))) +
+        fila('ir', '🗑️', '', 'Papelera', pap ? String(pap) : '', aV('papelera')) +
+        fila('verDiario', '🌈', 'oro', 'Diario de ánimo', hoyAn.length ? 'Hoy ' + hoyAn.map((k) => Animo.POR[k].e).join('') : '')) +
       grupo('Ajustes',
         fila('avisos', '🔔', 'rosa', 'Avisos', avisosTxt) +
         interruptor('alternarVibra', '📳', '', 'Vibración', pref.vibra) +
         interruptor('alternarSonido', '🔊', '', 'Sonido', pref.sonido) +
         interruptor('alternarQuieto', '🫧', '', 'Reducir movimiento', pref.quieto) +
-        (instalada ? '' : fila('comoInstalar', '📲', '', 'Instalar en el iPhone'))) +
-      grupo('Tu Liz y tu cuenta',
-        fila('verDiario', '🌈', 'oro', 'Diario de ánimo', hoyAn.length ? 'Hoy ' + hoyAn.map((k) => Animo.POR[k].e).join('') : '') +
-        fila('ir', '💜', 'rosa', 'Acerca de Liz', '', aV('acerca')) +
-        '<li><div class="item"><span class="ico">✉️</span><span class="txt"><b>' + esc(DEMO ? 'Modo de prueba' : perfil.correo || 'Tu cuenta') + '</b></span></div></li>' +
-        fila('sincronizarYa', '🔄', 'celeste', 'Sincronización', esc(estadoSync().t), '', undefined, 'filaSync')) +
+        (instalada ? '' : fila('comoInstalar', '📲', '', 'Instalar en el iPhone')) +
+        fila('sincronizarYa', '🔄', 'celeste', 'Sincronización', esc(estadoSync().t), '', undefined, 'filaSync') +
+        '<li><div class="item"><span class="ico">✉️</span><span class="txt"><b>Cuenta</b></span><span class="dato correo">' + esc(DEMO ? 'Modo de prueba' : perfil.correo || '—') + '</span></div></li>') +
+      '<div class="panel compacta soloAcerca"><ul class="lista"><li><button class="item" data-a="ir" data-v="acerca">' + cara + '<span class="txt"><b>Acerca de Liz</b></span><span class="chev">›</span></button></li></ul></div>' +
       '<p class="versionLiz">' + esc(V.larga) + ' · © ' + esc(V.fecha.slice(0, 4)) + ' ' + esc(V.autora) + '</p>' +
       (sinSesion ? '<button class="bt salirBt" data-a="volverEntrar">🔑 Volver a entrar</button>' : '<button class="bt salirBt" data-a="salir">Cerrar sesión</button>');
   }
@@ -1221,9 +1367,24 @@
     const l = Org.papelera(E);
     const tipo = { tarjetas: '🃏 Tarjeta', mazos: '🗂️ Mazo', materias: '📚 Materia', eventos: '📅 Evento', examenes: '📝 Examen', recordatorios: '⏰ Recordatorio', archivos: '📄 Archivo' };
     v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' +
-      (l.length ? escena('animo', fija('pPap', 'pPapelera')) + '<div class="panel"><ul class="lista">' + l.map((x) => '<li><div class="item"><span class="txt"><b>' + esc(x.nombre) + '</b><small>' + tipo[x.tabla] + ' · quedan ' + x.quedan + ' días</small></span>' +
-        '<button class="bt chico" data-a="restaurar" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '">↩️ Recuperar</button></div></li>').join('') + '</ul></div>'
+      // (Liz 1.0 · prueba 14) Cada cosa: ↩️ Recuperar y 🗑️ borrar para siempre; abajo, discreto, "Vaciar papelera" (no sale si está vacía)
+      (l.length ? escena('animo', fija('pPap', 'pPapelera')) + '<div class="panel"><ul class="lista">' + l.map((x) => '<li><div class="item"><span class="txt"><b>' + esc(x.nombre || '(sin nombre)') + '</b><small>' + tipo[x.tabla] + ' · quedan ' + x.quedan + ' días</small></span>' +
+        '<span class="botonesPap"><button class="bt chico" data-a="restaurar" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '">↩️ Recuperar</button>' +
+        '<button class="bt chico borrarYa" data-a="borrarParaSiempre" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '" aria-label="Borrar para siempre" data-tip="Borrar para siempre">🗑️</button></span></div></li>').join('') + '</ul></div>' +
+        '<button class="bt vaciarBt" data-a="vaciarPapelera">Vaciar papelera</button>'
         : vacio('feliz', fija('vPap', 'vPapelera')));
+  }
+  // Borrar para siempre (uno o todo): Org.borrarParaSiempre borra el contenido ya y la sincronización lo quita de todos lados (ver organizar.js)
+  async function borrarDeVerdad(cuales) {
+    const uno = cuales && cuales.length === 1;
+    if (!(await confirmar(uno ? '¿Borrar esto para siempre?' : '¿Vaciar la papelera?', uno ? 'Se borra del celular, de la compu y de la nube. No se puede deshacer.'
+      : '¿Borrar para siempre todo lo que hay en la papelera? No se puede deshacer.', uno ? 'Borrar para siempre' : 'Vaciar', true))) return;
+    const r = Org.borrarParaSiempre(E, cuales, DISP);
+    const rutas = r.archivos.map((a) => a.ruta).filter(Boolean);
+    if (sb && rutas.length) sb.storage.from('liz-privado').remove(rutas).catch(() => {});      // (el archivo guardado en la nube, ya)
+    avisar(uno ? 'Borrado para siempre.' : 'Papelera vacía.');
+    vibrar('bien');
+    cambio();
   }
 
   // ---------- Detalles que dan vida: vibración, sonido y el brillo al tocar ----------
@@ -1326,6 +1487,51 @@
     return nombre ? Org.crearMateria(E, nombre, DISP).id : null;
   }
   const materiasConocidas = () => [...new Set(Org.vivos(E.materias).map((m) => m.nombre).concat(Org.vivos(E.examenes).map((x) => x.materia)).filter(Boolean))].sort();
+
+  // ---------- (Liz 1.0 · prueba 14) MI HORARIO: las clases de la semana (solo se cambia aquí, en el celular; la compu lo recibe al sincronizar) ----------
+  // Cada clase es un evento semanal (agenda.js crearClase). Con el horario, Liz no manda el aviso de estudio mientras está en clase
+  // (supabase/avisos.sql), lo saluda distinto después de clases y le sugiere estudiar en sus ratos libres. Nuevo semestre: "Borrar todo".
+  const DIA_CORTO = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  function hojaHorario() {
+    const l = Ag.clases(E);
+    const porDia = Ag.DIAS_SEMANA.map((d, i) => [d, l.filter((c) => c.datos.dia === i)]).filter(([, cs]) => cs.length);
+    abrirHoja('<h2>🎓 Mi horario</h2><p class="suave" style="margin-top:-4px">Tus clases de la semana. Con esto no te mando avisos de estudio mientras estás en clase y te saludo al salir.</p>' +
+      (porDia.length ? porDia.map(([d, cs]) => '<h3 class="diaHorario">' + esc(d.charAt(0).toUpperCase() + d.slice(1)) + '</h3><div class="panel"><ul class="lista">' + cs.map((c) =>
+        '<li><div class="item"><span class="hora claseHora">' + esc(c.datos.inicio) + '–' + esc(c.datos.fin) + '</span><button class="txt" style="text-align:left" data-a="editarClase" data-id="' + esc(c.id) + '"><b>' + esc(c.titulo) + '</b><small>' +
+        esc(c.datos.aula || 'Toca para editar') + '</small></button><button class="borrarFila" data-a="borrarClase" data-id="' + esc(c.id) + '" aria-label="Borrar clase">🗑️</button></div></li>').join('') + '</ul></div>').join('')
+        : '<div class="panel" style="padding:16px;text-align:center"><p class="suave" style="margin:0">Todavía no tienes clases anotadas.</p></div>') +
+      '<div class="botones"><button class="bt prin grande" data-a="nuevaClase">＋ Agregar clase</button>' +
+      (l.length ? '<button class="bt grande vaciarBt" style="margin:6px auto 0" data-a="borrarHorario">🗑️ Borrar todo el horario (nuevo semestre)</button>' : '') +
+      '<button class="bt grande" data-cerrar>Listo</button></div>');
+  }
+  function formClase(fila) {
+    const c = fila ? fila.datos : {};
+    const st = { materia: fila ? fila.titulo : '', dia: fila ? c.dia : Math.min(4, (N.enCR(Date.now()).dow + 6) % 7), inicio: c.inicio || '08:00', fin: c.fin || '09:50', aula: c.aula || '' };
+    const leer = (h) => { for (const k of ['materia', 'inicio', 'fin', 'aula']) { const el = $('#fc-' + k, h); if (el) st[k] = el.value; } };
+    function dibujar() {
+      const h = abrirHoja('<h2>' + (fila ? 'Editar clase' : 'Agregar clase') + '</h2><form id="fClase">' +
+        '<label for="fc-materia">Materia</label><input type="text" id="fc-materia" list="fc-materias" value="' + esc(st.materia) + '" placeholder="Ej.: Micología" maxlength="80">' +
+        '<datalist id="fc-materias">' + materiasConocidas().map((m) => '<option value="' + esc(m) + '">').join('') + '</datalist>' +
+        '<label>Día</label><div class="seg dias">' + DIA_CORTO.map((d, i) => '<button type="button" class="' + (i === st.dia ? 'on' : '') + '" data-dia="' + i + '">' + d + '</button>').join('') + '</div>' +
+        '<div class="dos"><div><label for="fc-inicio">Empieza</label><input type="time" id="fc-inicio" value="' + esc(st.inicio) + '"></div><div><label for="fc-fin">Termina</label><input type="time" id="fc-fin" value="' + esc(st.fin) + '"></div></div>' +
+        '<label for="fc-aula">Aula (si quieres)</label><input type="text" id="fc-aula" value="' + esc(st.aula) + '" placeholder="Ej.: Aula 203" maxlength="60">' +
+        '<p class="error" id="fc-err"></p><div class="botones"><button class="bt prin grande">Guardar</button>' +
+        (fila ? '<button type="button" class="bt grande peligro" id="fc-borrar">🗑️ Borrar clase</button>' : '') + '<button type="button" class="bt grande" id="fc-volver">Volver</button></div></form>');
+      h.onclick = (ev) => { const b = ev.target.closest('[data-dia]'); if (!b) return; leer(h); st.dia = Number(b.dataset.dia); dibujar(); };
+      $('#fc-volver', h).onclick = () => hojaHorario();
+      if (fila) $('#fc-borrar', h).onclick = () => { Ag.borrar(E, 'eventos', fila.id, DISP); cambio(); avisar('Clase borrada (está en la papelera).'); hojaHorario(); };
+      $('#fClase', h).addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        leer(h);
+        const r = fila ? Ag.editarClase(E, fila.id, st, DISP) : Ag.crearClase(E, st, DISP);
+        if (r.error) { $('#fc-err', h).textContent = r.error.charAt(0).toUpperCase() + r.error.slice(1) + '.'; return; }
+        avisar(fila ? 'Clase guardada.' : 'Clase anotada en tu horario.');
+        cambio();
+        hojaHorario();
+      });
+    }
+    dibujar();
+  }
 
   // ---------- Formulario de la agenda: evento, examen o recordatorio ----------
   function formAgenda(tabla, fila) {
@@ -1568,6 +1774,9 @@
   function pintarCharla(v) {
     const h = N.enCR(Date.now()).h;
     if (!fijas.charla || fijas.charla.k !== h + perfil.nombre) fijas.charla = { k: h + perfil.nombre, txt: F.saludoCharla(perfil.nombre, h) };
+    // (prueba 14) Una fecha especial o después de clases, el saludo de la charla es ese (si no está en clase: entonces el de siempre)
+    const mom = momentoLiz(Date.now(), 0);
+    if (mom && (mom.tipo === 'especial' || mom.tipo === 'tras')) fijas.charla = { k: h + perfil.nombre, txt: mom.t };
     v.innerHTML = '<div class="charla"><div class="bienvenida"><div class="marcoLiz"><div class="aura"></div>' + lizImg('saludo', 'c', 'respira') + '</div>' +
       '<div class="comic cola-izq"><span class="txt">' + esc(fijas.charla.txt) + '</span></div></div>' +
       '<div class="rapidos">' + RAPIDOS.map(([k, t]) => '<button class="chip toque" data-a="rapido" data-k="' + k + '">' + t + '</button>').join('') + '</div>' +
@@ -1577,13 +1786,14 @@
   function abajoCharla(suave) {
     setTimeout(() => { medirCharla(); const m = $('#mensajes'); if (m) m.scrollTo({ top: m.scrollHeight, behavior: suave === false ? 'auto' : 'smooth' }); }, 60);
   }
+  let hueco = 0;          // (lo que iOS deja sin medir debajo de la vista en la app instalada: ver medirHueco)
   // Dónde termina la lista: justo arriba de la barra de escribir (que crece con el texto y sube con el teclado)
   function medirCharla() {
     if (vista !== 'charla') return;
     const a = $('#app').getBoundingClientRect(), b = $('#escribirLiz').getBoundingClientRect();
     if (b.height) $('#app').style.setProperty('--finCharla', Math.max(0, Math.round(a.bottom - b.top + 8)) + 'px');
     // (21-oct-2026) El fondo sólido de abajo (body::after) sube hasta la barra de escribir: nada se ve por detrás de ella ni del menú
-    if (b.height) document.documentElement.style.setProperty('--zocaloCharla', Math.max(0, Math.round(innerHeight - b.top + 6)) + 'px');
+    if (b.height) document.documentElement.style.setProperty('--zocaloCharla', Math.max(0, Math.round(innerHeight + hueco - b.top + 6)) + 'px');   // (desde el borde REAL de la pantalla)
   }
   // La parte de arriba se achica (Liz más pequeña, el globito en una línea) en pantallas chicas mientras él lee mensajes de antes, y
   // siempre con el teclado abierto; vuelve a su tamaño al llegar al último mensaje. Al cambiar de tamaño, si estaba en el último
@@ -1631,7 +1841,7 @@
     const porMazo = {};
     for (const x of tocan) { const n = nombreMazo((x.t || E.tarjetas[x]).mazo_id); porMazo[n] = (porMazo[n] || 0) + 1; }
     const exs = Ag.proximosExamenes(E, ahora).slice(0, 4).map((x) => N.nombreExamen(x) + ' el ' + N.fechaTxt(x.cuando) + ' a las ' + N.horaCR(x.cuando));
-    const hoyAg = Ag.delDia(E, ahora).map((x) => x.titulo + ' (' + N.horaCR(x.ms) + (x.hecho ? ', hecho' : '') + ')');
+    const hoyAg = Ag.delDia(E, ahora).map((x) => (x.tipo === 'clase' ? 'clase de ' : '') + x.titulo + ' (' + N.horaCR(x.ms) + (x.fin ? '-' + N.horaCR(x.fin) : '') + (x.hecho ? ', hecho' : '') + ')');
     const prox = Ag.listaRecordatorios(E, ahora).filter((x) => !x.hecho && x.vez > ahora && x.vez < ahora + 7 * DIA).slice(0, 5).map((x) => x.r.texto + ' (' + N.fechaTxt(x.vez) + ' ' + N.horaCR(x.vez) + ')');
     const reps = Object.values(E.repasos), hoyR = reps.filter((r) => r.fecha >= N.inicioDiaCR(ahora));
     return [
@@ -1724,7 +1934,8 @@
   }
   // Un día después de un examen (hasta 10 días), si nadie (ni la compu) preguntó todavía y su materia tiene tarjetas: Liz lo pregunta
   // en la charla, con dos botones. La marca "preguntoArchivar" va en el examen y se sincroniza: así no preguntan los dos.
-  let avisoCharla = false;
+  // (prueba 15) El puntito de la pestaña "Liz" sigue aunque se cierre la app, hasta que él abra la charla
+  let avisoCharla = (() => { try { return localStorage.getItem('liz-aviso-charla') === '1'; } catch (e) { return false; } })();
   function revisarExamenPasado() {
     const ahora = Date.now(), h = N.enCR(ahora).h;
     if (h < 8 || h >= 22) return;
@@ -1882,7 +2093,23 @@
       empezar(Org.paraRepasar(E, f), (x && x.nombre) || 'Archivado');
     },
     // Agenda
-    modoAgenda: (d) => { ag.modo = d.m; ag.ref = ag.dia; pintarSuave(); },
+    modoAgenda: (d) => { ag.modo = d.m; ag.ref = ag.dia; if (vista !== 'agenda') ir('agenda'); else pintarSuave(); },
+    borrarRec: (d) => { if (!E.recordatorios[d.id]) return; Ag.borrar(E, 'recordatorios', d.id, DISP); avisar('A la papelera (lo recuperas en 30 días).'); cambio(); },
+    irRecordatorios: () => { cerrarHoja(true); ir('recordatorios'); },
+    globoSig: (d, b) => globoSiguiente(b),      // (prueba 15) la burbuja de Hoy: la siguiente frase
+    // Pomodoro (prueba 14)
+    pomoEmpezar: () => pomoEmpezar(), pomoPausar: () => pomoPausar(), pomoParar: () => pomoParar(), pomoSaltar: () => pomoSaltarDescanso(), pomoTiempos: () => hojaPomoTiempos(),
+    // Mi horario (prueba 14)
+    miHorario: () => hojaHorario(),
+    nuevaClase: () => formClase(null),
+    editarClase: (d) => { const f = E.eventos[d.id]; if (f && Ag.esClase(f)) formClase(f); },
+    borrarClase: (d) => { Ag.borrar(E, 'eventos', d.id, DISP); cambio(); avisar('Clase borrada (está en la papelera).'); hojaHorario(); },
+    borrarHorario: async () => {
+      const n = Ag.clases(E).length;
+      if (!(await confirmar('¿Borrar todo el horario?', 'Se van tus ' + n + (n === 1 ? ' clase' : ' clases') + ' (quedan 30 días en la papelera). Ideal para empezar un semestre nuevo.', 'Borrar todo', true))) return hojaHorario();
+      Ag.borrarHorario(E, DISP); cambio(); avisar('Horario borrado. ¡A anotar el nuevo semestre!'); hojaHorario();
+    },
+    verPrivacidad: () => { cerrarHoja(true); ir('acerca'); setTimeout(() => { const s = $('#secPrivacidad'), a = $('#app'); if (s) a.scrollTo({ top: s.getBoundingClientRect().top - a.getBoundingClientRect().top + a.scrollTop - 60 }); }, 80); },
     agendaMover: (d) => {
       const c = N.enCR(ag.ref);
       if (ag.modo === 'mes') {
@@ -1966,6 +2193,8 @@
       cambio();
     },
     restaurar: (d) => { const r = Org.restaurar(E, d.tabla, d.id, DISP); avisar(r.ok ? 'Recuperado.' : r.error); cambio(); },
+    borrarParaSiempre: (d) => borrarDeVerdad([{ tabla: d.tabla, id: d.id }]),
+    vaciarPapelera: () => borrarDeVerdad(null),
     sincronizarYa: () => { if (!navigator.onLine) return avisar(F.frase('sinInternet')); sincronizar('abrir'); avisar('Sincronizando…'); },
     avisos: () => hojaAvisos(),
     alternarVibra: (d, b) => { pref.vibra = !pref.vibra; try { localStorage.setItem('liz-vibra', pref.vibra ? '1' : '0'); } catch (e) {} b.querySelector('.interruptor').classList.toggle('on', pref.vibra); if (pref.vibra) vibrar('bien'); },
@@ -2047,12 +2276,37 @@
     if (document.documentElement.scrollTop) document.documentElement.scrollTop = 0;
     if (document.body.scrollTop) document.body.scrollTop = 0;
   }
-  const enderezarYa = () => { enderezar(); setTimeout(enderezar, 120); setTimeout(() => { enderezar(); ajustarTeclado(); }, 450); };      // (iOS anima el teclado ~0,3 s)
+  const enderezarYa = () => { enderezar(); setTimeout(enderezar, 120); setTimeout(() => { enderezar(); ajustarTeclado(); medirHueco(); }, 450); };      // (iOS anima el teclado ~0,3 s)
+  // (Liz 1.0 · prueba 14) EL MENÚ FLOTABA DEMASIADO ARRIBA en el iPhone real (app instalada): una franja vacía de ~50 px entre el menú y
+  // la rayita, SIEMPRE. No era el CSS (la rayita se suma una vez): es una falla de iOS 26 en las apps instaladas: calcula la vista como si
+  // la barra de Safari siguiera abajo (innerHeight más corto que la pantalla) y todo lo "fijo abajo" queda subido. Apple la arregló en
+  // Safari 26.1; también pasa tras abrir y cerrar el teclado (la vista se queda ~59 px más corta). Arreglo: en la app instalada, el alto
+  // REAL de la pantalla es screen.height (en vertical); si la vista es más corta, se intenta que iOS la recalcule (un reacomodo de
+  // #app, solo al abrir y al volver a la app) y, si sigue corta, la diferencia (--hueco) se descuenta abajo: el menú, el fondo sólido
+  // de abajo, #app y el fondo de bacterias llegan hasta el borde real. Sin la falla, --hueco = 0 y no cambia nada.
+  function esInstalada() { return navigator.standalone === true || (window.matchMedia && matchMedia('(display-mode: standalone)').matches); }
+  function altoPantalla() { const a = screen.width, b = screen.height; return matchMedia('(orientation: landscape)').matches ? Math.min(a, b) : Math.max(a, b); }
+  function faltaAbajo() { if (!esInstalada()) return 0; const f = Math.round(altoPantalla() - innerHeight); return f > 2 && f < 160 ? f : 0; }
+  function medirHueco(curar) {
+    if (escribiendo() || tecladoAbierto) return;                                     // (con el teclado abierto, la vista es corta a propósito)
+    if (curar && faltaAbajo()) {
+      const app = $('#app'), y = app.scrollTop;
+      app.style.display = 'none'; void app.offsetHeight; app.style.display = ''; app.scrollTop = y;
+      setTimeout(() => medirHueco(false), 120);
+    }
+    const h = faltaAbajo();
+    if (h === hueco) return;
+    hueco = h;
+    document.documentElement.style.setProperty('--hueco', h + 'px');
+    medirCharla();
+    dispatchEvent(new Event('liz-pantalla'));
+  }
   document.addEventListener('focusout', enderezarYa);                                                       // (se cerró el teclado de cualquier cuadro)
-  document.addEventListener('visibilitychange', () => { if (!document.hidden) enderezarYa(); });            // (volvió a la app desde otra)
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) { enderezarYa(); medirHueco(true); } });   // (volvió a la app desde otra)
   addEventListener('pageshow', enderezarYa);
   addEventListener('orientationchange', enderezarYa);                                                       // (giró el celular)
-  addEventListener('resize', () => { if (!escribiendo()) enderezar(); });
+  addEventListener('resize', () => { if (!escribiendo()) enderezar(); medirHueco(); });
+  medirHueco(true);                                                                                         // (al abrir: lo tapa la pantalla de carga)
   addEventListener('scroll', () => { if (!escribiendo()) enderezar(); }, { passive: true });                 // (algo movió la página)
   // Subir al principio de la pantalla (cada pantalla se desplaza dentro de #app, no la página)
   function arribaDeTodo() { const a = $('#app'); if (a) a.scrollTop = 0; document.body.classList.remove('desplazado'); }
@@ -2075,64 +2329,213 @@
     const s = atob((b64 + '='.repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, '+').replace(/_/g, '/'));
     return Uint8Array.from(s, (c) => c.charCodeAt(0));
   }
+  // "Recordarme estudiar": se guarda en el celular y en su fila de avisos_push (columnas estudio y hora_estudio, de supabase/avisos.sql)
+  let avisosDemo = false;
+  function estudioPref() { let on = true, hora = ''; try { on = localStorage.getItem('liz-estudio') !== '0'; hora = localStorage.getItem('liz-estudio-hora') || ''; } catch (e) {} return { on, hora }; }
+  async function guardarEstudio(p, h) {
+    try { localStorage.setItem('liz-estudio', p.on ? '1' : '0'); localStorage.setItem('liz-estudio-hora', p.hora || ''); } catch (e) {}
+    const id = (() => { try { return localStorage.getItem('liz-aviso-id'); } catch (e) { return null; } })();
+    if (!id || !sb || DEMO) return;
+    const r = await sb.from('avisos_push').update({ estudio: !!p.on, hora_estudio: p.hora === '' ? null : Number(p.hora) }).eq('id', id);
+    if (r.error && h && $('#aErr', h)) $('#aErr', h).textContent = 'Lo guardé en el celular. Para que llegue con la app cerrada falta un paso en Supabase (correr avisos.sql otra vez).';
+  }
   async function hojaAvisos() {
     const puede = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
     let activo = false;
     try { activo = puede && Notification.permission === 'granted' && !!(await (await navigator.serviceWorker.ready).pushManager.getSubscription()); } catch (e) {}
-    const hora = +(localStorage.getItem('liz-aviso-hora') || 8);
-    const horas = Array.from({ length: 17 }, (_, i) => i + 6).map((h) => '<option value="' + h + '"' + (h === hora ? ' selected' : '') + '>' + (h <= 12 ? h : h - 12) + ':00 ' + (h < 12 ? 'a. m.' : 'p. m.') + '</option>').join('');
-    const h = abrirHoja('<h2>🔔 Avisos</h2><p>Te aviso <b>aunque la app esté cerrada</b>: tus recordatorios y eventos a su hora, tus exámenes (3 días antes, el día antes y 2 horas antes), ' +
-      'cuando la laptop termina tus tarjetas y, una vez al día, “Tienes N tarjetas para hoy 🧫”. Si ya te avisé en la compu y estabas ahí, el celular no lo repite.</p>' +
-      (!puede || !instalada ? '<p class="suave">En el iPhone, primero instala LIZ en la pantalla de inicio (Más → Instalar) y ábrela desde ahí.</p>' : '') +
-      '<label for="aHora">¿A qué hora te aviso las tarjetas?</label><select id="aHora">' + horas + '</select><p class="error" id="aErr"></p><div class="botones">' +
-      '<button class="bt prin grande" id="aOn">' + (activo ? 'Guardar la hora' : 'Activar los avisos') + '</button>' +
-      (activo ? '<button class="bt grande" id="aProbar">🔔 Probar aviso (llega en 10 s)</button><button class="bt grande" id="aOff">Apagar los avisos</button>' : '') +
-      '<button class="bt grande" data-cerrar>Cerrar</button></div>' +
-      '<details style="margin-top:14px"><summary class="suave" style="font-weight:800">¿No te llegan?</summary><ol class="suave" style="padding-left:22px;line-height:1.6;font-size:15px">' +
-      '<li>LIZ tiene que estar en la <b>pantalla de inicio</b> y abrirse desde ese ícono (en Safari los avisos no funcionan).</li>' +
-      '<li>iPhone: <b>Ajustes → Notificaciones → LIZ</b> → “Permitir notificaciones” encendido (y “Pantalla bloqueada”, “Centro de notificaciones” y “Globos”).</li>' +
-      '<li>Si tienes un <b>Modo de concentración</b> (No molestar, Dormir), agrega LIZ a las apps permitidas.</li>' +
-      '<li>Si reinstalaste la app, toca aquí <b>Activar los avisos</b> otra vez.</li></ol></details>');
+    if (DEMO && avisosDemo) activo = true;      // (para las fotos: cómo se ve con los avisos encendidos)
+    // (Liz 1.0 · prueba 14) Avisos = SOLO encender/apagar (aquí iOS pide el permiso), "Probar aviso" (llega al momento) y, si están apagados
+    // o el iPhone no dio permiso, cómo activarlos. Se quitó "¿A qué hora te aviso las tarjetas?" (se sentía como crear recordatorios, que
+    // se crean en la Agenda): se sigue usando la hora guardada (8:00 a. m. si nunca se eligió). No se borra ningún recordatorio.
+    const denegado = puede && Notification.permission === 'denied';
+    const ayuda = !puede || !instalada ? '<p class="suave ayudaAvisos">Para recibir avisos en el iPhone, LIZ tiene que estar en la <b>pantalla de inicio</b> y abrirse desde ese ícono (en Safari no funcionan): Más → Instalar en el iPhone.</p>'
+      : denegado ? '<p class="suave ayudaAvisos">El iPhone no le dio permiso a LIZ. Actívalo en <b>Ajustes → Notificaciones → LIZ</b> → “Permitir notificaciones”, y vuelve a encender el interruptor.</p>'
+      : !activo ? '<p class="suave ayudaAvisos">Enciende el interruptor y, cuando el iPhone pregunte, toca <b>Permitir</b>. Te aviso aunque la app esté cerrada: recordatorios, eventos y exámenes a su hora, y una vez al día tus tarjetas.</p>'
+      : '<p class="suave ayudaAvisos">¿No te llegan? Revisa <b>Ajustes → Notificaciones → LIZ</b> y que un Modo de concentración (No molestar, Dormir) no la esté callando.</p>';
+    // (prueba 14) RECORDARME ESTUDIAR: una vez al día "LIZ / ESTUDIO" a la hora que elija (o automático: a las 6 p. m., o al salir de
+    // clase si a esa hora está en una), nunca mientras está en clase y no si ese día ya repasó. Lo manda el servidor (avisos.sql).
+    const est = estudioPref();
+    const horasEst = '<option value="">Automático</option>' + Array.from({ length: 16 }, (_, i) => i + 6).map((x) => '<option value="' + x + '"' + (String(x) === est.hora ? ' selected' : '') + '>' +
+      (x <= 12 ? x : x - 12) + ':00 ' + (x < 12 ? 'a. m.' : 'p. m.') + '</option>').join('');
+    const h = abrirHoja('<h2>🔔 Avisos</h2><div class="panel compacta"><ul class="lista"><li><button class="item" id="aSwitch"><span class="ico rosa">🔔</span><span class="txt"><b>Avisos</b></span>' +
+      '<span class="interruptor' + (activo ? ' on' : '') + '"></span></button></li>' +
+      (activo ? '<li><button class="item" id="aEstudio"><span class="ico verde">📚</span><span class="txt"><b>Recordarme estudiar</b></span><span class="interruptor' + (est.on ? ' on' : '') + '"></span></button></li>' +
+        (est.on ? '<li><div class="item"><span class="ico">🕖</span><span class="txt"><b>¿A qué hora?</b></span><select id="aHoraEst" class="selChico">' + horasEst + '</select></div></li>' : '') : '') +
+      '</ul></div>' + (activo && est.on ? '<p class="suave ayudaAvisos">📚 Te recuerdo estudiar una vez al día, nunca mientras estás en clase y no si ya repasaste. Automático = 6 p. m. (o al salir de clase).</p>' : '') +
+      ayuda + '<p class="error" id="aErr"></p>' +
+      (activo ? '<div class="botones"><button class="bt grande" id="aProbar">🔔 Probar aviso</button></div>' : '') +
+      '<button class="enlaceAgenda" data-a="irRecordatorios">Tus recordatorios se crean en Agenda → Recordatorios ›</button>');
+    if (activo) {
+      $('#aEstudio', h).onclick = async () => { const p = estudioPref(); p.on = !p.on; await guardarEstudio(p, h); hojaAvisos(); };
+      const sel = $('#aHoraEst', h);
+      if (sel) sel.onchange = async () => { const p = estudioPref(); p.hora = sel.value; await guardarEstudio(p, h); avisar(p.hora ? 'Te recuerdo estudiar a las ' + (p.hora > 12 ? p.hora - 12 : p.hora) + ':00.' : 'Te lo recuerdo cuando estés libre.'); };
+    }
     if (activo) $('#aProbar', h).onclick = async (ev) => {
       const b = ev.target;
-      b.disabled = true;
-      b.textContent = 'Pidiendo el aviso…';
-      const r = await cerebro('probarAviso', {});
-      b.disabled = false;
-      if (r && r.ok) { b.textContent = '✓ Llega en 10 s: cierra la app para ver'; avisar('Listo: en 10 segundos te llega. Puedes cerrar la app.'); }
-      else { b.textContent = '🔔 Probar aviso (llega en 10 s)'; $('#aErr', h).textContent = 'No pude: ' + ((r && (r.error || r.dice)) || 'sin respuesta'); }
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        await reg.showNotification('Liz', { body: '¡Así te llegan mis avisos! 💜', icon: 'iconos/icono-192.png', badge: 'iconos/aviso-96.png', tag: 'liz-prueba', data: { url: '#hoy' } });
+        b.textContent = '✓ Aviso mandado';
+        avisar('Te mandé un aviso de prueba ahora mismo.');
+      } catch (e) { $('#aErr', h).textContent = 'No pude mandarlo: ' + (e.message || e); }
     };
-    $('#aOn', h).onclick = async () => {
+    $('#aSwitch', h).onclick = async () => {
       const err = $('#aErr', h);
+      if (activo) {
+        try {
+          const s = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
+          if (s) await s.unsubscribe();
+          const id = localStorage.getItem('liz-aviso-id');
+          if (id && sb) await sb.from('avisos_push').delete().eq('id', id);
+          localStorage.removeItem('liz-aviso-id');
+        } catch (e) {}
+        cerrarHoja(true);
+        avisar('Avisos apagados.');
+        setTimeout(() => { hojaAvisos(); if (vista === 'mas') pintar(); }, 400);
+        return;
+      }
       try {
         if (DEMO) throw new Error('En el modo de prueba no hay avisos.');
-        if (!puede) throw new Error('Este navegador no permite avisos. En el iPhone: instala Liz en la pantalla de inicio y ábrela desde ahí.');
+        if (!puede) throw new Error('Este navegador no permite avisos. En el iPhone: instala LIZ en la pantalla de inicio y ábrela desde ahí.');
         if (!CFG.vapidPublica) throw new Error('Falta la llave pública de los avisos (ver planes/movil.md).');
         if ((await Notification.requestPermission()) !== 'granted') throw new Error('No me diste permiso. Puedes darlo en Ajustes → Notificaciones → LIZ.');
         const reg = await navigator.serviceWorker.ready;
         const s = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64aBytes(CFG.vapidPublica) }));
-        const hh = +$('#aHora', h).value;
+        const hh = +(localStorage.getItem('liz-aviso-hora') || 8);
         let id = localStorage.getItem('liz-aviso-id');
         if (!id) { id = N.uuid(); localStorage.setItem('liz-aviso-id', id); }
         const r = await sb.from('avisos_push').upsert({ id, suscripcion: s.toJSON(), hora: hh });
         if (r.error) throw new Error(r.error.message);
         localStorage.setItem('liz-aviso-hora', hh);
+        await guardarEstudio(estudioPref(), null);
         cerrarHoja(true);
         avisar('Listo: avisos activados. Pruébalo con “Probar aviso”.');
-        setTimeout(hojaAvisos, 1200);
+        setTimeout(() => { hojaAvisos(); if (vista === 'mas') pintar(); }, 900);
       } catch (e) { err.textContent = e.message || String(e); }
     };
-    if (activo) $('#aOff', h).onclick = async () => {
-      try {
-        const s = await (await navigator.serviceWorker.ready).pushManager.getSubscription();
-        if (s) await s.unsubscribe();
-        const id = localStorage.getItem('liz-aviso-id');
-        if (id && sb) await sb.from('avisos_push').delete().eq('id', id);
-      } catch (e) {}
-      cerrarHoja(true);
-      avisar('Avisos apagados.');
-    };
+  }
+
+  // ---------- (Liz 1.0 · prueba 14) ESTUDIAR CON LIZ: pomodoro (25 min de estudio + 5 de descanso; cada 4 bloques, 15) ----------
+  // El reloj se calcula con la hora en que empezó (si cierras la app, sigue bien al volver). Al empezar un bloque se dejan ANOTADOS los dos
+  // avisos (fin del estudio y fin del descanso) como recordatorios ocultos (agenda.js): el servidor los manda con la app cerrada ("LIZ /
+  // POMODORO"); si la app está abierta, avisa ella y los marca como avisados (así no llegan dos). Cada bloque terminado se anota en "avisos"
+  // (Agenda.anotarPomodoro): la compu y el celular cuentan los mismos (hoy y esta semana). Los tiempos se cambian en "⚙️ Cambiar tiempos".
+  const POMO_K = 'liz-pomo', POMO_T = 'liz-pomo-tiempos';
+  function pomoTiempos() {
+    let t = {};
+    try { t = JSON.parse(localStorage.getItem(POMO_T) || '{}') || {}; } catch (e) {}
+    const n = (v, d, a, b) => Math.min(b, Math.max(a, Math.round(Number(v) || d)));
+    return { estudio: n(t.estudio, 25, 5, 90), descanso: n(t.descanso, 5, 1, 30), largo: n(t.largo, 15, 5, 45), cada: n(t.cada, 4, 2, 8) };
+  }
+  function pomoEstado() { try { const s = JSON.parse(localStorage.getItem(POMO_K) || 'null'); return s && s.fase ? s : null; } catch (e) { return null; } }
+  function pomoGuardar(s) { try { if (s) localStorage.setItem(POMO_K, JSON.stringify(s)); else localStorage.removeItem(POMO_K); } catch (e) {} }
+  const mmss = (ms) => { const s = Math.max(0, Math.ceil(ms / 1000)); return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0'); };
+  function pomoQueda(s, ahora) { if (s.pausa != null) return s.pausa; return s.fase === 'estudio' ? s.fin - ahora : s.fase === 'descanso' ? s.finDesc - ahora : 0; }
+  function pomoTxt(s) { const q = mmss(pomoQueda(s, Date.now())); return s.fase === 'estudio' ? q + (s.pausa != null ? ' en pausa' : ' estudiando') : s.fase === 'descanso' ? q + ' de descanso' : 'listo para otro'; }
+  const pomoTextos = (t, largo) => [largo ? 'Descanso largo de ' + t.largo + ' minutos: ¡' + t.cada + ' pomodoros seguidos! Te lo ganaste 💜' : 'Descanso de ' + t.descanso + ' minutos, te lo ganaste ☕',
+    '¡Se acabó el descanso! ¿Otro bloque de ' + t.estudio + ' minutos? 📚'];
+  function pomoAviso(ms, texto) { const r = Ag.crearRecordatorio(E, { texto, cuando: ms, datos: { pomodoro: true } }, DISP); return r.ok ? r.fila.id : null; }
+  // Ya avisó la app (o ya no hace falta): se anota como avisado y el recordatorio oculto se borra (así el servidor no lo manda)
+  function pomoQuitar(id, ms) {
+    const r = id && E.recordatorios[id];
+    if (!r || r.borrado_en) return;
+    if (ms) Sincro.agregar(E, 'avisos', { clave: id, ocurrencia: ms, dispositivo: DISP, presente: true, fecha: Date.now() });
+    Ag.borrar(E, 'recordatorios', id, DISP);
+  }
+  function pomoProgramar(s, desde, quedaEstudio) {
+    const t = pomoTiempos();
+    if (s.fase === 'estudio') { s.fin = desde + (quedaEstudio != null ? quedaEstudio : t.estudio * MIN); s.finDesc = s.fin + (s.largo ? t.largo : t.descanso) * MIN; }
+    const tx = pomoTextos(t, s.largo);
+    s.recs = [s.fase === 'estudio' ? pomoAviso(s.fin, tx[0]) : null, pomoAviso(s.finDesc, tx[1])];
+  }
+  function pomoEmpezar() {
+    const t = pomoTiempos(), antes = pomoEstado(), ahora = Date.now();
+    if (antes) for (const id of antes.recs || []) pomoQuitar(id);
+    const bloque = antes ? antes.bloque || 0 : 0;
+    const s = { fase: 'estudio', ini: ahora, bloque, largo: (bloque + 1) % t.cada === 0, contado: false, pausa: null, minutos: t.estudio };
+    pomoProgramar(s, ahora);
+    pomoGuardar(s);
+    guardarLocal(); pedirSincro();
+    vibrar('bien'); gestoLiz('asentir');
+    avisar('¡Empezamos! ' + t.estudio + ' minutos de concentración. Yo te aviso 🍅');
+    pintarSuave();
+  }
+  function pomoPausar() {
+    const s = pomoEstado(); if (!s || s.fase === 'espera') return;
+    if (s.pausa == null) { s.pausa = pomoQueda(s, Date.now()); for (const id of s.recs || []) pomoQuitar(id); s.recs = []; avisar('En pausa. Cuando quieras, seguimos.'); }
+    else { const q = s.pausa; s.pausa = null; if (s.fase === 'estudio') pomoProgramar(s, Date.now(), q); else { s.finDesc = Date.now() + q; pomoProgramar(s, Date.now()); } avisar('¡Seguimos!'); }
+    pomoGuardar(s); guardarLocal(); pedirSincro(); pintarSuave();
+  }
+  function pomoParar() {
+    const s = pomoEstado(); if (!s) return;
+    for (const id of s.recs || []) pomoQuitar(id);
+    pomoGuardar(null); guardarLocal(); pedirSincro();
+    avisar(s.fase === 'estudio' ? 'Listo, paramos. Lo que estudiaste igual cuenta 💜' : 'Listo. ¡Buen trabajo!');
+    pintarSuave();
+  }
+  function pomoSaltarDescanso() {
+    const s = pomoEstado(); if (!s || s.fase !== 'descanso') return;
+    pomoQuitar(s.recs[1]); s.fase = 'espera'; s.recs = []; pomoGuardar(s); guardarLocal(); pedirSincro(); pintarSuave();
+  }
+  // Cada segundo: ¿terminó el bloque o el descanso? (si la app estuvo cerrada, se pone al día al volver)
+  async function pomoAvisoLocal(texto) {
+    vibrar('bien'); sonar('fin');
+    if (document.hidden && 'serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
+      try { (await navigator.serviceWorker.ready).showNotification('LIZ / POMODORO', { body: texto, icon: 'iconos/icono-192.png', badge: 'iconos/aviso-96.png', tag: 'liz-pomodoro', data: { url: '#pomodoro' } }); } catch (e) {}
+    } else avisar(texto);
+  }
+  function pomoRevisar() {
+    const s = pomoEstado();
+    if (!s || s.pausa != null) return;
+    const ahora = Date.now(), t = pomoTiempos();
+    let cambio2 = false;
+    if (s.fase === 'estudio' && ahora >= s.fin) {
+      if (!s.contado) { Ag.anotarPomodoro(E, s.fin, DISP); s.contado = true; s.bloque = (s.bloque || 0) + 1; }
+      pomoQuitar(s.recs[0], s.fin);
+      s.fase = 'descanso'; cambio2 = true;
+      if (ahora < s.finDesc) { pomoAvisoLocal(pomoTextos(t, s.largo)[0]); confeti(24); gestoLiz('celebrar'); }
+    }
+    if (s.fase === 'descanso' && ahora >= s.finDesc) {
+      pomoQuitar(s.recs[1], s.finDesc);
+      s.fase = 'espera'; s.recs = []; cambio2 = true;
+      if (ahora - s.finDesc < 2 * MIN) pomoAvisoLocal(pomoTextos(t, s.largo)[1]);
+    }
+    if (cambio2) { pomoGuardar(s); guardarLocal(); pedirSincro(); pintarSuave(); }
+    if (vista === 'pomodoro') { const el = $('#pomoT'); if (el) el.textContent = mmss(pomoQueda(s, ahora)); const an = $('#pomoAnillo'); if (an) an.style.setProperty('--p', pomoProgreso(s, ahora)); }
+  }
+  function pomoProgreso(s, ahora) {
+    const t = pomoTiempos(), tot = s.fase === 'estudio' ? (s.minutos || t.estudio) * MIN : s.fase === 'descanso' ? (s.largo ? t.largo : t.descanso) * MIN : 1;
+    return s.fase === 'espera' ? 1 : Math.min(1, Math.max(0, 1 - pomoQueda(s, ahora) / tot));
+  }
+  setInterval(pomoRevisar, 1000);
+  function pintarPomodoro(v) {
+    const s = pomoEstado(), t = pomoTiempos(), p = Ag.pomodoros(E), ahora = Date.now();
+    const fase = !s ? 'listo' : s.fase;
+    const enBloque = s ? ((s.bloque || 0) % t.cada) + (fase === 'estudio' ? 1 : 0) : 1;
+    const frase = fase === 'listo' ? '¿Estudiamos juntos? ' + t.estudio + ' minutos de concentración y ' + t.descanso + ' de descanso. Yo te cuido el tiempo.'
+      : fase === 'estudio' ? (s.pausa != null ? 'Pausa. Cuando quieras, seguimos.' : 'Concentración total. Yo te aviso cuando toque descansar 🤫')
+      : fase === 'descanso' ? (s.largo ? '¡Descanso largo! Estírate, toma agua, mira lejos 💜' : 'Descanso. Levántate un ratito y respira.') : '¡Bloque terminado! ¿Otro?';
+    v.innerHTML = '<button class="volverBt" data-a="ir" data-v="estudiar">‹ Estudiar</button>' + escena(fase === 'descanso' ? 'feliz' : 'saludo', frase) +
+      '<div class="pomo ' + fase + '"><div class="pomoAnillo" id="pomoAnillo" style="--p:' + (s ? pomoProgreso(s, ahora) : 0) + '"><div class="pomoCentro">' +
+      '<b id="pomoT">' + (s ? mmss(pomoQueda(s, ahora)) : mmss(t.estudio * MIN)) + '</b><small>' + (fase === 'descanso' ? (s.largo ? 'Descanso largo' : 'Descanso') : fase === 'espera' ? 'Listo' : 'Estudio') +
+      ' · bloque ' + Math.min(enBloque, t.cada) + ' de ' + t.cada + '</small></div></div>' +
+      '<div class="pomoBotones">' + (fase === 'listo' || fase === 'espera' ? '<button class="bt prin grande" data-a="pomoEmpezar">▶ ' + (fase === 'espera' ? 'Otro bloque' : 'Empezar') + '</button>'
+        : '<button class="bt prin grande" data-a="pomoPausar">' + (s.pausa != null ? '▶ Seguir' : '⏸ Pausa') + '</button>' + (fase === 'descanso' ? '<button class="bt grande" data-a="pomoSaltar">⏭ Saltar descanso</button>' : '')) +
+      (s ? '<button class="bt grande" data-a="pomoParar">⏹ Terminar</button>' : '') + '</div></div>' +
+      '<div class="pastillas pomoCuenta"><span class="pastilla">🍅 <b>' + p.hoy + '</b> hoy</span><span class="pastilla">📅 <b>' + p.semana + '</b> esta semana</span></div>' +
+      '<p class="suave centro" style="font-size:13px;margin:4px 0 0">Cuentan los de la compu y los del celular.</p>' +
+      '<button class="enlaceAgenda" data-a="pomoTiempos">⚙️ Cambiar tiempos (' + t.estudio + ' · ' + t.descanso + ' · ' + t.largo + ' min)</button>';
+  }
+  function hojaPomoTiempos() {
+    const t = pomoTiempos();
+    const fila = (k, nom, a, b) => '<div class="pomoFila"><span>' + nom + '</span><span class="pomoPaso"><button type="button" data-k="' + k + '" data-d="-1">−</button><b id="pt-' + k + '">' + t[k] + '</b><button type="button" data-k="' + k + '" data-d="1">＋</button></span></div>';
+    const h = abrirHoja('<h2>⚙️ Tiempos del pomodoro</h2><div class="panel" style="padding:6px 14px">' + fila('estudio', 'Estudio (min)') + fila('descanso', 'Descanso (min)') + fila('largo', 'Descanso largo (min)') +
+      fila('cada', 'Descanso largo cada (bloques)') + '</div><div class="botones"><button class="bt prin grande" id="ptListo">Guardar</button><button class="bt grande" id="ptFabrica">Volver a 25 · 5 · 15</button><button class="bt grande" data-cerrar>Cancelar</button></div>');
+    const lim = { estudio: [5, 90, 5], descanso: [1, 30, 1], largo: [5, 45, 5], cada: [2, 8, 1] };
+    h.onclick = (ev) => { const b = ev.target.closest('[data-k]'); if (!b) return; const k = b.dataset.k, [a, z, p] = lim[k]; t[k] = Math.min(z, Math.max(a, t[k] + Number(b.dataset.d) * p)); $('#pt-' + k, h).textContent = t[k]; };
+    $('#ptListo', h).onclick = () => { try { localStorage.setItem(POMO_T, JSON.stringify(t)); } catch (e) {} cerrarHoja(true); avisar('Tiempos guardados (se usan desde el próximo bloque).'); pintarSuave(); };
+    $('#ptFabrica', h).onclick = () => { try { localStorage.removeItem(POMO_T); } catch (e) {} cerrarHoja(true); avisar('Volvimos a 25 · 5 · 15.'); pintarSuave(); };
   }
 
   // ---------- Avisito y conexión ----------
@@ -2264,6 +2667,11 @@
     animos: (m) => { animos = m || {}; pintar(); }, gestos: (m) => { gestos = m || {}; }, gesto: (n) => { gestoHasta = 0; return gestoLiz(n); }, animo: (a) => { animoForzado = a || null; pintar(); }, enviar: enviarCharla, escribir: (t) => { A.escribirResp(); setTimeout(() => revisarEscrito(t), 100); },
     pegar: hojaPegar, hacerTarjetas: hacerTarjetasDeTexto,
     teclado: (px) => { tecladoSimulado = px || null; ajustarTeclado(); },      // (para las capturas: simula el teclado abierto)
+    loNuevo: () => revisarLoNuevo(true),      // (para las fotos)
+    avisosEncendidos: () => { avisosDemo = true; hojaAvisos(); },
+    fechasDemo: (l) => { fechasDemo = l; pintarSuave(); },
+    pomo: () => pomoEstado(),
+    pantalla: (curar) => { medirHueco(curar); return { pantalla: altoPantalla(), vista: innerHeight, rayita: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--abajo')) || 0, hueco }; },   // (para las pruebas: ¿iOS midió la vista más corta?)
     // (21-oct-2026) ánimo, frases de cariño y el secreto (pruebas y capturas)
     enlace: (h) => irPorEnlace(h),      // (los avisos al tocarlos; para las pruebas)
     animoHoja: () => hojaAnimo(false), cerrarHoja: () => cerrarHoja(null), animoMarcar: (l) => guardarAnimo(l, 'caritas'),

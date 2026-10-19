@@ -791,3 +791,129 @@ body::before { display: block; content: ''; position: fixed; left: 0; right: 0; 
   pointer-events: none; opacity: 0; transition: opacity .25s;
   background: linear-gradient(to bottom, rgba(24, 18, 31, .97) 0%, rgba(24, 18, 31, .93) 72%, rgba(24, 18, 31, 0) 100%); }
 body.desplazado::before { opacity: 1; }
+/* ---------- (Liz 1.0 · prueba 14) EL MENÚ, PEGADITO A LA RAYITA DEL IPHONE ----------
+   En el iPhone real (app instalada) quedaba una franja vacía de ~50 px entre el menú y la rayita. Causa: iOS 26 calcula la vista de la
+   app instalada como si la barra de Safari siguiera abajo (innerHeight más corto que la pantalla), así que todo lo "fijo abajo" quedaba
+   subido. app.js (medirHueco) mide esa diferencia contra el alto REAL de la pantalla y la pone en --hueco (0 si no hay falla): aquí se
+   descuenta UNA vez. El menú queda a 8 px de la rayita (safe-area-inset-bottom), y el fondo sólido, #app y las bacterias llegan al borde.
+   Lo último de cada pantalla queda justo encima del menú (16 px de aire). */
+:root { --hueco: 0px; --sobreRayita: 8px; --zocalo: calc(var(--menu) + var(--sobreRayita) + var(--abajo)); }
+#menu { bottom: calc(var(--sobreRayita) + var(--abajo) - var(--hueco)); }
+#app, body.enCharla #app { bottom: calc(-1 * var(--hueco)); }
+#app { padding-bottom: calc(var(--zocalo) + 16px); }
+body::after { bottom: calc(-1 * var(--hueco)); }
+#micro { height: auto; bottom: calc(-1 * var(--hueco)); }
+#escribirLiz { bottom: calc(var(--zocalo) + 10px - var(--hueco)); }
+.fab { bottom: calc(var(--zocalo) + 16px - var(--hueco)); }
+#aviso { bottom: calc(var(--zocalo) + 14px - var(--hueco)); }
+/* La pantalla de carga, centrada en la pantalla REAL (igual que la imagen de arranque del iPhone, que es una foto de su primer instante) */
+#carga { bottom: calc(-1 * var(--hueco)); }/* ---------- (Liz 1.0 · prueba 14) "Más": Acerca de Liz sola, con la carita de Liz como ícono (mismo tamaño que los demás, en círculo) ---------- */
+.compacta .item .ico.icoLiz { border-radius: 50%; padding: 0; overflow: hidden; background: none; box-shadow: 0 0 0 1.5px rgba(169, 139, 255, .55), 0 0 10px rgba(169, 139, 255, .35); }
+.compacta .item .ico.icoLiz .lizFoto { width: 100%; height: 100%; border: 0; box-shadow: none; }
+.soloAcerca { margin-top: 22px; }
+.compacta .item .dato.correo { max-width: 58%; overflow: hidden; text-overflow: ellipsis; }
+/* ---------- (Liz 1.0 · prueba 14) Papelera: recuperar y borrar uno por uno, y "Vaciar papelera" discreto (advertencia suave) ---------- */
+.botonesPap { display: inline-flex; gap: 6px; flex: none; }
+.bt.chico.borrarYa { min-width: 40px; padding-left: 0; padding-right: 0; background: rgba(255, 92, 116, .08); border-color: rgba(255, 92, 116, .3); }
+.vaciarBt { display: block; width: auto; margin: 14px auto 4px; min-height: 40px; padding: 0 18px; border-radius: 14px; font-weight: 800; font-size: 14.5px;
+  background: transparent; border: 1px solid rgba(255, 92, 116, .32); color: #ff9aa8; box-shadow: none; }
+.vaciarBt:active { background: rgba(255, 92, 116, .12); }
+/* ---------- (Liz 1.0 · prueba 14) Hoja de Avisos: interruptor, probar y una línea pequeña que lleva a la Agenda ---------- */
+.ayudaAvisos { font-size: 14.5px; line-height: 1.5; margin: 12px 2px 4px; }
+.enlaceAgenda { display: block; margin: 16px auto 2px; padding: 6px 10px; background: none; border: 0; color: var(--t-acento); font: inherit; font-size: 13.5px; font-weight: 800; }
+/* ---------- (Liz 1.0 · prueba 14) Agenda: solo "Mes · Semana" y la sección Recordatorios debajo del calendario ---------- */
+#secRecordatorios small { font-size: 13px; font-weight: 700; color: var(--t-texto-suave); margin-left: 4px; letter-spacing: 0; text-transform: none; }
+.subRec { margin: 4px 2px 8px; font-size: 13.5px; font-weight: 800; }
+.nadaDia { margin: 4px 2px 12px; font-size: 14.5px; }
+.borrarFila { flex: none; width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; font-size: 16px; background: rgba(255, 92, 116, .07);
+  border: 1px solid rgba(255, 92, 116, .25); color: #ff9aa8; margin-left: 6px; }
+.borrarFila:active { background: rgba(255, 92, 116, .16); }
+/* ---------- (Liz 1.0 · prueba 14) CHARLA: letra 2 px más chica y la burbuja de Liz OSCURA "de laboratorio futurista" ----------
+   Antes: 16,5 px (globito de arriba 16), burbujas de Liz blancas (cansaban la vista sobre el fondo oscuro). Ahora: 14,5 px (arriba 14),
+   vidrio morado-azulado semitransparente con un poco de desenfoque, borde fino brillante y un resplandor leve; texto blanco suave
+   (#ebe6f5 sobre ~#211a33: contraste ~14:1, se lee con poco brillo). Las de él siguen moradas (degradado lleno, sin borde): se distinguen. */
+.msg .burbuja { padding: 10px 14px; border-radius: 19px; font-size: 14.5px; line-height: 1.45; }
+.msg .hora { margin-top: 3px; font-size: 10px; letter-spacing: .02em; }
+.msg.liz .burbuja, .bienvenida .comic {
+  background: linear-gradient(160deg, rgba(44, 33, 74, .78), rgba(24, 22, 52, .74)); color: #ebe6f5;
+  -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2);
+  border: 1px solid rgba(160, 140, 255, .5);
+  box-shadow: 0 0 12px rgba(140, 120, 255, .22), inset 0 0 14px rgba(110, 190, 255, .06), 0 8px 20px rgba(0, 0, 0, .35); }
+.msg.liz .burbuja { border-bottom-left-radius: 6px; }
+.msg.liz .hora { color: #b9a6ff; opacity: .7; }
+.msg.liz .extra { background: rgba(169, 139, 255, .14); color: #d6c9ff; border: 1px solid rgba(169, 139, 255, .25); }
+.msg.liz .burbuja b { color: #cdb8ff; }
+/* El globito de Liz saludando, arriba de la charla: el mismo vidrio oscuro (su colita, del mismo color, solo la mitad de afuera) */
+.bienvenida .comic { font-size: 14px; line-height: 1.4; font-weight: 800; padding: 10px 14px; border-radius: 19px; animation-name: globo; }
+.bienvenida .comic::after { background: rgba(36, 28, 64, .96); box-shadow: none; border-right: 1px solid rgba(160, 140, 255, .5); border-bottom: 1px solid rgba(160, 140, 255, .5);
+  width: 18px; height: 18px; clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+.bienvenida .comic.cola-izq::after { left: -9.5px; }
+body.charlaChica .bienvenida .comic { font-size: 13px; }
+/* ---------- (Liz 1.0 · prueba 14) "Tu privacidad" en Acerca de Liz ---------- */
+.privacidad { padding: 14px 16px 6px; }
+.privacidad .intro { margin: 0 0 6px; font-weight: 800; color: var(--t-texto); }
+.privacidad h4 { margin: 14px 0 6px; font-size: 12px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: var(--t-acento); }
+.privacidad p { margin: 0 0 9px; font-size: 14.5px; line-height: 1.5; color: var(--t-texto-suave); font-weight: 650; }
+/* ---------- (Liz 1.0 · prueba 14) HORARIO DE CLASES, FECHAS ESPECIALES y POMODORO ---------- */
+:root { --clase: #2dd4bf; --especial: #ff7eb6; }
+.t-clase { background: var(--clase); box-shadow: 0 0 6px var(--clase); } .t-especial { background: var(--especial); box-shadow: 0 0 6px var(--especial); }
+.segFila { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+.segFila .seg { flex: 1; margin: 0; }
+.horarioBt { flex: none; min-height: 48px; padding: 0 12px; border-radius: 999px; font-weight: 900; font-size: 14px; color: #b8fff3;
+  background: rgba(45, 212, 191, .1); border: 1px solid rgba(45, 212, 191, .4); }
+.semana .cosas .esClase { color: #b8fff3; background: rgba(45, 212, 191, .1); border-left: 3px solid var(--clase); border-radius: 6px; padding: 1px 5px; margin: 1px 0; }
+.semana .cosas .esEspecial { color: #ffc4dd; font-weight: 900; }
+.diaHorario { margin: 14px 2px 6px; }
+.claseHora { flex: none; min-width: 92px; font-weight: 900; color: #b8fff3; font-size: 14px; }
+.seg.dias button { font-size: 13.5px; min-height: 38px; }
+.selChico { max-width: 52%; min-height: 36px; padding: 0 8px; border-radius: 12px; font-size: 14px; }
+.comic.especial { font-size: 17px; }
+/* Estudiar con Liz (pomodoro) */
+.pomoBt { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 14px; padding: 11px 14px; border-radius: 20px; text-align: left;
+  background: linear-gradient(135deg, rgba(255, 107, 107, .14), rgba(142, 107, 255, .12)); border: 1px solid rgba(255, 140, 140, .35); color: var(--t-texto); }
+.pomoBt .e { font-size: 28px; line-height: 1; }
+.pomoBt .t { flex: 1; display: flex; flex-direction: column; gap: 2px; } .pomoBt .t b { font-size: 16.5px; font-weight: 900; } .pomoBt .t small { font-size: 13px; color: var(--t-texto-suave); font-weight: 700; }
+.pomoBt .chev { font-size: 22px; color: var(--t-texto-suave); }
+.pomo { display: flex; flex-direction: column; align-items: center; gap: 18px; margin: 6px 0 14px; }
+.pomoAnillo { --p: 0; --c: #ff8a8a; width: min(250px, 68vw); aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center;
+  background: conic-gradient(var(--c) calc(var(--p) * 360deg), rgba(169, 139, 255, .2) 0); box-shadow: 0 0 40px rgba(255, 138, 138, .25); transition: --p .9s linear; }
+.pomo.descanso .pomoAnillo { --c: var(--clase); box-shadow: 0 0 40px rgba(45, 212, 191, .25); }
+.pomo.espera .pomoAnillo, .pomo.listo .pomoAnillo { --c: var(--t-acento); box-shadow: 0 0 40px rgba(169, 139, 255, .25); }
+.pomoCentro { width: calc(100% - 22px); aspect-ratio: 1; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #2a2140, #15111e); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; }
+.pomoCentro b { font-size: 54px; font-weight: 900; letter-spacing: .02em; font-variant-numeric: tabular-nums; }
+.pomoCentro small { font-size: 14px; font-weight: 800; color: var(--t-texto-suave); }
+.pomoBotones { display: grid; gap: 10px; width: 100%; }
+.pomoCuenta { justify-content: center; }
+.pomoFila { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--vidrio-borde); }
+.pomoFila:last-child { border-bottom: 0; }
+.pomoFila > span:first-child { font-weight: 800; }
+.pomoPaso { display: inline-flex; align-items: center; gap: 10px; } .pomoPaso b { min-width: 28px; text-align: center; font-size: 18px; }
+.pomoPaso button { width: 38px; height: 38px; border-radius: 12px; font-size: 20px; font-weight: 900; background: rgba(169, 139, 255, .14); border: 1px solid var(--vidrio-borde); color: var(--t-texto); }
+/* ---------- (Liz 1.0 · prueba 15) TODAS las burbujas de Liz (globitos de Hoy, de cada pantalla, de las hojas, del repaso) con el MISMO
+   vidrio oscuro "de laboratorio futurista" de la charla (antes eran blancas): fondo morado-azulado semitransparente con desenfoque, borde
+   fino brillante, resplandor leve y texto blanco suave (#ebe6f5: contraste ~14:1). Su colita: del mismo color, solo la mitad de afuera. ---------- */
+.comic { background: linear-gradient(160deg, rgba(44, 33, 74, .84), rgba(24, 22, 52, .8)); color: #ebe6f5;
+  -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); border: 1px solid rgba(160, 140, 255, .5);
+  box-shadow: 0 0 12px rgba(140, 120, 255, .22), inset 0 0 14px rgba(110, 190, 255, .06), 0 8px 20px rgba(0, 0, 0, .35); }
+.comic b { color: #cdb8ff; }
+.comic small, .acerca .comic.secreto small { color: #b9a6ff; }
+.comic::after { width: 18px; height: 18px; background: rgba(36, 28, 64, .97); box-shadow: none;
+  border-right: 1px solid rgba(160, 140, 255, .5); border-bottom: 1px solid rgba(160, 140, 255, .5); clip-path: polygon(100% 0, 100% 100%, 0 100%); }
+.comic.cola-arriba::after { top: -9.5px; margin-left: -9px; }
+.comic.cola-abajo::after { bottom: -9.5px; }
+.comic.cola-der::after { right: -9.5px; }
+.comic.cola-izq::after { left: -9.5px; }
+/* La frase de cariño y la fecha especial: el mismo vidrio, con un brillo rosado-morado un poco más fuerte */
+.comic.carino { background: linear-gradient(160deg, rgba(58, 34, 80, .86), rgba(30, 22, 58, .82)); border-color: rgba(255, 126, 182, .55);
+  box-shadow: 0 0 22px rgba(255, 126, 182, .28), 0 0 34px rgba(169, 139, 255, .25), 0 10px 26px rgba(0, 0, 0, .4); }
+.comic.carino::after { background: rgba(48, 30, 72, .97); border-color: rgba(255, 126, 182, .55); }
+/* La burbuja de Hoy: una frase; al tocarla, la siguiente con un fundido suave (los puntitos dicen cuántas hay) */
+.globoHoy { cursor: pointer; transition: opacity .18s ease, transform .18s ease; -webkit-tap-highlight-color: transparent; }
+.globoHoy.cambia { opacity: 0; transform: translateY(4px) scale(.98); }
+.puntosGlobo { display: flex; justify-content: center; gap: 6px; margin-top: 9px; }
+.puntosGlobo i { width: 6px; height: 6px; border-radius: 50%; background: rgba(185, 166, 255, .3); transition: background .2s, box-shadow .2s; }
+.puntosGlobo i.on { background: #b9a6ff; box-shadow: 0 0 6px #b9a6ff; }
+/* Lo que Liz le contestó en el diario de ánimo (Progreso → Cómo te has sentido) */
+.respAn { margin: 12px 0 2px; display: grid; gap: 8px; }
+.respAn .r { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; color: var(--t-texto-suave); }
+.respAn .r b { flex: none; color: var(--t-texto); font-weight: 900; min-width: 58px; }

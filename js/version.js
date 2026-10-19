@@ -10,7 +10,7 @@
   else raiz.LizVersion = fabrica();
 })(typeof self !== 'undefined' ? self : this, function () {
   const liz = '1.0';
-  const bolsillo = 13;
+  const bolsillo = 15;
   return {
     liz,
     bolsillo,
@@ -25,6 +25,48 @@
       'Charla con Liz desde el celular: pregúntale, pídele recordatorios o que te explique algo.',
       '“¿Cómo te sientes hoy?”: tu diario de ánimo, y Liz se adapta a cómo estás.',
       'Y alguna sorpresa de vez en cuando… 💜',
+    ],
+    // (Liz 1.0 · prueba 14) LO NUEVO EN ESTA VERSIÓN: Liz lo muestra UNA vez después de actualizarse (en la compu y en el celular; no en una
+    // instalación nueva) y queda la lista en "Acerca de Liz". Para la próxima actualización: cambiar "id" (así se vuelve a mostrar) y "cosas".
+    loNuevo: {
+      id: 'bolsillo-15',
+      cosas: [
+        'La burbuja de Liz en Hoy dice una sola cosa a la vez: tócala para ver la siguiente.',
+        'Cuando marcas cómo te sientes, Liz te contesta en la charla (y queda en tu diario de ánimo).',
+        'El menú de abajo queda pegadito al borde del iPhone, y al abrir la app sale directo la pantalla de carga.',
+        '“Más” más ordenado: Más opciones, Ajustes y Acerca de Liz.',
+        'Papelera: borra para siempre una cosa o vacíala toda.',
+        'Avisos más simples: un interruptor y “Probar aviso”.',
+        'Todas las burbujas de Liz son oscuras y no cansan la vista; la charla, con letra más cómoda.',
+        'Agenda: solo Mes y Semana, y tus recordatorios debajo del calendario.',
+        'Mi horario: anota tus clases en la Agenda y Liz se acomoda a ellas.',
+        'Estudiar con Liz: pomodoro de 25 + 5 minutos, con aviso aunque la app esté cerrada.',
+        'Liz te recuerda estudiar una vez al día, cuando estés libre (lo eliges en Avisos).',
+        'Tus recuerdos con Liz se respaldan solos en la nube cada día.',
+        'Tu privacidad, explicada en “Acerca de Liz”.',
+      ],
+    },
+    // (Liz 1.0 · prueba 14) TU PRIVACIDAD (en "Acerca de Liz", en la compu y en el celular). REVISADO EN EL CÓDIGO el 21-oct-2026: qué se
+    // guarda dónde (compu: %APPDATA%; celular: IndexedDB; nube: tablas con RLS "solo su dueño" + carpeta privada liz-privado/<su cuenta>),
+    // qué sale a cada servicio (main.js, liz-cerebro), que la cámara y la pantalla no se guardan, y que liz-cerebro no anota el contenido.
+    // Si algo de esto cambia, cambiar aquí también. "{creadora}" lo pone la app (privado).
+    privacidad: [
+      ['Dónde se guardan tus cosas', [
+        'En tu compu: lo que recuerdo de ti, nuestras charlas, mi diario, tus apuntes y, si me la enseñaste, la huella de tu voz.',
+        'En tu celular: tus tarjetas, tu agenda y lo que hablamos ahí, para que funcione aunque no haya internet.',
+        'En la nube (Supabase), en tu cuenta privada: tus tarjetas, mazos y progreso, tu agenda, los archivos que subes, cómo te has sentido, lo que hablamos en el celular y un respaldo diario de lo de tu compu. Así tu compu y tu celular se ponen de acuerdo, y si uno se daña no pierdes nada.',
+        'Las reglas de la nube solo dejan entrar a tu cuenta. Las fotos de tu cámara y de tu pantalla no las guardo en ningún lado, y mi voz se hace en tu propia compu.',
+      ]],
+      ['A quién le pregunto para responderte', [
+        'Groq: lo que me dices o escribes (y tu voz, para entenderla). Según Groq, no se queda con eso.',
+        'Google Gemini: cuando me pides que mire tu pantalla o tu cámara, y de respaldo si Groq está lleno. Ojo: uso el plan gratis de Google, y ahí Google puede usar lo que le mando para mejorar sus productos (a veces lo revisan personas, sin tu nombre ni tu cuenta). Por eso, no me mandes contraseñas ni datos delicados.',
+        'Claude (de Anthropic): solo cuando tocas el botón 🧠.',
+        'Cuando te muestro fotos o videos, lo que buscas va a Google, YouTube o Wikipedia, en tu navegador.',
+      ]],
+      ['Quién puede verlo', [
+        'Nadie revisa tus conversaciones ni tu diario de ánimo. No hay anuncios y nada se vende.',
+        '{creadora} administra la cuenta de la nube y las claves de los servicios: podría entrar a la base de datos, pero prometió no leer lo tuyo. Si algún día quieres, se puede pasar todo a una cuenta solo tuya.',
+      ]],
     ],
     // (21-oct-2026) AUTORA y derechos: Liz (el código, el diseño, los textos, su personalidad y la voz que ella diseñó) es de su autora.
     // Lo de terceros va en "creditos", con su licencia. El nombre de la autora es público a propósito (ella lo pidió); la dedicatoria con el

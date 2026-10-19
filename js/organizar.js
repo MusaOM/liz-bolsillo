@@ -72,7 +72,8 @@
   // Restaurar: lo que se borró junto (la misma hora) vuelve junto; si el mazo o la materia de una tarjeta están borrados, vuelven también
   function restaurar(E, tabla, id, disp) {
     const x = E[tabla] && E[tabla][id];
-    if (!x || !x.borrado_en) return { error: 'eso no está en la papelera' };
+    if (!x || !x.borrado_en || vaciado(x)) return { error: 'eso no está en la papelera' };
+    if (tabla === 'tarjetas' && vaciado(E.mazos[x.mazo_id])) return { error: 'su mazo se borró para siempre' };
     const cuando = x.borrado_en;
     Sincro.cambiar(E, tabla, { id, borrado_en: null }, disp);
     if (tabla === 'tarjetas') {
@@ -97,7 +98,7 @@
     // (Parte 2: también lo del calendario y los archivos)
     for (const tabla of ['materias', 'mazos', 'tarjetas', 'eventos', 'examenes', 'recordatorios', 'archivos']) {
       for (const x of Object.values(E[tabla] || {})) {
-        if (!x.borrado_en) continue;
+        if (!x.borrado_en || vaciado(x) || (x.datos && x.datos.pomodoro)) continue;      // (los bloques del pomodoro: ocultos, ver agenda.js)
         // Una tarjeta borrada junto con su mazo se muestra solo como el mazo
         if (tabla === 'tarjetas') { const m = E.mazos[x.mazo_id]; if (m && m.borrado_en === x.borrado_en) continue; }
         if (tabla === 'mazos') { const ma = E.materias[x.materia_id]; if (ma && ma.borrado_en === x.borrado_en) continue; }
@@ -107,6 +108,35 @@
       }
     }
     return l.sort((a, b) => b.borrado_en - a.borrado_en);
+  }
+  // (Liz 1.0 · prueba 14) BORRAR PARA SIEMPRE (uno, o "Vaciar papelera" = todos). Sin tocar la sincronización: se usa lo que ya existe.
+  // Cada aparato borra de verdad (de sí mismo y de Supabase, con los repasos de esas tarjetas y el archivo guardado) lo que lleva más
+  // de 30 días en la papelera (Sincro, paso 3). Aquí, en el momento: (1) el CONTENIDO se borra ya (pregunta, respuesta, nombre, texto…
+  // quedan vacíos: así se sube y le llega a la compu en segundos), (2) queda marcado datos.vaciado (ya no sale en ninguna papelera ni se
+  // puede recuperar) y (3) su borrado_en se corre para que "venza" en VENCE_DIAS: el aparato que sincronice después lo borra de verdad
+  // de todos lados. (Se deja ese margen para que la compu alcance a recibir el cambio aunque esté apagada unos días.)
+  const VENCE_DIAS = 7;
+  const TEXTOS = ['pregunta', 'respuesta', 'nombre', 'titulo', 'texto', 'nota', 'que', 'contexto'];
+  function vaciado(x) { return !!(x && x.datos && x.datos.vaciado); }
+  function borrarParaSiempre(E, cuales, disp, ahora) {
+    ahora = ahora || Date.now();
+    const vence = ahora - (Nucleo.PAPELERA_DIAS - VENCE_DIAS) * Nucleo.DIA;
+    const filas = [];
+    const sumar = (tabla, x) => { if (x && x.borrado_en && !vaciado(x) && !filas.some((f) => f.x === x)) filas.push({ tabla, x }); };
+    for (const { tabla, id } of cuales || papelera(E, ahora)) {
+      const x = E[tabla] && E[tabla][id];
+      if (!x || !x.borrado_en) continue;
+      sumar(tabla, x);
+      // Lo que se borró junto con él (la papelera lo muestra como uno solo): los mazos de la materia y sus tarjetas
+      const mazos = tabla === 'materias' ? Object.values(E.mazos).filter((m) => m.materia_id === id && m.borrado_en === x.borrado_en) : tabla === 'mazos' ? [x] : [];
+      for (const m of mazos) { sumar('mazos', m); for (const t of Object.values(E.tarjetas).filter((t) => t.mazo_id === m.id && t.borrado_en === x.borrado_en)) sumar('tarjetas', t); }
+    }
+    for (const { tabla, x } of filas) {
+      const cambio = { id: x.id, borrado_en: Math.min(x.borrado_en, vence), datos: { vaciado: ahora } };
+      for (const k of TEXTOS) if (typeof x[k] === 'string') cambio[k] = '';
+      Sincro.cambiar(E, tabla, cambio, disp, ahora);
+    }
+    return { ok: true, borrados: filas.length, archivos: filas.filter((f) => f.tabla === 'archivos').map((f) => f.x) };
   }
 
   // ---------- Mazos y materias ----------
@@ -226,7 +256,7 @@
     return tocan.concat(resto);
   }
 
-  return { lim, vivos, crearMateria, crearMazo, crearTarjeta, editarTarjeta, marcar, borrarTarjeta, borrarMazo, borrarMateria, restaurar, papelera,
+  return { lim, vivos, crearMateria, crearMazo, crearTarjeta, editarTarjeta, marcar, borrarTarjeta, borrarMazo, borrarMateria, restaurar, papelera, borrarParaSiempre, vaciado,
     renombrarMazo, renombrarMateria, moverMazo, juntarMazos, arbol, buscar, paraRepasar,
     sabida, archivada, archivadoX, activa, marcarSabida, archivar, archivados, buscarMateriaOMazo };
 });

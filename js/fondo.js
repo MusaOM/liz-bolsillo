@@ -55,7 +55,7 @@
     const g = lienzo.getContext('2d');
     const quieto = matchMedia('(prefers-reduced-motion: reduce)').matches;
     let W = 0, H = 0;
-    const medir = () => { const w0 = W, h0 = H; W = lienzo.width = innerWidth; H = lienzo.height = innerHeight; if (w0) for (const c of cosas) { c.x *= W / w0; c.y *= H / h0; } };
+    const medir = () => { const w0 = W, h0 = H; W = lienzo.width = innerWidth; H = lienzo.height = lienzo.clientHeight || innerHeight;   // (el alto real del lienzo: llega hasta el borde de la pantalla aunque iOS mida la vista más corta) if (w0) for (const c of cosas) { c.x *= W / w0; c.y *= H / h0; } };
     const cs = colores().length ? colores() : ['#a98bff', '#4cc9f0', '#f72585', '#7cf29a'];
     const imgs = {};
     for (const [k, f] of Object.entries(FORMAS)) imgs[k] = cs.map((c) => f(c));
@@ -68,6 +68,7 @@
     cosas.push(nuevo('molecula', azar(0, W), azar(0, H), { alfa: 0.2, vx: azar(-3, 3), vy: azar(-3, 3), va: 0.05 }));
     for (let i = 0; i < 13; i++) cosas.push(nuevo(elegir(BACT), azar(0, W), azar(0, H)));
     addEventListener('resize', medir);
+    addEventListener('liz-pantalla', medir);
 
     let ultimo = performance.now(), acum = 0, t = 0, proxDiv = 5, pedido = 0;
     function dibujar(dt) {

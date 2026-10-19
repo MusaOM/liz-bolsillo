@@ -39,6 +39,19 @@
     return Sincro.cambiar(E, 'animo', { id: idDia(dia), dia, emociones: lista.slice(0, 3), creada: (previo && previo.creada) || ahora,
       datos: Object.assign({}, previo && previo.datos, { como: como || 'caritas', saltado: false }), borrado_en: null }, dispositivo, ahora);
   }
+  // (Liz 1.0 · prueba 15) Lo que Liz le CONTESTÓ al marcar (p. ej. "Te doy tu espacio…") queda en su diario, en la fila de ese día
+  // (datos.respuesta), junto a lo que él marcó. Se sincroniza como lo demás (misma fila, campo datos).
+  function anotarRespuesta(E, texto, dispositivo, ahora) {
+    ahora = ahora || Date.now();
+    const dia = N.diaCR(ahora), f = delDia(E, dia);
+    if (!f || !texto) return null;
+    return Sincro.cambiar(E, 'animo', { id: f.id, datos: Object.assign({}, f.datos, { respuesta: String(texto).slice(0, 400), respuestaEn: ahora }) }, dispositivo, ahora);
+  }
+  // Lo que Liz le dice al marcar: su reacción y, si hay, la línea de cómo lo acompaña ese día ("Te doy tu espacio…"), sin repetir
+  function respuestaAlMarcar(lista, fem) {
+    const r = reaccion(lista, fem), l = lineaHoy(lista);
+    return [r, l && l !== r ? l : ''].filter(Boolean).join(' ');
+  }
   function saltar(E, dispositivo, ahora) {
     ahora = ahora || Date.now();
     const dia = N.diaCR(ahora);
@@ -161,7 +174,7 @@
     for (let i = n - 1; i >= 0; i--) {
       const ms = ini - i * DIA + 12 * N.H, d = N.diaCR(ms), f = delDia(E, d), est = porDia[d] || { repasos: 0, bien: 0 };
       out.push({ dia: d, ms, emociones: f && Array.isArray(f.emociones) ? f.emociones.filter((k) => POR[k]) : [], saltado: !!(f && f.datos && f.datos.saltado),
-        repasos: est.repasos, bien: est.bien });
+        repasos: est.repasos, bien: est.bien, respuesta: (f && f.datos && f.datos.respuesta) || '' });
     }
     return out;
   }
@@ -269,6 +282,6 @@
   }
 
   return { EMOCIONES, POR, PESADAS, nombre, idDia, delDia, hoy, deHoy, debePreguntar, guardar, saltar, delTexto, PIDE_RESUMEN, COMO_ACTUAR,
-    instrucciones, reaccion, principal, lineaHoy, animoLiz, pesado, tarjetasSugeridas, dias, cuentas, resumen, resumenTexto, necesitaCuidado, textoCuidado, CUIDADO_DIAS,
+    instrucciones, reaccion, principal, lineaHoy, anotarRespuesta, respuestaAlMarcar, animoLiz, pesado, tarjetasSugeridas, dias, cuentas, resumen, resumenTexto, necesitaCuidado, textoCuidado, CUIDADO_DIAS,
     leerFrases, ultimoAviso, esperaCarino, carinoAhora, anotarCarino, anotarCuidado, secreto };
 });
