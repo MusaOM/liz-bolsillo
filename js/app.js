@@ -1397,6 +1397,7 @@
   // Liz, el correo y la sincronización) · la versión, pequeñita · y al final, separado, "Cerrar sesión" (pide confirmar).
   // Cada cosa en UN solo lugar: aquí no están Charlar (pestaña Liz), Pegar texto / Subir archivo (Estudiar → Mazos) ni Recordatorios (Agenda).
   function pintarMas(v) {
+    setTimeout(refrescarCerebro, 300);
     const pap = Org.papelera(E).length, arch = Org.archivados(E).length;
     const esperando = Org.vivos(E.archivos).filter((a) => a.estado === 'esperando' || a.estado === 'leyendo').length;
     const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
@@ -1427,6 +1428,8 @@
         interruptor('alternarQuieto', '🫧', '', 'Reducir movimiento', pref.quieto) +
         (instalada ? '' : fila('comoInstalar', '📲', '', 'Instalar en el iPhone')) +
         fila('sincronizarYa', '🔄', 'celeste', 'Sincronización', esc(estadoSync().t), '', undefined, 'filaSync') +
+        // (19-oct-2026) una línea discreta: qué cerebro usa el chat del celular y lo gastado este mes
+        '<li id="filaCerebro" class="lineaCerebro"' + (textoCerebro() ? '' : ' hidden') + '><span>' + esc(textoCerebro()) + '</span></li>' +
         '<li><div class="item"><span class="ico">✉️</span><span class="txt"><b>Cuenta</b></span><span class="dato correo">' + esc(DEMO ? 'Modo de prueba' : perfil.correo || '—') + '</span></div></li>') +
       '<div class="panel compacta soloAcerca"><ul class="lista"><li><button class="item" data-a="ir" data-v="acerca">' + cara + '<span class="txt"><b>Acerca de Liz</b></span><span class="chev">›</span></button></li></ul></div>' +
       '<p class="versionLiz">' + esc(V.larga) + ' · © ' + esc(V.fecha.slice(0, 4)) + ' ' + esc(V.autora) + '</p>' +
@@ -1829,8 +1832,31 @@
         else if (st === 401) { sinSesion = true; m = 'tu sesión venció: vuelve a entrar'; }
         return { error: m };
       }
+      if (r.data && r.data.cerebro) guardarCerebro(r.data.cerebro);
       return r.data || { error: 'no respondió' };
     } catch (e) { return { error: e.message || String(e) }; }
+  }
+  // ---------- (19-oct-2026) Qué cerebro usa el celular y cuánto lleva gastado este mes (Más → Sincronización, una línea discreta) ----------
+  // OpenRouter (de pago, con tope por mes) → Groq gratis → Gemini: lo decide liz-cerebro; la app solo lo muestra.
+  let cerebroInfo = (() => { try { return JSON.parse(localStorage.getItem('liz-cerebro-estado') || 'null'); } catch (e) { return null; } })();
+  function guardarCerebro(c) {
+    cerebroInfo = Object.assign({}, cerebroInfo || {}, c, { ms: Date.now() });
+    try { localStorage.setItem('liz-cerebro-estado', JSON.stringify(cerebroInfo)); } catch (e) {}
+    const el = $('#filaCerebro span');
+    if (el) { el.textContent = textoCerebro(); $('#filaCerebro').hidden = !el.textContent; }
+  }
+  const dolares = (n) => '$' + (Number(n) || 0).toFixed(2).replace('.', ',');
+  function textoCerebro() {
+    const c = cerebroInfo;
+    if (!c) return '';
+    if (c.via === 'openrouter') return 'Cerebro: OpenRouter · gastado este mes ' + dolares(c.gastoMes);
+    if (c.alTope) return 'Cerebro: Groq gratis · OpenRouter llegó al tope de ' + dolares(c.tope) + ' este mes';
+    return 'Cerebro: Groq gratis' + (c.gastoMes ? ' · gastado este mes ' + dolares(c.gastoMes) : '');
+  }
+  async function refrescarCerebro() {
+    if (DEMO || !sb || !navigator.onLine || (cerebroInfo && Date.now() - cerebroInfo.ms < 10 * MIN)) return;
+    const r = await cerebro('estadoCerebro');
+    if (r && r.via) guardarCerebro({ via: r.via, gastoMes: r.gastoMes, tope: r.tope, alTope: r.alTope });
   }
 
   // ---------- CHARLA con Liz (pestaña "Liz") ----------

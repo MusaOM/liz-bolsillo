@@ -1,12 +1,11 @@
 // frases.js — lo que dice Liz en el celular. Lista FIJA (sin inteligencia artificial: funciona sin internet y no gasta nada).
 // {nombre} se cambia por su nombre (lo sube la Liz de la PC); si todavía no lo sabe, se quita con cuidado.
 // Para agregar frases: solo sumarlas a la lista que corresponda.
+// (19-oct-2026) Las frases INGENIOSAS (la pantalla de carga, el globito de Hoy, el saludo de la charla) viven en js/frases-liz.js, la MISMA
+// fuente que usa la compu: aquí ya no hay copia. Cambian cada día (y según la hora y el ánimo).
 (function (raiz) {
+  const FL = raiz.FrasesLiz || (typeof require === 'function' ? require('./frases-liz.js') : null);
   const F = {
-    madrugada: ['¿Todavía despierto, {nombre}? Unas poquitas y a dormir, ¿sí?', 'Las bacterias no duermen, pero tú sí deberías, {nombre}.', 'Modo búho activado. Repasamos un ratito y descansas.'],
-    manana: ['¡Buenos días, {nombre}! ¿Arrancamos con unas tarjetas?', 'Buenos días, {nombre}. Café en una mano, tarjetas en la otra.', '¡Hola, {nombre}! Mañana fresca, cerebro fresco.', 'Buenos días. Tus neuronas ya están en fase exponencial.'],
-    tarde: ['¡Buenas tardes, {nombre}! Un repasito rápido y sigues.', 'Hola, {nombre}. ¿Unas tarjetas mientras esperas algo?', 'Buenas tardes. Las tarjetas te estaban esperando en la incubadora.'],
-    noche: ['Buenas noches, {nombre}. Repasar antes de dormir ayuda a recordar.', 'Hola, {nombre}. Unas tarjetas y a descansar.', 'Buenas noches. Hoy cerramos el día con ciencia.'],
     hayHoy: ['Tienes {n} tarjetas para hoy.', 'Hoy te tocan {n} tarjetas. ¡Tú puedes!', '{n} tarjetas listas para repasar.'],
     hayUna: ['Hoy te toca solo una tarjeta. Facilito.', 'Una sola tarjeta para hoy. ¿La sacamos ya?'],
     nadaHoy: ['¡No hay tarjetas para hoy! Liz está orgullosa 🧫', '¡Al día! No tienes tarjetas pendientes hoy.', 'Todo repasado. Tu cultivo de conocimiento va creciendo.'],
@@ -20,10 +19,8 @@
     racha: ['Llevas {n} días seguidos. No rompas la racha.', '¡Racha de {n} días! Me encanta.', '{n} días seguidos estudiando. Orgullosa de ti.'],
     sincronice: ['Me puse al día con la compu.', 'Listo, todo igual que en la compu.'],
     sinInternet: ['Sin internet: guardo todo aquí y lo paso a la compu después.'],
-    // (Parte 2) Pantalla de carga: las mismas frases de laboratorio de la PC (src/renderer/intro.js, FRASES_MICRO)
-    carga: ['Cultivando mis neuronas en agar...', 'Ajustando el enfoque del microscopio...', 'Tiñendo mis ideas de Gram...', 'Flameando el asa...',
-      'Poniéndome la bata y los guantes...', 'Incubando mis ideas a 37 grados...', 'Contando colonias, ya casi...', 'Pipeteando mis pensamientos...',
-      'Sembrando por estrías...', 'Buscando mi cepa favorita...'],
+    // Pantalla de carga: las mismas frases de laboratorio de la compu (js/frases-liz.js)
+    carga: FL ? FL.F.carga : ['Cultivando mis neuronas en agar...'],
     agendaHoy: ['Hoy tienes {n} cosas en tu agenda.', 'En tu agenda de hoy hay {n} cosas.'],
     agendaUna: ['Hoy tienes una cosa en tu agenda.'],
     examenPronto: ['Ojo: {que} es {cuando}. ¡Vamos con todo!', 'Se acerca {que}: {cuando}. Yo te ayudo a repasar.'],
@@ -47,22 +44,7 @@
     vBuscar: ['No encontré nada con eso. ¿Probamos otra palabra?'],
     vPapelera: ['La papelera está vacía. Todo en su lugar.'],
     vMazo: ['Este mazo está vacío. ¿Le agregamos una tarjeta?'],
-    // (20-oct-2026) La charla con Liz y lo nuevo
-    // (prueba 17) El saludo de arriba de la charla, con la voz de Liz (antes "¿En qué te ayudo hoy?" / "¿qué necesitas?": sonaba a asistente).
-    // Sin "ayudo", "necesitas" ni frases de servicio; nunca el nombre al principio (si no lo sabe, quedaría "¡!").
-    cMadrugada: ['¿Todavía despierto, {nombre}? Cuéntame qué te tiene en vela.', 'Hola, búho. Las bacterias no duermen, pero tú deberías… ¿qué pasó, {nombre}?',
-      'Madrugada de laboratorio, ¿eh? Aquí estoy contigo, {nombre}.'],
-    cManana: ['¡Buenos días, {nombre}! Ya me puse la bata. ¿Cómo amaneciste?', 'Buenos días, {nombre}. Mis neuronas ya están en fase exponencial, ¿y las tuyas?',
-      '¡Hola, {nombre}! Mañana fresca, cultivo fresco. ¿Qué me cuentas?', 'Buenos días. Te guardé un lugar en mi mesa de laboratorio, {nombre}.'],
-    cTarde: ['¡Buenas tardes, {nombre}! ¿Cómo va tu día?', 'Hola, {nombre}. Aquí sigo, entre placas y tarjetas. ¿Qué me cuentas?',
-      'Buenas tardes. Me alegra verte por aquí, {nombre}.', 'Hola, {nombre}. Justo estaba contando colonias. ¿Charlamos un rato?'],
-    cNoche: ['Buenas noches, {nombre}. ¿Cómo te fue hoy?', 'Hola, {nombre}. Ya casi cierro el laboratorio, pero para ti siempre hay tiempo.',
-      'Buenas noches. Cuéntame tu día, que yo te cuento el mío entre microscopios.'],
-    // según su ánimo (el de su foto: animoHoy en app.js)
-    cDormida: ['Medio dormida, la verdad… pero para ti me despierto, {nombre}.', 'Hola, {nombre}. Estoy bostezando entre placas de Petri, pero aquí estoy.'],
-    cFeliz: ['Hoy ando feliz, {nombre}: tu racha me tiene orgullosa. ¿Qué me cuentas?', '¡Hola, {nombre}! Estoy de buenísimo humor, como un cultivo en fase exponencial.'],
-    cTierna: ['Hola, {nombre}. Hoy algunas tarjetas se pusieron difíciles, pero aquí estoy contigo.', 'Hola, {nombre}. Paso a paso, que así se aprende. ¿Cómo estás?'],
-    cSorprendida: ['Hola, {nombre}. Se viene un examen, ¿eh? Cuando quieras, lo preparamos juntos.', 'Hola, {nombre}. Tengo el examen en la mira; tú tranquilo, que vamos juntos.'],
+    // (20-oct-2026) La charla con Liz (el saludo de arriba está en js/frases-liz.js)
     cSinInternet: ['Para charlar necesito internet 📶. Mientras, puedes repasar tus tarjetas: eso sí funciona sin conexión.'],
     cError: ['Uy, se me trabó el cerebro un momento. ¿Me lo repites en un ratito?', 'Perdón, no pude pensar ahorita. ¿Lo intentamos otra vez?'],
     escribe: ['Escríbeme tu respuesta con tus palabras. Yo la reviso.', 'Cuéntame lo que sabes de esta, como te salga.'],
@@ -78,16 +60,13 @@
     // Sin nombre: "¡Hola, {nombre}!" → "¡Hola!"; "Buenos días, {nombre}." → "Buenos días."
     return s.replace(/,\s*\{nombre\}/g, '').replace(/\{nombre\},?\s*/g, '').replace(/\s+([!?.,])/g, '$1');
   }
+  // El globito de Hoy y el saludo de la charla: de js/frases-liz.js (la del día, según la hora y su ánimo)
   function saludo(nombre, hora) {
     const h = hora === undefined ? new Date().getHours() : hora;
-    const t = h < 5 ? 'madrugada' : h < 12 ? 'manana' : h < 19 ? 'tarde' : h < 23 ? 'noche' : 'madrugada';
-    return frase(t, { nombre: nombre || '' });
+    return FL ? FL.saludoHoy(nombre || '', h) : 'Hola' + (nombre ? ', ' + nombre : '') + '.';
   }
-  // El saludo de la charla, según la hora y (la mitad de las veces) su ánimo de ahora: dormida, feliz, tierna o sorprendida
-  const DE_ANIMO = { dormida: 'cDormida', feliz: 'cFeliz', tierna: 'cTierna', sorprendida: 'cSorprendida' };
   function saludoCharla(nombre, h, animo) {
-    if (DE_ANIMO[animo] && (animo === 'dormida' || Math.random() < 0.5)) return frase(DE_ANIMO[animo], { nombre: nombre || '' });
-    return frase(h < 5 ? 'cMadrugada' : h < 12 ? 'cManana' : h < 19 ? 'cTarde' : h < 23 ? 'cNoche' : 'cMadrugada', { nombre: nombre || '' });
+    return FL ? FL.saludoCharla(nombre || '', h, animo) : 'Hola' + (nombre ? ', ' + nombre : '') + '.';
   }
   raiz.Frases = { F, frase, saludo, saludoCharla };
   if (typeof module === 'object' && module.exports) module.exports = raiz.Frases;

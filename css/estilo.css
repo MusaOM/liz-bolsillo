@@ -747,3 +747,5 @@ body.charlaChica .bienvenida .comic { font-size: 13px; }
 .respAn { margin: 12px 0 2px; display: grid; gap: 8px; }
 .respAn .r { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; line-height: 1.45; color: var(--t-texto-suave); }
 .respAn .r b { flex: none; color: var(--t-texto); font-weight: 900; min-width: 58px; }
+.compacta .lista li.lineaCerebro { padding: 0 14px 9px 56px; margin-top: -4px; font-size: 12px; font-weight: 600; color: var(--t-texto-suave); line-height: 1.3; }
+.compacta .lista li.lineaCerebro[hidden] { display: none; }

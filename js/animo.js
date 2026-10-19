@@ -48,9 +48,11 @@
     return Sincro.cambiar(E, 'animo', { id: f.id, datos: Object.assign({}, f.datos, { respuesta: String(texto).slice(0, 400), respuestaEn: ahora }) }, dispositivo, ahora);
   }
   // Lo que Liz le dice al marcar: su reacción y, si hay, la línea de cómo lo acompaña ese día ("Te doy tu espacio…"), sin repetir
+  // (19-oct-2026) + una línea ingeniosa de laboratorio, la del día (js/frases-liz.js: la misma fuente que la compu; nunca si está triste o enojado)
+  const FL = () => (typeof self !== 'undefined' && self.FrasesLiz) || (typeof require === 'function' ? (() => { try { return require('./frases-liz.js'); } catch (e) { return null; } })() : null);
   function respuestaAlMarcar(lista, fem) {
-    const r = reaccion(lista, fem), l = lineaHoy(lista);
-    return [r, l && l !== r ? l : ''].filter(Boolean).join(' ');
+    const r = reaccion(lista, fem), l = lineaHoy(lista), f = FL() ? FL().lineaAnimo(lista) : '';
+    return [r, l && l !== r ? l : '', f].filter(Boolean).join(' ');
   }
   function saltar(E, dispositivo, ahora) {
     ahora = ahora || Date.now();
