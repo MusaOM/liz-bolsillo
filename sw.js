@@ -3,7 +3,7 @@
 // Al tocar un aviso, se abre la pantalla que corresponde (url: ./#recordatorios, ./#repasar, ./#mazo=<id>...).
 // Al cambiar archivos de la app, el celular baja la versión nueva porque cambia VERSION. (21-oct-2026) El número sale de
 // js/version.js ("bolsillo"): herramientas/preparar-publicacion.js lo copia aquí solo (no hace falta cambiarlo a mano).
-const VERSION = 'liz-bolsillo-16';
+const VERSION = 'liz-bolsillo-17';
 const ARCHIVOS = [
   './', 'index.html', 'manifest.webmanifest', 'css/estilo.css',
   'js/config.js', 'js/nucleo.js', 'js/sincro.js', 'js/organizar.js', 'js/agenda.js', 'js/frases.js', 'js/almacen.js', 'js/fondo.js', 'js/app.js',
@@ -34,14 +34,22 @@ self.addEventListener('fetch', (ev) => {
 self.addEventListener('push', (ev) => {
   let d = {};
   try { d = ev.data ? ev.data.json() : {}; } catch (e) { d = { cuerpo: ev.data && ev.data.text() }; }
-  const n = d.n || (String(d.cuerpo || '').match(/^Tienes (\d+) tarjetas? para hoy/) || [])[1] || 0;
+  // (prueba 17) "ESTUDIO: Tienes N tarjetas para hoy…": el número va a la insignia del ícono. SIEMPRE se muestra el aviso (si un push
+  // llega y no se muestra nada, iOS castiga a la app y termina cancelando la suscripción).
+  const n = d.n || (String(d.cuerpo || '').match(/Tienes (\d+) tarjetas? para hoy/) || [])[1] || 0;
   ev.waitUntil(Promise.all([
-    self.registration.showNotification(d.titulo || 'Liz', {
+    self.registration.showNotification(d.titulo || 'LIZ', {
       body: d.cuerpo || 'Tienes tarjetas para hoy 🧫', icon: 'iconos/icono-192.png', badge: 'iconos/aviso-96.png',
       tag: d.etiqueta || 'liz-' + Date.now(), data: { url: d.url || './' },
     }),
     n && self.navigator && self.navigator.setAppBadge ? self.navigator.setAppBadge(Number(n)).catch(() => {}) : null,
   ]));
+});
+// (prueba 17) Si el sistema renueva la suscripción, se pide una nueva con la misma llave; la app la guarda en el servidor al abrirse
+// (refrescarAvisos en js/app.js).
+self.addEventListener('pushsubscriptionchange', (ev) => {
+  const op = ev.oldSubscription && ev.oldSubscription.options;
+  if (op && op.applicationServerKey) ev.waitUntil(self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: op.applicationServerKey }).catch(() => {}));
 });
 self.addEventListener('notificationclick', (ev) => {
   ev.notification.close();

@@ -48,10 +48,21 @@
     vPapelera: ['La papelera está vacía. Todo en su lugar.'],
     vMazo: ['Este mazo está vacío. ¿Le agregamos una tarjeta?'],
     // (20-oct-2026) La charla con Liz y lo nuevo
-    cMadrugada: ['¿Todavía despierto, {nombre}? Cuéntame, aquí estoy.', 'Hola, búho. ¿Qué te tiene despierto, {nombre}?'],
-    cManana: ['¡Buenos días, {nombre}! ¿En qué te ayudo hoy?', 'Buenos días, {nombre}. ¿Qué estudiamos hoy?'],
-    cTarde: ['¡Buenas tardes, {nombre}! ¿De qué hablamos?', 'Hola, {nombre}. Aquí estoy, ¿qué necesitas?'],
-    cNoche: ['Buenas noches, {nombre}. ¿Cómo te fue hoy?', 'Hola, {nombre}. ¿Repasamos algo o solo charlamos?'],
+    // (prueba 17) El saludo de arriba de la charla, con la voz de Liz (antes "¿En qué te ayudo hoy?" / "¿qué necesitas?": sonaba a asistente).
+    // Sin "ayudo", "necesitas" ni frases de servicio; nunca el nombre al principio (si no lo sabe, quedaría "¡!").
+    cMadrugada: ['¿Todavía despierto, {nombre}? Cuéntame qué te tiene en vela.', 'Hola, búho. Las bacterias no duermen, pero tú deberías… ¿qué pasó, {nombre}?',
+      'Madrugada de laboratorio, ¿eh? Aquí estoy contigo, {nombre}.'],
+    cManana: ['¡Buenos días, {nombre}! Ya me puse la bata. ¿Cómo amaneciste?', 'Buenos días, {nombre}. Mis neuronas ya están en fase exponencial, ¿y las tuyas?',
+      '¡Hola, {nombre}! Mañana fresca, cultivo fresco. ¿Qué me cuentas?', 'Buenos días. Te guardé un lugar en mi mesa de laboratorio, {nombre}.'],
+    cTarde: ['¡Buenas tardes, {nombre}! ¿Cómo va tu día?', 'Hola, {nombre}. Aquí sigo, entre placas y tarjetas. ¿Qué me cuentas?',
+      'Buenas tardes. Me alegra verte por aquí, {nombre}.', 'Hola, {nombre}. Justo estaba contando colonias. ¿Charlamos un rato?'],
+    cNoche: ['Buenas noches, {nombre}. ¿Cómo te fue hoy?', 'Hola, {nombre}. Ya casi cierro el laboratorio, pero para ti siempre hay tiempo.',
+      'Buenas noches. Cuéntame tu día, que yo te cuento el mío entre microscopios.'],
+    // según su ánimo (el de su foto: animoHoy en app.js)
+    cDormida: ['Medio dormida, la verdad… pero para ti me despierto, {nombre}.', 'Hola, {nombre}. Estoy bostezando entre placas de Petri, pero aquí estoy.'],
+    cFeliz: ['Hoy ando feliz, {nombre}: tu racha me tiene orgullosa. ¿Qué me cuentas?', '¡Hola, {nombre}! Estoy de buenísimo humor, como un cultivo en fase exponencial.'],
+    cTierna: ['Hola, {nombre}. Hoy algunas tarjetas se pusieron difíciles, pero aquí estoy contigo.', 'Hola, {nombre}. Paso a paso, que así se aprende. ¿Cómo estás?'],
+    cSorprendida: ['Hola, {nombre}. Se viene un examen, ¿eh? Cuando quieras, lo preparamos juntos.', 'Hola, {nombre}. Tengo el examen en la mira; tú tranquilo, que vamos juntos.'],
     cSinInternet: ['Para charlar necesito internet 📶. Mientras, puedes repasar tus tarjetas: eso sí funciona sin conexión.'],
     cError: ['Uy, se me trabó el cerebro un momento. ¿Me lo repites en un ratito?', 'Perdón, no pude pensar ahorita. ¿Lo intentamos otra vez?'],
     escribe: ['Escríbeme tu respuesta con tus palabras. Yo la reviso.', 'Cuéntame lo que sabes de esta, como te salga.'],
@@ -72,8 +83,10 @@
     const t = h < 5 ? 'madrugada' : h < 12 ? 'manana' : h < 19 ? 'tarde' : h < 23 ? 'noche' : 'madrugada';
     return frase(t, { nombre: nombre || '' });
   }
-  // El saludo de la charla, según la hora
-  function saludoCharla(nombre, h) {
+  // El saludo de la charla, según la hora y (la mitad de las veces) su ánimo de ahora: dormida, feliz, tierna o sorprendida
+  const DE_ANIMO = { dormida: 'cDormida', feliz: 'cFeliz', tierna: 'cTierna', sorprendida: 'cSorprendida' };
+  function saludoCharla(nombre, h, animo) {
+    if (DE_ANIMO[animo] && (animo === 'dormida' || Math.random() < 0.5)) return frase(DE_ANIMO[animo], { nombre: nombre || '' });
     return frase(h < 5 ? 'cMadrugada' : h < 12 ? 'cManana' : h < 19 ? 'cTarde' : h < 23 ? 'cNoche' : 'cMadrugada', { nombre: nombre || '' });
   }
   raiz.Frases = { F, frase, saludo, saludoCharla };

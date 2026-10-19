@@ -73,22 +73,31 @@
     tGuardar = setTimeout(() => Almacen.guardar(K + 'E', E).catch((e) => console.warn('No pude guardar', e)), 250);
   }
   function pedirSincro() { clearTimeout(tSincro); tSincro = setTimeout(() => sincronizar('cambio'), 1500); }     // (20-oct-2026: antes 3 s)
-  const porSubir = () => E.pendientes.length + Sincro.TABLAS.reduce((s, t) => s + (E.sucios[t] || []).length, 0);
+  // (Liz 1.0 · prueba 17) Lo que tiene HORA (un bloque del pomodoro, un recordatorio, un evento, un examen) se sube YA, sin esperar: si él
+  // bloquea el iPhone justo después, iOS congela la app y el servidor nunca se enteraba (y el aviso no llegaba).
+  function subirYa() { clearTimeout(tSincro); guardarLocal(); return sincronizar('ya'); }
+  const porSubir = () => E.pendientes.length + Sincro.TABLAS.reduce((s, t) => s + (E.sucios[t] || []).length, 0) + (E.pendAvisos || []).length;
   function cambio() { guardarLocal(); pedirSincro(); pintar(); }
+  // (prueba 17) Una sincronización nunca se queda "pegada": si iOS cortó la conexión con la app en segundo plano, una promesa podía no
+  // terminar nunca y "sincronizando" quedaba en true para siempre (ya no se sincronizaba nada hasta cerrar la app). Tope: 40 s.
+  let sincroDesde = 0;
+  const conTope = (p, ms, que) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(que + ' tardó demasiado')), ms))]);
 
   async function sincronizar(motivo) {
     if (!cli || !E.usuario) return;
     if (!navigator.onLine) { pintarEstado(); return; }
-    if (sincronizando) { otraVez = true; return; }
+    if (sincronizando && Date.now() - sincroDesde < 45000) { otraVez = true; return; }
     sincronizando = true;
+    sincroDesde = Date.now();
     pintarEstado();
     try {
       if (!DEMO) {
-        const { data } = await sb.auth.getSession();
+        const { data } = await conTope(sb.auth.getSession(), 15000, 'la sesión');
         if (!data || !data.session) { sinSesion = true; return; }
         sinSesion = false;
       }
-      const r = await Sincro.sincronizar(E, cli, { dispositivo: DISP });
+      const r = await conTope(Sincro.sincronizar(E, cli, { dispositivo: DISP }), 40000, 'la sincronización');
+      subirCharlaPendiente();
       escucharCambios();
       ultimoError = '';
       guardarLocal();
@@ -109,6 +118,7 @@
     } finally {
       sincronizando = false;
       pintarEstado();
+      if (vista === 'pomodoro') pintarSuave();      // (prueba 17: "🔔 Aviso programado" en cuanto el servidor lo tiene)
       if (otraVez) { otraVez = false; setTimeout(() => sincronizar('otra'), 800); }
     }
   }
@@ -128,7 +138,14 @@
         tRT = setTimeout(() => sincronizar('tiempo real'), 700);        // (varios cambios juntos → una sola sincronización)
       });
     }
-    canal.subscribe((estado) => { if (estado !== 'SUBSCRIBED') console.warn('Tiempo real:', estado); });
+    // (prueba 17) Si el canal se cae (iOS corta la conexión en segundo plano), se descarta: la próxima sincronización lo vuelve a abrir.
+    // Antes quedaba muerto para siempre y lo de la compu ya no llegaba al instante.
+    const este = canal;
+    canal.subscribe((estado) => {
+      if (estado === 'SUBSCRIBED') return;
+      console.warn('Tiempo real:', estado);
+      if (/CHANNEL_ERROR|TIMED_OUT|CLOSED/.test(estado) && canal === este) { try { sb.removeChannel(este); } catch (e) {} canal = null; }
+    });
   }
   async function traerPerfil() {
     const { data, error } = await sb.from('perfil').select('nombre, avatar, actualizado, datos').maybeSingle();
@@ -192,7 +209,9 @@
     }
     // (21-oct-2026) Lo que manda la PC en privado: las frases de cariño, la dedicatoria, quién la creó y a quién sugerir si necesita apoyo
     const lc = data.datos && data.datos.lizCelular;
-    if (lc) perfil.lizc = { frases: lc.frasesCarino || null, dedicatoria: lc.dedicatoria || '', creadora: lc.creadora || '', apoyo: lc.apoyo || '', masculino: lc.masculino !== false };
+    // (prueba 17) + las FECHAS ESPECIALES: antes no se copiaban aquí, así que en el iPhone de verdad nunca salía el saludo especial (solo en ?demo)
+    if (lc) perfil.lizc = { frases: lc.frasesCarino || null, dedicatoria: lc.dedicatoria || '', creadora: lc.creadora || '', apoyo: lc.apoyo || '', masculino: lc.masculino !== false,
+      fechas: Array.isArray(lc.fechas) ? lc.fechas : [] };
     Almacen.guardar(K + 'perfil', perfil);
   }
   const aDataURL = (blob) => new Promise((ok, mal) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = mal; f.readAsDataURL(blob); });
@@ -253,6 +272,7 @@
     $('#menu').hidden = false;
     if (!irPorEnlace(location.hash)) pintar();
     setTimeout(() => revisarLoNuevo(false, yaUsada), 3200);
+    setTimeout(refrescarAvisos, 4000);      // (prueba 17: el servidor queda con la suscripción ACTUAL de este iPhone)
     setTimeout(() => gestoLiz(deNoche() ? 'bostezo' : 'saludo'), 1900);     // (cuando ya se fue la pantalla de carga)
     // (21-oct-2026) "¿Cómo te sientes hoy?" (si no hay internet para saber si ya lo marcó en la compu) y, de vez en cuando, una frase de cariño
     setTimeout(revisarAnimoDia, 7000);
@@ -315,10 +335,20 @@
   }
   const PINTA = { hoy: pintarHoy, repasar: pintarRepasar, charla: pintarCharla, agenda: pintarAgenda, mazos: pintarMazos, mas: pintarMas,
     archivos: pintarArchivos, progreso: pintarProgreso, papelera: pintarPapelera, acerca: pintarAcerca, archivados: pintarArchivados, pomodoro: pintarPomodoro };
+  // (prueba 17) Si una pantalla falla al dibujarse (un dato raro que llegó de la nube, por ejemplo), no queda en blanco ni "trabada":
+  // sale un aviso con el motivo y un botón para volver a intentar (y las demás pestañas siguen andando).
+  function pintarVista(v) {
+    try { PINTA[vista](v); } catch (e) {
+      console.error('Pantalla ' + vista + ':', e);
+      v.innerHTML = '<div class="panel" style="padding:18px;text-align:center"><p style="margin:0 0 6px;font-weight:800">Ups, esta pantalla no se pudo dibujar.</p>' +
+        '<p class="suave" style="margin:0 0 12px;font-size:13px">' + esc(String((e && e.message) || e).slice(0, 160)) + '</p>' +
+        '<button class="bt prin" data-a="ir" data-v="' + esc(vista) + '">Intentar de nuevo</button> <button class="bt" data-a="ir" data-v="hoy">Ir a Hoy</button></div>';
+    }
+  }
   function pintar() {
     const v = $('#vista');
     v.classList.remove('vista'); void v.offsetWidth; v.classList.add('vista');      // (la animación de entrada, suave)
-    PINTA[vista](v);
+    pintarVista(v);
     // (21-oct-2026) Arriba, el nombre de la pantalla, chiquito y a la izquierda (sin la foto redonda); en la charla no hace falta (ahí
     // está Liz saludando con su globito)
     const titulo = vista === 'mazos' && mazoAbierto && E.mazos[mazoAbierto] ? 'Mazo' : TITULOS[vista];
@@ -338,7 +368,7 @@
     if (vista === 'charla') { pintarCarita(); pintarMenu(); return; }    // (la charla no se repinta sola: se perdería lo que escribe)
     const v = $('#vista');
     v.classList.remove('vista');
-    PINTA[vista](v);
+    pintarVista(v);
     pintarCarita();
     pintarMenu();
   }
@@ -573,7 +603,8 @@
     if (x.fila && x.fila.dispositivo === 'pc') sub.push('💻');
     const titulo = x.tabla === 'examenes' ? x.titulo.charAt(0).toUpperCase() + x.titulo.slice(1) : x.titulo;
     return '<li><div class="item' + (x.hecho ? ' hecho' : '') + '">' + (linea ? '<span class="hora">' + N.horaCR(x.ms) + '</span>' : '') +
-      (x.tabla === 'recordatorios' ? '<button class="check' + (x.hecho ? ' on' : '') + '" data-a="hecho" data-id="' + esc(x.id) + '" aria-label="Hecho">✓</button>'
+      // (prueba 17) En uno que se REPITE, solo se marca hecho el de hoy o uno pasado: el ✓ de un día que viene marcaba en realidad el de hoy
+      (x.tabla === 'recordatorios' && !(x.repite && x.ms >= N.inicioDiaCR(Date.now()) + DIA) ? '<button class="check' + (x.hecho ? ' on' : '') + '" data-a="hecho" data-id="' + esc(x.id) + '" aria-label="Hecho">✓</button>'
         : '<div class="ico ' + (COLOR[x.tipo] || 'celeste') + '">' + (ICONO[x.tipo] || '📅') + '</div>') +
       '<button class="txt" style="text-align:left" data-a="editarAgenda" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '"><b>' + esc(titulo) + '</b><small>' + (sub.join(' · ') || '&nbsp;') + '</small></button>' +
       (conBorrar ? '<button class="borrarFila" data-a="borrarRec" data-id="' + esc(x.id) + '" aria-label="Borrar" data-tip="Borrar">🗑️</button>' : '') + '</div></li>';
@@ -723,18 +754,18 @@
   // (Liz 1.0 · prueba 14) "LO NUEVO EN ESTA VERSIÓN": una sola vez después de actualizarse (version.js → loNuevo.id). En una instalación nueva
   // no sale (se anota y listo). Si está repasando, charlando o hay otra hoja abierta, espera. La lista queda en Acerca de Liz.
   function revisarLoNuevo(forzar, yaUsada) {
-    if (!V || !V.loNuevo) return;
+    if (!V || !V.loNuevoCelular) return;
     let visto = null;
     try { visto = localStorage.getItem('liz-lo-nuevo'); } catch (e) {}
-    const anotar = () => { try { localStorage.setItem('liz-lo-nuevo', V.loNuevo.id); } catch (e) {} };
+    const anotar = () => { try { localStorage.setItem('liz-lo-nuevo', V.loNuevoCelular.id); } catch (e) {} };
     if (!forzar) {
-      if (visto === V.loNuevo.id) return;
+      if (visto === V.loNuevoCelular.id) return;
       if (!visto && !yaUsada && !DEMO) return anotar();
       if (sesion || vista === 'charla' || document.querySelector('#hoja:not([hidden])')) return void setTimeout(() => revisarLoNuevo(false, true), 20000);
     }
     anotar();
     abrirHoja(escena('feliz', '¡Me actualicé! Mira lo nuevo 💜') + '<h2>🆕 Lo nuevo en esta versión</h2><div class="panel"><ul class="nuevo">' +
-      V.loNuevo.cosas.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div><div class="botones"><button class="bt prin grande" data-cerrar>¡Genial!</button></div>' +
+      V.loNuevoCelular.cosas.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div><div class="botones"><button class="bt prin grande" data-cerrar>¡Genial!</button></div>' +
       '<button class="enlaceAgenda" data-a="verPrivacidad">🔒 Leer cómo cuido tu privacidad ›</button>');
   }
   function revisarAnimoDia() {
@@ -1290,7 +1321,7 @@
       '<p class="autoraLiz">Creada por <b>' + esc(V.autora) + '</b></p>' +
       '<p class="dedica">' + esc(lc.dedicatoria || 'Creada con mucho cariño 💜') + '</p><p class="queEs">Tu compañera de estudio y microbióloga junior.</p></div>' +
       // (Liz 1.0 · prueba 14) Lo nuevo de esta actualización y "Tu privacidad" (version.js: lo mismo que en la compu)
-      (V.loNuevo ? '<h3 id="secNuevo">🆕 Lo nuevo en esta versión</h3><div class="panel"><ul class="nuevo">' + V.loNuevo.cosas.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' : '') +
+      (V.loNuevoCelular ? '<h3 id="secNuevo">🆕 Lo nuevo en esta versión</h3><div class="panel"><ul class="nuevo">' + V.loNuevoCelular.cosas.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' : '') +
       '<h3>✨ Lo que trae Liz ' + esc(V.liz) + '</h3><div class="panel"><ul class="nuevo">' + V.novedades.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' +
       (V.privacidad ? '<h3 id="secPrivacidad">🔒 Tu privacidad</h3><div class="panel privacidad"><p class="intro">Lo que hablas conmigo es tuyo. Así lo cuido:</p>' +
         V.privacidad.map(([t, ls]) => '<h4>' + esc(t) + '</h4>' + ls.map((l) => '<p>' + esc(l.replace('{creadora}', creadoraCel()).replace(/^./, (c) => c.toUpperCase())) + '</p>').join('')).join('') + '</div>' : '') +
@@ -1333,7 +1364,8 @@
     const esperando = Org.vivos(E.archivos).filter((a) => a.estado === 'esperando' || a.estado === 'leyendo').length;
     const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
     let avisosTxt = 'Apagados';
-    try { if (localStorage.getItem('liz-aviso-id') && 'Notification' in window && Notification.permission === 'granted') avisosTxt = 'Activados'; } catch (e) {}
+    // (prueba 17) el estado de verdad (refrescarAvisos): activados, o "⚠ Reactivar" si iOS perdió la suscripción o el permiso
+    try { if (localStorage.getItem('liz-aviso-id')) avisosTxt = avisosEstado === 'reactivar' ? '⚠ Reactivar' : 'Activados'; } catch (e) {}
     const fila = (a, ic, color, t, dato, datos, extra, id) => '<li' + (id ? ' id="' + id + '"' : '') + '><button class="item" data-a="' + a + '"' + (datos || '') + '><span class="ico ' + (color || '') + '">' + ic + '</span>' +
       '<span class="txt"><b>' + t + '</b></span>' + (dato ? '<span class="dato">' + dato + '</span>' : '') + (extra === undefined ? '<span class="chev">›</span>' : extra) + '</button></li>';
     const interruptor = (a, ic, color, t, on) => fila(a, ic, color, t, '', '', '<span class="interruptor' + (on ? ' on' : '') + '"></span>');
@@ -1585,6 +1617,7 @@
         ag.ref = ag.dia;
         avisar(editando ? 'Guardado.' : st.tabla === 'examenes' ? 'Anotado. Te aviso 3 días antes, el día antes y 2 horas antes.' : 'Anotado. Te aviso a su hora (y la compu también).');
         cambio();
+        subirYa();      // (prueba 17: lo que tiene hora, a la nube YA, para que el aviso llegue aunque cierre la app enseguida)
       });
       if (editando) $('#fa-borrar', h).onclick = () => { Ag.borrar(E, tabla, fila.id, DISP); cerrarHoja(true); avisar('A la papelera (lo recuperas en 30 días).'); cambio(); };
     }
@@ -1651,13 +1684,17 @@
     const ruta = (E.usuario || 'demo') + '/archivos/' + id + ext;
     avisar('Subiendo “' + f.name + '”…');
     if (!DEMO) {
-      const r = await sb.storage.from('liz-privado').upload(ruta, f, { contentType: f.type || 'application/octet-stream', upsert: false });
+      // (prueba 17) con tope de tiempo y sin quedarse callada si falla (antes, un error dejaba "Subiendo…" para siempre)
+      let r;
+      try { r = await conTope(sb.storage.from('liz-privado').upload(ruta, f, { contentType: f.type || 'application/octet-stream', upsert: false }), 5 * 60000, 'la subida'); }
+      catch (e) { return avisar('No lo pude subir: ' + (e.message || e) + '. ¿Lo intentamos otra vez?'); }
       if (r.error) return avisar('No lo pude subir: ' + r.error.message);
     }
     Sincro.cambiar(E, 'archivos', { id, nombre: f.name, materia, tamano: f.size, tipo: ext.slice(1), ruta, origen: 'celular', estado: 'esperando', mensaje: null,
       tarjetas: 0, mazo_id: null, creada: Date.now(), borrado_en: null, datos: {} }, DISP);
     avisar(F.frase('subido'));
     cambio();
+    subirYa();      // (que la compu se entere ya)
     if (DEMO) simularLaptop(id);
   });
   async function abrirArchivo(id) {
@@ -1773,10 +1810,12 @@
   }
   function pintarCharla(v) {
     const h = N.enCR(Date.now()).h;
-    if (!fijas.charla || fijas.charla.k !== h + perfil.nombre) fijas.charla = { k: h + perfil.nombre, txt: F.saludoCharla(perfil.nombre, h) };
+    // (prueba 17) con la voz de Liz y según su ánimo (el de su foto), no un "¿En qué te ayudo hoy?" genérico
+    const an = animoHoy();
+    if (!fijas.charla || fijas.charla.k !== h + perfil.nombre + an) fijas.charla = { k: h + perfil.nombre + an, txt: F.saludoCharla(perfil.nombre, h, an) };
     // (prueba 14) Una fecha especial o después de clases, el saludo de la charla es ese (si no está en clase: entonces el de siempre)
     const mom = momentoLiz(Date.now(), 0);
-    if (mom && (mom.tipo === 'especial' || mom.tipo === 'tras')) fijas.charla = { k: h + perfil.nombre, txt: mom.t };
+    if (mom && (mom.tipo === 'especial' || mom.tipo === 'tras')) fijas.charla = { k: h + perfil.nombre + an, txt: mom.t };
     v.innerHTML = '<div class="charla"><div class="bienvenida"><div class="marcoLiz"><div class="aura"></div>' + lizImg('saludo', 'c', 'respira') + '</div>' +
       '<div class="comic cola-izq"><span class="txt">' + esc(fijas.charla.txt) + '</span></div></div>' +
       '<div class="rapidos">' + RAPIDOS.map(([k, t]) => '<button class="chip toque" data-a="rapido" data-k="' + k + '">' + t + '</button>').join('') + '</div>' +
@@ -1822,9 +1861,21 @@
     if (!DEMO) Almacen.guardar(K + 'charla', charla).catch(() => {});
     const caja = $('#mensajes');
     if (vista === 'charla' && caja) { const p = $('#pensandoMsg'); if (p) p.remove(); caja.insertAdjacentHTML('beforeend', burbuja(m)); abajoCharla(); }
-    // A la nube (para que la PC lo sepa); si falla (sin internet o sin la tabla), no pasa nada
-    if (!DEMO && sb && navigator.onLine && E.usuario) sb.from('charla').insert({ id: m.id, quien: m.quien, texto: String(m.texto).slice(0, 4000), fecha: m.fecha, dispositivo: DISP }).then(() => {}, () => {});
+    // A la nube (para que la PC lo sepa). (prueba 17) Si no se pudo (sin internet), queda marcado y sube en la próxima sincronización:
+    // antes se perdía y la Liz de la compu nunca se enteraba de lo que hablaron sin internet.
+    if (!DEMO) { m.pend = true; subirCharlaPendiente(); }
     return m;
+  }
+  let subiendoCharla = false;
+  async function subirCharlaPendiente() {
+    if (DEMO || !sb || !navigator.onLine || !E.usuario || subiendoCharla) return;
+    const pend = charla.filter((x) => x.pend);
+    if (!pend.length) return;
+    subiendoCharla = true;
+    try {
+      const r = await sb.from('charla').upsert(pend.map((m) => ({ id: m.id, quien: m.quien, texto: String(m.texto).slice(0, 4000), fecha: m.fecha, dispositivo: DISP })), { onConflict: 'id', ignoreDuplicates: true });
+      if (!r.error) { for (const m of pend) delete m.pend; Almacen.guardar(K + 'charla', charla).catch(() => {}); }
+    } catch (e) {} finally { subiendoCharla = false; }
   }
   function pensando(si) {
     pensandoCharla = si;
@@ -1878,7 +1929,9 @@
     // (21-oct-2026) Su ÁNIMO de ahora (el que él ve en Hoy: dormida, contenta...) va al cerebro: así no dice "¡estoy activa!" si se ve dormida
     // (21-oct-2026) y cómo se siente ÉL hoy (su diario de ánimo): Liz se adapta; si pregunta "¿cómo me he sentido?", el resumen
     const r = await cerebro('charla', { mensajes: charla.slice(-12).map((m) => ({ quien: m.quien, texto: m.texto })), contexto: contextoTexto(), animo: animoHoy(),
-      animoEl: Animo.deHoy(E), animoDijo: dijo, femenino: fem(), diarioAnimo: Animo.PIDE_RESUMEN.test(texto) ? Animo.resumenTexto(E, Date.now(), { fem: fem() }) : '' });
+      animoEl: Animo.deHoy(E), animoDijo: dijo, femenino: fem(), diarioAnimo: Animo.PIDE_RESUMEN.test(texto) ? Animo.resumenTexto(E, Date.now(), { fem: fem() }) : '',
+      // (prueba 17) cómo se siente él, armado con LA MISMA función que la compu (animo.js → partePrompt): liz-cerebro lo usa tal cual
+      animoTexto: Animo.partePrompt(E, Date.now(), { dueno: perfil.nombre || '', fem: fem(), consulta: texto, dijo }) });
     pensando(false);
     if (r.sinInternet) return agregarMsg({ quien: 'liz', texto: F.frase('cSinInternet'), animo: 'tierna' });
     if (r.error && !r.dice) return agregarMsg({ quien: 'liz', texto: F.frase('cError') + ' (' + r.error + ')', animo: 'tierna' });
@@ -1887,12 +1940,12 @@
     if (r.recordatorio) {
       const cuando = N.msDeCR(r.recordatorio.fecha, r.recordatorio.hora);
       const x = isFinite(cuando) ? Ag.crearRecordatorio(E, { texto: r.recordatorio.texto, cuando, repite: r.recordatorio.repite || null }, DISP) : { error: 'fecha rara' };
-      if (x.ok) { extra = { html: '⏰ Anotado: ' + esc(r.recordatorio.texto) + ' · ' + esc(N.fechaTxt(cuando)) + ', ' + N.horaCR(cuando) }; animo = 'feliz'; cambio(); }
+      if (x.ok) { extra = { html: '⏰ Anotado: ' + esc(r.recordatorio.texto) + ' · ' + esc(N.fechaTxt(cuando)) + ', ' + N.horaCR(cuando) }; animo = 'feliz'; cambio(); subirYa(); }
     }
     if (r.examen) {
       const cuando = N.msDeCR(r.examen.fecha, r.examen.hora);
       const x = isFinite(cuando) ? Ag.crearExamen(E, { que: r.examen.que, materia: r.examen.materia, cuando }, DISP) : { error: 'fecha rara' };
-      if (x.ok) { extra = { html: '📝 Anotado: ' + esc(N.nombreExamen(x.fila).replace(/^./, (c) => c.toUpperCase())) + ' · ' + esc(N.fechaTxt(cuando)) + ', ' + N.horaCR(cuando) + '<br>Te aviso 3 días antes, el día antes y 2 horas antes.' }; animo = 'feliz'; cambio(); }
+      if (x.ok) { extra = { html: '📝 Anotado: ' + esc(N.nombreExamen(x.fila).replace(/^./, (c) => c.toUpperCase())) + ' · ' + esc(N.fechaTxt(cuando)) + ', ' + N.horaCR(cuando) + '<br>Te aviso 3 días antes, el día antes y 2 horas antes.' }; animo = 'feliz'; cambio(); subirYa(); }
     }
     if (r.pegar) extra = { html: '<button class="bt chico prin" data-a="pegarTexto">📋 Pegar el texto</button>' };
     agregarMsg({ quien: 'liz', texto: r.dice || '…', extra, animo: r.limite ? 'dormida' : animo });
@@ -2339,11 +2392,49 @@
     const r = await sb.from('avisos_push').update({ estudio: !!p.on, hora_estudio: p.hora === '' ? null : Number(p.hora) }).eq('id', id);
     if (r.error && h && $('#aErr', h)) $('#aErr', h).textContent = 'Lo guardé en el celular. Para que llegue con la app cerrada falta un paso en Supabase (correr avisos.sql otra vez).';
   }
+  // (Liz 1.0 · prueba 17) LA SUSCRIPCIÓN SE REFRESCA SOLA: al abrir la app (y al volver después de un rato), si tiene permiso, se vuelve a
+  // guardar en el servidor la suscripción ACTUAL de este iPhone (avisos_push). Antes solo se guardaba al encender el interruptor: si iOS la
+  // cambiaba, si se borró la fila o si se reinstaló la app, el servidor mandaba los avisos a una dirección muerta y no llegaba nada.
+  // (iOS no deja suscribirse sin que él toque algo: si ya no hay suscripción, queda "⚠ Toca para reactivar" en Más → Avisos.)
+  let avisosEstado = 'apagados';      // 'activados' | 'reactivar' | 'apagados'
+  async function refrescarAvisos() {
+    if (DEMO || !sb || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return avisosEstado;
+    let id = null;
+    try { id = localStorage.getItem('liz-aviso-id'); } catch (e) {}
+    if (!id) return (avisosEstado = 'apagados');
+    if (Notification.permission !== 'granted') return (avisosEstado = 'reactivar');
+    try {
+      const s = await conTope((await navigator.serviceWorker.ready).pushManager.getSubscription(), 8000, 'la suscripción');
+      if (!s) return (avisosEstado = 'reactivar');
+      const p = estudioPref(), hora = +(localStorage.getItem('liz-aviso-hora') || 8);
+      let r = await sb.from('avisos_push').upsert({ id, suscripcion: s.toJSON(), hora, estudio: !!p.on, hora_estudio: p.hora === '' ? null : Number(p.hora) });
+      if (r.error) r = await sb.from('avisos_push').upsert({ id, suscripcion: s.toJSON(), hora });       // (sin avisos.sql nuevo: sin esas columnas)
+      avisosEstado = r.error ? avisosEstado : 'activados';
+    } catch (e) { console.warn('Avisos:', e); }
+    if (vista === 'mas') pintarSuave();
+    return avisosEstado;
+  }
+  // Lo que dice el servidor de sus avisos (supabase/avisos.sql → liz_estado_avisos): ¿revisa cada minuto?, ¿cuándo mandó el último y cómo le fue?
+  async function estadoServidorAvisos() {
+    if (DEMO || !sb) return '';
+    try {
+      const r = await conTope(sb.rpc('liz_estado_avisos'), 8000, 'el servidor');
+      if (r.error || !r.data) return '';
+      const d = r.data, u = (d.ultimos || [])[0];
+      if (!d.cron) return '⚠ El servidor NO está revisando los avisos (falta correr avisos.sql en Supabase).';
+      if (!d.suscripciones) return '⚠ El servidor no tiene ninguna suscripción tuya: apaga y enciende los avisos.';
+      if (!u) return '✓ El servidor revisa cada minuto. Todavía no ha mandado ningún aviso.';
+      const hace = Math.max(0, Math.round((Date.now() - new Date(u.cuando).getTime()) / 60000));
+      return (u.status === 200 ? '✓' : '⚠') + ' El servidor revisa cada minuto. Último envío: hace ' + (hace < 60 ? hace + ' min' : Math.round(hace / 60) + ' h') +
+        (u.status === 200 ? ' (' + (u.enviados || 0) + ' enviado' + (u.enviados === 1 ? '' : 's') + (u.fallidos ? ', ' + u.fallidos + ' fallido' + (u.fallidos === 1 ? '' : 's') : '') + ').' : ', falló (' + (u.status || 'sin respuesta') + ').');
+    } catch (e) { return ''; }
+  }
   async function hojaAvisos() {
     const puede = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
     const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
     let activo = false;
-    try { activo = puede && Notification.permission === 'granted' && !!(await (await navigator.serviceWorker.ready).pushManager.getSubscription()); } catch (e) {}
+    try { activo = puede && Notification.permission === 'granted' && !!localStorage.getItem('liz-aviso-id') && !!(await (await navigator.serviceWorker.ready).pushManager.getSubscription()); } catch (e) {}
+    if (activo) refrescarAvisos();      // (de paso, el servidor queda con la suscripción de ahora)
     if (DEMO && avisosDemo) activo = true;      // (para las fotos: cómo se ve con los avisos encendidos)
     // (Liz 1.0 · prueba 14) Avisos = SOLO encender/apagar (aquí iOS pide el permiso), "Probar aviso" (llega al momento) y, si están apagados
     // o el iPhone no dio permiso, cómo activarlos. Se quitó "¿A qué hora te aviso las tarjetas?" (se sentía como crear recordatorios, que
@@ -2364,21 +2455,29 @@
         (est.on ? '<li><div class="item"><span class="ico">🕖</span><span class="txt"><b>¿A qué hora?</b></span><select id="aHoraEst" class="selChico">' + horasEst + '</select></div></li>' : '') : '') +
       '</ul></div>' + (activo && est.on ? '<p class="suave ayudaAvisos">📚 Te recuerdo estudiar una vez al día, nunca mientras estás en clase y no si ya repasaste. Automático = 6 p. m. (o al salir de clase).</p>' : '') +
       ayuda + '<p class="error" id="aErr"></p>' +
-      (activo ? '<div class="botones"><button class="bt grande" id="aProbar">🔔 Probar aviso</button></div>' : '') +
+      (activo ? '<div class="botones"><button class="bt grande" id="aProbar">🔔 Probar aviso</button></div><p class="suave ayudaAvisos" id="aServidor"></p>' : '') +
       '<button class="enlaceAgenda" data-a="irRecordatorios">Tus recordatorios se crean en Agenda → Recordatorios ›</button>');
     if (activo) {
       $('#aEstudio', h).onclick = async () => { const p = estudioPref(); p.on = !p.on; await guardarEstudio(p, h); hojaAvisos(); };
       const sel = $('#aHoraEst', h);
       if (sel) sel.onchange = async () => { const p = estudioPref(); p.hora = sel.value; await guardarEstudio(p, h); avisar(p.hora ? 'Te recuerdo estudiar a las ' + (p.hora > 12 ? p.hora - 12 : p.hora) + ':00.' : 'Te lo recuerdo cuando estés libre.'); };
     }
+    if (activo) estadoServidorAvisos().then((t) => { const el = $('#aServidor', h); if (el) el.textContent = t; });
+    // (prueba 17) "Probar aviso" por el camino DE VERDAD (el servidor → Apple → este iPhone), no uno hecho aquí mismo: así, si llega, llegan
+    // todos; y si no, dice POR QUÉ (antes mostraba un aviso local que salía siempre, aunque los de verdad no funcionaran).
     if (activo) $('#aProbar', h).onclick = async (ev) => {
-      const b = ev.target;
-      try {
-        const reg = await navigator.serviceWorker.ready;
-        await reg.showNotification('Liz', { body: '¡Así te llegan mis avisos! 💜', icon: 'iconos/icono-192.png', badge: 'iconos/aviso-96.png', tag: 'liz-prueba', data: { url: '#hoy' } });
-        b.textContent = '✓ Aviso mandado';
-        avisar('Te mandé un aviso de prueba ahora mismo.');
-      } catch (e) { $('#aErr', h).textContent = 'No pude mandarlo: ' + (e.message || e); }
+      const b = ev.target, err = $('#aErr', h);
+      if (DEMO) { avisar('En el modo de prueba no hay avisos.'); return; }
+      b.disabled = true; b.textContent = 'Mandando el aviso…'; err.textContent = '';
+      await refrescarAvisos();
+      let id = null;
+      try { id = localStorage.getItem('liz-aviso-id'); } catch (e) {}
+      const r = await cerebro('probarAviso', { id });
+      b.disabled = false; b.textContent = '🔔 Probar aviso';
+      if (r && r.ok && r.enviados) { avisar('Listo: te mandé “PRUEBA: Así se verán tus avisos”. Llega en unos segundos.'); return; }
+      if (r && r.ok && r.enviados === undefined) { avisar('Listo: en 10 segundos te llega. Puedes cerrar la app.'); return; }
+      err.textContent = r && r.muerta ? 'Apple ya no acepta la suscripción de este iPhone (venció). Apaga y vuelve a encender el interruptor de Avisos.'
+        : 'No llegó: ' + ((r && (r.error || r.dice)) || 'sin respuesta del servidor') + '.';
     };
     $('#aSwitch', h).onclick = async () => {
       const err = $('#aErr', h);
@@ -2389,6 +2488,7 @@
           const id = localStorage.getItem('liz-aviso-id');
           if (id && sb) await sb.from('avisos_push').delete().eq('id', id);
           localStorage.removeItem('liz-aviso-id');
+          avisosEstado = 'apagados';
         } catch (e) {}
         cerrarHoja(true);
         avisar('Avisos apagados.');
@@ -2409,6 +2509,7 @@
         if (r.error) throw new Error(r.error.message);
         localStorage.setItem('liz-aviso-hora', hh);
         await guardarEstudio(estudioPref(), null);
+        avisosEstado = 'activados';
         cerrarHoja(true);
         avisar('Listo: avisos activados. Pruébalo con “Probar aviso”.');
         setTimeout(() => { hojaAvisos(); if (vista === 'mas') pintar(); }, 900);
@@ -2456,7 +2557,7 @@
     const s = { fase: 'estudio', ini: ahora, bloque, largo: (bloque + 1) % t.cada === 0, contado: false, pausa: null, minutos: t.estudio };
     pomoProgramar(s, ahora);
     pomoGuardar(s);
-    guardarLocal(); pedirSincro();
+    subirYa();
     vibrar('bien'); gestoLiz('asentir');
     avisar('¡Empezamos! ' + t.estudio + ' minutos de concentración. Yo te aviso 🍅');
     pintarSuave();
@@ -2465,24 +2566,25 @@
     const s = pomoEstado(); if (!s || s.fase === 'espera') return;
     if (s.pausa == null) { s.pausa = pomoQueda(s, Date.now()); for (const id of s.recs || []) pomoQuitar(id); s.recs = []; avisar('En pausa. Cuando quieras, seguimos.'); }
     else { const q = s.pausa; s.pausa = null; if (s.fase === 'estudio') pomoProgramar(s, Date.now(), q); else { s.finDesc = Date.now() + q; pomoProgramar(s, Date.now()); } avisar('¡Seguimos!'); }
-    pomoGuardar(s); guardarLocal(); pedirSincro(); pintarSuave();
+    pomoGuardar(s); subirYa(); pintarSuave();
   }
   function pomoParar() {
     const s = pomoEstado(); if (!s) return;
     for (const id of s.recs || []) pomoQuitar(id);
-    pomoGuardar(null); guardarLocal(); pedirSincro();
+    pomoGuardar(null); subirYa();
     avisar(s.fase === 'estudio' ? 'Listo, paramos. Lo que estudiaste igual cuenta 💜' : 'Listo. ¡Buen trabajo!');
     pintarSuave();
   }
   function pomoSaltarDescanso() {
     const s = pomoEstado(); if (!s || s.fase !== 'descanso') return;
-    pomoQuitar(s.recs[1]); s.fase = 'espera'; s.recs = []; pomoGuardar(s); guardarLocal(); pedirSincro(); pintarSuave();
+    pomoQuitar(s.recs[1]); s.fase = 'espera'; s.recs = []; pomoGuardar(s); subirYa(); pintarSuave();
   }
   // Cada segundo: ¿terminó el bloque o el descanso? (si la app estuvo cerrada, se pone al día al volver)
   async function pomoAvisoLocal(texto) {
     vibrar('bien'); sonar('fin');
     if (document.hidden && 'serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
-      try { (await navigator.serviceWorker.ready).showNotification('LIZ / POMODORO', { body: texto, icon: 'iconos/icono-192.png', badge: 'iconos/aviso-96.png', tag: 'liz-pomodoro', data: { url: '#pomodoro' } }); } catch (e) {}
+      // (prueba 17) El MISMO formato que los del servidor: título "LIZ" y el tipo en mayúsculas al principio
+      try { (await navigator.serviceWorker.ready).showNotification('LIZ', { body: 'POMODORO: ' + texto, icon: 'iconos/icono-192.png', badge: 'iconos/aviso-96.png', tag: 'liz-pomodoro', data: { url: '#pomodoro' } }); } catch (e) {}
     } else avisar(texto);
   }
   function pomoRevisar() {
@@ -2501,7 +2603,7 @@
       s.fase = 'espera'; s.recs = []; cambio2 = true;
       if (ahora - s.finDesc < 2 * MIN) pomoAvisoLocal(pomoTextos(t, s.largo)[1]);
     }
-    if (cambio2) { pomoGuardar(s); guardarLocal(); pedirSincro(); pintarSuave(); }
+    if (cambio2) { pomoGuardar(s); subirYa(); pintarSuave(); }
     if (vista === 'pomodoro') { const el = $('#pomoT'); if (el) el.textContent = mmss(pomoQueda(s, ahora)); const an = $('#pomoAnillo'); if (an) an.style.setProperty('--p', pomoProgreso(s, ahora)); }
   }
   function pomoProgreso(s, ahora) {
@@ -2523,6 +2625,10 @@
       '<div class="pomoBotones">' + (fase === 'listo' || fase === 'espera' ? '<button class="bt prin grande" data-a="pomoEmpezar">▶ ' + (fase === 'espera' ? 'Otro bloque' : 'Empezar') + '</button>'
         : '<button class="bt prin grande" data-a="pomoPausar">' + (s.pausa != null ? '▶ Seguir' : '⏸ Pausa') + '</button>' + (fase === 'descanso' ? '<button class="bt grande" data-a="pomoSaltar">⏭ Saltar descanso</button>' : '')) +
       (s ? '<button class="bt grande" data-a="pomoParar">⏹ Terminar</button>' : '') + '</div></div>' +
+      // (prueba 17) ¿El aviso del final ya lo tiene el servidor? (si no, solo avisa con la app abierta)
+      (s && s.fase !== 'espera' && s.pausa == null && !DEMO ? '<p class="suave centro pomoAvisoEstado">' + (!navigator.onLine ? '⚠ Sin internet: te aviso solo si la app está abierta.'
+        : (s.recs || []).some((id) => id && (E.sucios.recordatorios || []).includes(id)) ? '⏳ Programando el aviso…'
+        : avisosEstado === 'activados' ? '🔔 Te aviso aunque cierres la app.' : '⚠ Los avisos están apagados: te aviso solo con la app abierta (actívalos en Más → Avisos).') + '</p>' : '') +
       '<div class="pastillas pomoCuenta"><span class="pastilla">🍅 <b>' + p.hoy + '</b> hoy</span><span class="pastilla">📅 <b>' + p.semana + '</b> esta semana</span></div>' +
       '<p class="suave centro" style="font-size:13px;margin:4px 0 0">Cuentan los de la compu y los del celular.</p>' +
       '<button class="enlaceAgenda" data-a="pomoTiempos">⚙️ Cambiar tiempos (' + t.estudio + ' · ' + t.descanso + ' · ' + t.largo + ' min)</button>';
@@ -2554,10 +2660,12 @@
   window.addEventListener('offline', pintarEstado);
   let ocultaDesde = 0;
   document.addEventListener('visibilitychange', () => {
-    if (document.hidden) { ocultaDesde = Date.now(); return; }
+    // (prueba 17) Al irse a otra app o bloquear el iPhone: lo pendiente se sube YA (iOS congela la app enseguida)
+    if (document.hidden) { ocultaDesde = Date.now(); if (E.usuario && porSubir()) subirYa(); return; }
     if (document.visibilityState === 'visible' && E.usuario) {
       pintarSuave();
       sincronizar('abrir');
+      if (Date.now() - ocultaDesde > 30 * MIN) refrescarAvisos();
       // Volvió después de un rato: lo saluda (de noche, bosteza)
       if (ocultaDesde && Date.now() - ocultaDesde > 15 * MIN) setTimeout(() => gestoLiz(deNoche() ? 'bostezo' : 'saludo'), 500);
     }

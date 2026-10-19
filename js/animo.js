@@ -119,6 +119,17 @@
       ' Que se note en tu forma de ser, con naturalidad; no le repitas a cada rato que sabes cómo se siente. No eres psicóloga: no diagnostiques.' +
       ' Si alguna vez dice que quiere hacerse daño o que no quiere vivir, tómalo en serio: dile con cariño que no está solo, que hable YA con alguien de confianza y que, si está en peligro, llame al 911.';
   }
+  // (Liz 1.0 · prueba 17) LA PARTE DEL PROMPT sobre cómo se siente él: LA MISMA en la compu (src/main/animo-pc.js → prompt) y en el
+  // celular (la arma la app con esta función y la manda a liz-cerebro como "animoTexto"): una sola fuente, sin copias.
+  function partePrompt(E, ahora, opc) {
+    opc = opc || {};
+    const partes = [];
+    const ins = instrucciones(deHoy(E, ahora), { dueno: opc.dueno, fem: opc.fem });
+    if (ins) partes.push(ins);
+    if (opc.dijo && opc.dijo.length) partes.push('Acaba de contarte cómo se siente (' + opc.dijo.map((k) => nombre(k, opc.fem)).join(', ') + '; ya quedó en su diario de ánimo): respóndele a eso primero, con cariño.');
+    if (PIDE_RESUMEN.test(String(opc.consulta || ''))) partes.push('SU DIARIO DE ÁNIMO (te pregunta por él): ' + resumenTexto(E, ahora, { fem: opc.fem }));
+    return partes.join('\n');
+  }
   // Lo que Liz contesta al marcar las caritas (manda lo más "pesado": si marcó feliz y cansado, responde a lo de cansado)
   const REACCION = {
     feliz: ['¡Me encanta saber eso! Que siga así de bonito el día.', '¡Qué bueno! Se te nota la buena energía.'],
@@ -282,6 +293,6 @@
   }
 
   return { EMOCIONES, POR, PESADAS, nombre, idDia, delDia, hoy, deHoy, debePreguntar, guardar, saltar, delTexto, PIDE_RESUMEN, COMO_ACTUAR,
-    instrucciones, reaccion, principal, lineaHoy, anotarRespuesta, respuestaAlMarcar, animoLiz, pesado, tarjetasSugeridas, dias, cuentas, resumen, resumenTexto, necesitaCuidado, textoCuidado, CUIDADO_DIAS,
+    instrucciones, partePrompt, reaccion, principal, lineaHoy, anotarRespuesta, respuestaAlMarcar, animoLiz, pesado, tarjetasSugeridas, dias, cuentas, resumen, resumenTexto, necesitaCuidado, textoCuidado, CUIDADO_DIAS,
     leerFrases, ultimoAviso, esperaCarino, carinoAhora, anotarCarino, anotarCuidado, secreto };
 });

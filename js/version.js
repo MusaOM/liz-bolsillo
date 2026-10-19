@@ -10,7 +10,7 @@
   else raiz.LizVersion = fabrica();
 })(typeof self !== 'undefined' ? self : this, function () {
   const liz = '1.0';
-  const bolsillo = 16;
+  const bolsillo = 17;
   return {
     liz,
     bolsillo,
@@ -26,23 +26,29 @@
       '“¿Cómo te sientes hoy?”: tu diario de ánimo, y Liz se adapta a cómo estás.',
       'Y alguna sorpresa de vez en cuando… 💜',
     ],
-    // (Liz 1.0 · prueba 14) LO NUEVO EN ESTA VERSIÓN: Liz lo muestra UNA vez después de actualizarse (en la compu y en el celular; no en una
-    // instalación nueva) y queda la lista en "Acerca de Liz". Para la próxima actualización: cambiar "id" (así se vuelve a mostrar) y "cosas".
-    loNuevo: {
-      id: 'bolsillo-15',
+    // LO NUEVO EN ESTA VERSIÓN: Liz lo muestra UNA vez después de actualizarse (no en una instalación nueva) y queda la lista en "Acerca de
+    // Liz". (Liz 1.0 · prueba 17) UNA LISTA POR APARATO, con su propio id: el celular muestra solo lo nuevo del celular (loNuevoCelular) y la
+    // compu solo lo de la compu (loNuevoPC); nada de uno en el otro, tampoco en "Acerca de Liz". Para la próxima actualización de cada uno:
+    // cambiar su "id" (así se vuelve a mostrar) y sus "cosas".
+    loNuevoCelular: {
+      id: 'celular-17',
       cosas: [
-        'La burbuja de Liz en Hoy dice una sola cosa a la vez: tócala para ver la siguiente.',
-        'Cuando marcas cómo te sientes, Liz te contesta en la charla (y queda en tu diario de ánimo).',
-        'El menú de abajo queda pegadito al borde del iPhone, y al abrir la app sale directo la pantalla de carga.',
-        '“Más” más ordenado: Más opciones, Ajustes y Acerca de Liz.',
-        'Papelera: borra para siempre una cosa o vacíala toda.',
-        'Avisos más simples: un interruptor y “Probar aviso”.',
-        'Todas las burbujas de Liz son oscuras y no cansan la vista; la charla, con letra más cómoda.',
-        'Agenda: solo Mes y Semana, y tus recordatorios debajo del calendario.',
-        'Mi horario: anota tus clases en la Agenda y Liz se acomoda a ellas.',
-        'Estudiar con Liz: pomodoro de 25 + 5 minutos, con aviso aunque la app esté cerrada.',
-        'Liz te recuerda estudiar una vez al día, cuando estés libre (lo eliges en Avisos).',
-        'Tus recuerdos con Liz se respaldan solos en la nube cada día.',
+        'Soy la misma Liz de la compu: la misma forma de ser y lo que sé de ti, siempre al día.',
+        'Avisos más claros: arriba dice “LIZ” y el tipo va al principio (POMODORO, ESTUDIO, RECORDATORIO, EXAMEN…).',
+        'Avisos más seguros: lo que tiene hora se guarda en la nube al instante, y “Probar aviso” te dice si de verdad llegan.',
+        'En “Estudiar con Liz” ves si el aviso del final ya quedó programado.',
+        'Lo que me escribes sin internet le llega a la Liz de la compu en cuanto vuelve la conexión.',
+        'El menú de abajo se ve completo y volvió el fondo de bacterias.',
+      ],
+    },
+    loNuevoPC: {
+      id: 'pc-17',
+      cosas: [
+        'La Liz del celular ahora es la misma que yo: mi forma de ser y lo que sé de ti le llegan al momento.',
+        'Lo que me cuentas en el celular lo aprendo aquí también.',
+        'Tus recuerdos conmigo se respaldan solos en la nube cada día; en una compu nueva, los recupero.',
+        'El pomodoro cuenta también los que hagas en el celular.',
+        'Lo que te contesto cuando me dices cómo te sientes queda en tu diario de ánimo.',
         'Tu privacidad, explicada en “Acerca de Liz”.',
       ],
     },
