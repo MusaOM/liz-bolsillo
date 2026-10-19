@@ -189,11 +189,14 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .escena .comic { flex: 1; margin: 0 0 0 8px; font-size: 16px; }
 
 /* HOY: la foto de Liz GRANDE en un círculo con aura (como el diseño 2) y su globito de cómic debajo */
-.heroe { position: relative; display: flex; flex-direction: column; align-items: center; margin: 0 -16px 4px; padding: 14px 16px 0; overflow: hidden; }
-.heroe .marcoFoto { position: relative; width: 212px; height: 212px; margin-top: 4px; }
+/* (21-oct-2026) El anillo de afuera (la placa) y el brillo se cortaban en una línea recta ARRIBA: .heroe recortaba todo
+   (overflow hidden) y la placa empezaba 14 px por encima. Ahora hay espacio arriba para el anillo y el brillo, y solo se recorta
+   a los LADOS (overflow clip en x, así no aparece una barra horizontal); arriba y abajo nunca se corta. */
+.heroe { position: relative; display: flex; flex-direction: column; align-items: center; margin: 0 -16px 4px; padding: 14px 16px 0; overflow: hidden; overflow: clip visible; }
+.heroe .marcoFoto { position: relative; width: 212px; height: 212px; margin-top: 40px; }
 .heroe .marcoFoto .aura { width: 340px; height: 340px; left: -64px; top: -64px; }
-.heroe .placa { width: 270px; height: 270px; left: 50%; top: -14px; margin-left: -135px; }
-.heroe .placa.chica { width: 92px; height: 92px; left: 14px; top: 150px; margin-left: 0; border-color: rgba(76, 201, 240, .24); }
+.heroe .placa { width: 270px; height: 270px; left: 50%; top: 25px; margin-left: -135px; }
+.heroe .placa.chica { width: 92px; height: 92px; left: 14px; top: 186px; margin-left: 0; border-color: rgba(76, 201, 240, .24); }
 .heroe .lizFoto { width: 212px; }
 .heroe .comic { margin: 22px 0 6px; max-width: 94%; text-align: center; font-size: 16.5px; }
 .comic.cola-arriba::after { left: 50%; top: -10px; margin-left: -11px; transform: rotate(-135deg); }
@@ -440,22 +443,61 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 @keyframes puntito { 30% { transform: translateY(-6px); opacity: 1; } }
 
 /* ---------- Charla con Liz ---------- */
-.charla { display: flex; flex-direction: column; gap: 12px; padding-bottom: calc(150px + var(--abajo)); }
-.bienvenida { display: flex; align-items: flex-end; gap: 4px; margin: 0 0 4px; min-height: 150px; }
-.bienvenida .marcoLiz { position: relative; width: 120px; flex: none; display: grid; place-items: end center; }
-.bienvenida .marcoLiz .aura { width: 170px; height: 170px; left: -25px; bottom: -10px; }
-.bienvenida .liz2d { position: relative; max-width: 120px; max-height: 160px; }
+/* (21-oct-2026) Nada queda debajo de la hora y la batería del iPhone: una franja del color del fondo en la zona segura de arriba
+   (en todas las pantallas) y, en la charla, la barra de arriba (título "Liz" + su carita) queda FIJA al bajar */
+body::before { content: ''; position: fixed; left: 0; right: 0; top: 0; height: var(--arriba); z-index: 36; pointer-events: none; background: rgba(14, 11, 19, .94); }
+/* (21-oct-2026) En la charla TODA la parte de arriba (título "Liz", Liz 2D con su globito y los botones rápidos) queda FIJA: la
+   pantalla no se mueve; solo se mueven los mensajes (#mensajes), en el espacio entre esa parte y la barra de escribir. La lista
+   termina justo arriba de la barra (--finCharla lo mide app.js: medirCharla), así nada se dibuja debajo de la barra ni del menú.
+   Con el teclado abierto, app.js pone top/height del área visible (visualViewport) */
+body.enCharla #app { position: fixed; left: 0; right: 0; top: 0; bottom: 0; display: flex; flex-direction: column; padding-bottom: var(--finCharla, calc(170px + var(--abajo))); }
+body.enCharla #cabeza, body.enCharla .bienvenida, body.enCharla .rapidos { flex: none; }
+/* Con el teclado abierto queda poco espacio (en un iPhone chico, casi nada): el título se achica y los botones rápidos se guardan
+   mientras escribe (vuelven al cerrar el teclado) */
+body.enCharla #cabeza, body.enCharla #carita, body.enCharla #carita .lizFoto, body.enCharla #cabeza .titulo { transition: min-height .35s var(--suave), width .35s var(--suave), height .35s var(--suave), font-size .35s var(--suave); }
+body.enCharla .rapidos { max-height: 64px; transition: max-height .35s var(--suave), opacity .25s, padding .35s var(--suave); }
+body.teclado #cabeza { min-height: 38px; padding-top: 2px; padding-bottom: 0; }
+body.teclado #carita, body.teclado #carita .lizFoto { width: 32px; height: 32px; }
+body.teclado #cabeza .titulo { font-size: 22px; }
+body.teclado .rapidos { max-height: 0; opacity: 0; padding-top: 0; padding-bottom: 0; pointer-events: none; }
+body.enCharla #vista { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.charla { display: flex; flex-direction: column; flex: 1; min-height: 0; }
+#mensajes { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 16px;
+  margin: 0 -16px; padding: 14px 16px 12px; scrollbar-width: none;
+  -webkit-mask-image: linear-gradient(transparent, #000 16px, #000 calc(100% - 12px), transparent); mask-image: linear-gradient(transparent, #000 16px, #000 calc(100% - 12px), transparent); }
+#mensajes::-webkit-scrollbar { display: none; }
+#mensajes > :first-child { margin-top: auto; }      /* (con pocos mensajes, quedan abajo, cerca de la barra, como en un chat) */
+/* Más aire entre un mensaje de Liz y uno de él (y al revés) */
+.msg.liz + .msg.el, .msg.el + .msg.liz { margin-top: 8px; }
+/* Con el teclado abierto (charla): el menú de abajo se esconde y la barra de escribir va pegada arriba del teclado (app.js, visualViewport) */
+body.teclado #menu { display: none !important; }
+body.teclado #escribirLiz { bottom: auto; }
+.bienvenida { display: flex; align-items: flex-end; gap: 4px; margin: 0 0 4px; min-height: 150px; transition: min-height .35s var(--suave); }
+.bienvenida .marcoLiz { position: relative; width: 120px; flex: none; display: grid; place-items: end center; transition: width .35s var(--suave); }
+.bienvenida .marcoLiz .aura { width: 170px; height: 170px; left: -25px; bottom: -10px; transition: opacity .35s; }
+.bienvenida .liz2d { position: relative; max-width: 120px; max-height: 160px; transition: max-width .35s var(--suave), max-height .35s var(--suave); }
 .bienvenida .liz2d.sin { width: 90px; height: 90px; margin-bottom: 20px; }
-.bienvenida .comic { flex: 1; margin: 0 0 36px 8px; font-size: 16px; }
+.bienvenida .comic { flex: 1; margin: 0 0 36px 8px; font-size: 16px; transition: margin .35s var(--suave), font-size .35s var(--suave); }
+/* Achicada (pantallas chicas, mientras lee mensajes de antes, o con el teclado abierto): Liz más pequeña y el globito en una línea */
+body.charlaChica .bienvenida { min-height: 64px; }
+body.charlaChica .bienvenida .marcoLiz { width: 58px; }
+body.charlaChica .bienvenida .marcoLiz .aura { opacity: .45; }
+body.charlaChica .bienvenida .liz2d { max-width: 58px; max-height: 70px; }
+body.charlaChica .bienvenida .liz2d.sin { width: 50px; height: 50px; margin-bottom: 6px; }
+.bienvenida .comic { min-width: 0; }
+.bienvenida .comic .txt { display: block; }
+body.charlaChica .bienvenida .comic { margin: 0 0 14px 8px; font-size: 14px; padding: 10px 14px; }
+body.charlaChica .bienvenida .comic .txt { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }      /* (en el span: la colita del globito no se corta) */
 .msg { display: flex; align-items: flex-end; gap: 8px; animation: aparece .35s var(--suave) both; }
 .msg .lizFoto { width: 34px; flex: none; border-width: 1.5px; box-shadow: 0 0 12px rgba(169, 139, 255, .4); }
-.msg .burbuja { max-width: 80%; padding: 10px 15px; border-radius: 22px; font-weight: 700; font-size: 16.5px; line-height: 1.42; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg .burbuja { max-width: 80%; padding: 13px 17px; border-radius: 22px; font-weight: 700; font-size: 16.5px; line-height: 1.42; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.liz .burbuja { background: linear-gradient(170deg, #fbf6ff, #ece2fb); color: #2a1f3a; border-bottom-left-radius: 6px; box-shadow: 0 0 0 2px rgba(169, 139, 255, .45), 0 8px 20px rgba(0, 0, 0, .35); }
 .msg.el { justify-content: flex-end; }
 .msg.el .burbuja { background: linear-gradient(135deg, #a58aff, #7c5cf0); color: #fff; border-bottom-right-radius: 6px; box-shadow: 0 8px 20px rgba(124, 92, 240, .35); }
 .msg .extra { display: block; margin-top: 8px; padding: 7px 11px; border-radius: 14px; background: rgba(124, 92, 240, .12); color: #4b2fa8; font-size: 14px; font-weight: 800; }
 .msg .extra .bt { margin-top: 6px; min-height: 38px; }
-.msg .hora { display: block; margin-top: 3px; font-size: 11px; opacity: .55; font-weight: 800; }
+.msg .hora { display: block; margin-top: 4px; font-size: 11px; opacity: .55; font-weight: 800; }
+.msg.el .hora { opacity: 1; color: rgba(255, 255, 255, .82); text-align: right; }      /* (en la burbuja morada casi no se leía) */
 .rapidos { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: none; }
 .rapidos::-webkit-scrollbar { display: none; }
 .rapidos .chip { flex: none; white-space: nowrap; }

@@ -27,7 +27,8 @@
   let animos = {};                          // las fotos de su cara con cada ánimo (privadas): 'contenta' → imagen
   let gestos = {};                          // los clips de gestos (privados, WebP animado): 'saludo' → { url, ms }
   let animoForzado = null;                  // (para las fotos de prueba)
-  let charla = [];                          // la charla con Liz en este celular: [{ id, quien: 'el'|'liz', texto, fecha, extra }]
+  let tecladoSimulado = null, tecladoAbierto = false;      // (el teclado del iPhone en la charla: ajustarTeclado)
+  let charla = [];                        // la charla con Liz en este celular: [{ id, quien: 'el'|'liz', texto, fecha, extra }]
   let vista = 'hoy';
   let sesion = null;                        // la ronda de repaso en curso
   let mazoAbierto = null, buscando = '';
@@ -288,6 +289,8 @@
     PINTA[vista](v);
     $('#tituloVista').textContent = vista === 'mazos' && mazoAbierto && E.mazos[mazoAbierto] ? 'Mazo' : TITULOS[vista];
     $('#escribirLiz').hidden = vista !== 'charla';
+    document.body.classList.toggle('enCharla', vista === 'charla');      // (la barra de arriba fija, solo en la charla)
+    if (vista !== 'charla') ajustarTeclado();
     pintarCarita();
     pintarEstado();
     pintarMenu();
@@ -963,7 +966,7 @@
       fila('sincronizarYa', '🔄', 'celeste', 'Sincronizar ahora', E.ultimaSincro ? 'Última vez: ' + hace(E.ultimaSincro) : 'Todavía no') +
       (instalada ? '' : fila('comoInstalar', '📲', '', 'Instalar en el iPhone', 'Para tenerla en la pantalla de inicio')) +
       (DEMO ? '' : sinSesion ? fila('volverEntrar', '🔑', 'oro', 'Volver a entrar', 'Con tu correo y contraseña') : fila('salir', '🚪', '', 'Cerrar sesión', 'En este celular')) + '</ul></div>' +
-      '<p class="pie">LIZ · Liz de bolsillo · versión 7</p>';
+      '<p class="pie">LIZ · Liz de bolsillo · versión 8</p>';
   }
   function pintarPapelera(v) {
     const l = Org.papelera(E);
@@ -1308,18 +1311,46 @@
   function burbuja(m) {
     const extra = m.extra ? '<span class="extra">' + m.extra.html + '</span>' : '';
     return m.quien === 'liz'
-      ? '<div class="msg liz">' + fotoLiz(m.animo || 'contenta') + '<div class="burbuja">' + esc(m.texto) + extra + '<span class="hora">' + horaMsg(m.fecha) + '</span></div></div>'
+      ? '<div class="msg liz">' + fotoLiz(animoHoy()) + '<div class="burbuja">' + esc(m.texto) + extra + '<span class="hora">' + horaMsg(m.fecha) + '</span></div></div>'
       : '<div class="msg el"><div class="burbuja">' + esc(m.texto) + '<span class="hora">' + horaMsg(m.fecha) + '</span></div></div>';
   }
   function pintarCharla(v) {
     const h = N.enCR(Date.now()).h;
     if (!fijas.charla || fijas.charla.k !== h + perfil.nombre) fijas.charla = { k: h + perfil.nombre, txt: F.saludoCharla(perfil.nombre, h) };
     v.innerHTML = '<div class="charla"><div class="bienvenida"><div class="marcoLiz"><div class="aura"></div>' + lizImg('saludo', 'c', 'respira') + '</div>' +
-      '<div class="comic cola-izq">' + esc(fijas.charla.txt) + '</div></div>' +
+      '<div class="comic cola-izq"><span class="txt">' + esc(fijas.charla.txt) + '</span></div></div>' +
       '<div class="rapidos">' + RAPIDOS.map(([k, t]) => '<button class="chip toque" data-a="rapido" data-k="' + k + '">' + t + '</button>').join('') + '</div>' +
-      '<div id="mensajes">' + charla.slice(-60).map(burbuja).join('') + (pensandoCharla ? '<div class="msg liz" id="pensandoMsg">' + fotoLiz('pensativa') + '<div class="burbuja">' + PENSANDO + '</div></div>' : '') + '</div></div>';
+      '<div id="mensajes">' + charla.slice(-60).map(burbuja).join('') + (pensandoCharla ? '<div class="msg liz" id="pensandoMsg">' + fotoLiz(animoHoy()) + '<div class="burbuja">' + PENSANDO + '</div></div>' : '') + '</div></div>';
   }
-  function abajoCharla() { setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 60); }
+  // (21-oct-2026) Los mensajes se mueven DENTRO de #mensajes (la parte de arriba y la barra de escribir quedan fijas)
+  function abajoCharla(suave) {
+    setTimeout(() => { medirCharla(); const m = $('#mensajes'); if (m) m.scrollTo({ top: m.scrollHeight, behavior: suave === false ? 'auto' : 'smooth' }); }, 60);
+  }
+  // Dónde termina la lista: justo arriba de la barra de escribir (que crece con el texto y sube con el teclado)
+  function medirCharla() {
+    if (vista !== 'charla') return;
+    const a = $('#app').getBoundingClientRect(), b = $('#escribirLiz').getBoundingClientRect();
+    if (b.height) $('#app').style.setProperty('--finCharla', Math.max(0, Math.round(a.bottom - b.top + 8)) + 'px');
+  }
+  // La parte de arriba se achica (Liz más pequeña, el globito en una línea) en pantallas chicas mientras él lee mensajes de antes, y
+  // siempre con el teclado abierto; vuelve a su tamaño al llegar al último mensaje. Al cambiar de tamaño, si estaba en el último
+  // mensaje, se queda ahí (si no, la lista "se movería sola" y volvería a achicarse)
+  let alFinal = true;
+  function compactarCharla() {
+    const m = $('#mensajes');
+    if (!m || vista !== 'charla') { document.body.classList.remove('charlaChica'); return; }
+    const falta = m.scrollHeight - m.clientHeight - m.scrollTop;
+    const chica = innerHeight < 900;
+    if (falta <= 4) alFinal = true; else if (falta > 60) alFinal = false;
+    document.body.classList.toggle('charlaChica', tecladoAbierto || (chica && !alFinal));
+  }
+  document.addEventListener('scroll', (ev) => { if (ev.target && ev.target.id === 'mensajes') compactarCharla(); }, true);
+  if (window.ResizeObserver) {
+    const ro = new ResizeObserver(() => { const m = $('#mensajes'); if (m && alFinal) m.scrollTop = m.scrollHeight; });
+    new MutationObserver(() => { const m = $('#mensajes'); if (m && !m.dataset.visto) { m.dataset.visto = 1; ro.disconnect(); ro.observe(m); alFinal = true; } })
+      .observe(document.getElementById('vista'), { childList: true });
+  }
+  addEventListener('resize', () => { medirCharla(); compactarCharla(); });
   function agregarMsg(m) {
     m = Object.assign({ id: N.uuid(), fecha: Date.now() }, m);
     charla = charla.concat(m).slice(-120);
@@ -1335,7 +1366,7 @@
     const caja = $('#mensajes');
     if (!caja) return;
     const p = $('#pensandoMsg');
-    if (si && !p) { caja.insertAdjacentHTML('beforeend', '<div class="msg liz" id="pensandoMsg">' + fotoLiz('pensativa') + '<div class="burbuja">' + PENSANDO + '</div></div>'); abajoCharla(); gestoLiz('pensar'); }
+    if (si && !p) { caja.insertAdjacentHTML('beforeend', '<div class="msg liz" id="pensandoMsg">' + fotoLiz(animoHoy()) + '<div class="burbuja">' + PENSANDO + '</div></div>'); abajoCharla(); gestoLiz('pensar'); }
     if (!si && p) p.remove();
   }
   // Lo que la app sabe de su estudio ahora (va al cerebro como contexto)
@@ -1373,7 +1404,8 @@
     if (archivarDesdeCharla(texto)) return;
     if (!DEMO && !navigator.onLine) { agregarMsg({ quien: 'liz', texto: F.frase('cSinInternet'), animo: 'tierna' }); return; }
     pensando(true);
-    const r = await cerebro('charla', { mensajes: charla.slice(-12).map((m) => ({ quien: m.quien, texto: m.texto })), contexto: contextoTexto() });
+    // (21-oct-2026) Su ÁNIMO de ahora (el que él ve en Hoy: dormida, contenta...) va al cerebro: así no dice "¡estoy activa!" si se ve dormida
+    const r = await cerebro('charla', { mensajes: charla.slice(-12).map((m) => ({ quien: m.quien, texto: m.texto })), contexto: contextoTexto(), animo: animoHoy() });
     pensando(false);
     if (r.sinInternet) return agregarMsg({ quien: 'liz', texto: F.frase('cSinInternet'), animo: 'tierna' });
     if (r.error && !r.dice) return agregarMsg({ quien: 'liz', texto: F.frase('cError') + ' (' + r.error + ')', animo: 'tierna' });
@@ -1697,7 +1729,34 @@
   document.addEventListener('input', (ev) => { if (ev.target.id === 'tEscribe' && sesion && sesion.escrito) sesion.escrito.borrador = ev.target.value; });
   // El cuadro de la charla: crece con el texto; Enter manda (Mayús+Enter: otra línea)
   const textoLiz = $('#textoLiz');
-  const crecer = () => { textoLiz.style.height = 'auto'; textoLiz.style.height = Math.min(140, textoLiz.scrollHeight) + 'px'; };
+  // (21-oct-2026) EL TECLADO en la charla: en el iPhone, al abrirse, el teclado tapa la parte de abajo pero la página no se achica
+  // (y el menú y la barra de escribir se descuadraban). Con visualViewport se sabe cuánto ocupa el teclado: el menú se esconde, la
+  // barra de escribir va pegada justo arriba del teclado y el último mensaje queda visible encima; al cerrarlo, todo vuelve.
+  function ajustarTeclado() {
+    const vv = window.visualViewport;
+    const tecl = tecladoSimulado != null ? tecladoSimulado : vv ? Math.max(0, innerHeight - vv.height - vv.offsetTop) : 0;
+    const abierto = vista === 'charla' && tecl > 80;
+    document.body.classList.toggle('teclado', abierto);
+    document.documentElement.style.setProperty('--tecl', abierto ? Math.round(tecl) + 'px' : '0px');
+    const bar = $('#escribirLiz'), app = $('#app');
+    if (abierto) {
+      const arriba = vv && tecladoSimulado == null ? vv.offsetTop : 0;      // (lo que se ve: de "arriba" hasta donde empieza el teclado)
+      const fondo = vv && tecladoSimulado == null ? vv.offsetTop + vv.height : innerHeight - tecl;
+      bar.style.top = Math.round(fondo - bar.offsetHeight - 6) + 'px';
+      app.style.top = Math.round(arriba) + 'px';
+      app.style.bottom = 'auto';
+      app.style.height = Math.round(fondo - arriba) + 'px';
+    } else { bar.style.top = ''; app.style.top = app.style.bottom = app.style.height = ''; }
+    const cambio = abierto !== tecladoAbierto;
+    tecladoAbierto = abierto;
+    medirCharla();
+    compactarCharla();
+    if (cambio && abierto) abajoCharla(false);
+  }
+  if (window.visualViewport) { visualViewport.addEventListener('resize', ajustarTeclado); visualViewport.addEventListener('scroll', ajustarTeclado); }
+  textoLiz.addEventListener('focus', () => setTimeout(ajustarTeclado, 350));
+  textoLiz.addEventListener('blur', () => setTimeout(ajustarTeclado, 350));
+  const crecer = () => { textoLiz.style.height = 'auto'; textoLiz.style.height = Math.min(140, textoLiz.scrollHeight) + 'px'; ajustarTeclado(); };      // (la lista termina arriba de la barra, aunque crezca)
   textoLiz.addEventListener('input', crecer);
   textoLiz.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); $('#formLiz').requestSubmit(); } });
   $('#formLiz').addEventListener('submit', (ev) => {
@@ -1838,6 +1897,7 @@
     const tocan = Org.paraRepasar(E, { soloHoy: true }).length, ex = Ag.proximosExamenes(E, Date.now())[0];
     if (/toca hoy/.test(ultimo)) return { dice: 'Hoy te tocan ' + tocan + ' tarjetas, casi todas de Tinciones. Y ojo: ' + (ex ? N.nombreExamen(ex) + ' es ' + enDias(ex.cuando) : 'no tienes exámenes cerca') + '. ¿Empezamos con unas 5 ahorita?' };
     if (/recuerda/.test(ultimo)) return { dice: 'Listo, te lo anoto para mañana a las 3 de la tarde. 📝', recordatorio: { texto: 'Sacar las placas de agar', fecha: N.diaCR(Date.now() + DIA), hora: '15:00', repite: null } };
+    if (/dormida|cansada|como estas/.test(ultimo)) return { dice: b.animo === 'dormida' ? 'Medio dormida, la verdad… 😴 ¡pero para ti me despierto! ¿Repasamos unas poquitas o ya a dormir?' : '¡Bien despierta y contenta de verte! ¿Qué hacemos?' };
     if (/animo/.test(ultimo)) return { dice: 'Ya repasaste un montón y se nota. Respira, duerme bien y confía en lo que sabes: yo estoy contigo. 💜' };
     return { dice: '¡Claro! Pregúntame lo que quieras de micro; si no lo sé, lo buscamos juntos en tus apuntes.' };
   }
@@ -1894,6 +1954,7 @@
   self.LizApp = { estado: () => E, sincronizar, avisar, ir, foto: ponerFoto, liz2d: (m) => { liz2d = m || {}; pintarFijas(); pintarSuave(); }, empezar: () => A.repasarHoy(), voltear: () => A.voltear(), accion: (n) => A[n]({}), formAgenda,   // (para las pruebas y las fotos)
     animos: (m) => { animos = m || {}; pintar(); }, gestos: (m) => { gestos = m || {}; }, gesto: (n) => { gestoHasta = 0; return gestoLiz(n); }, animo: (a) => { animoForzado = a || null; pintar(); }, enviar: enviarCharla, escribir: (t) => { A.escribirResp(); setTimeout(() => revisarEscrito(t), 100); },
     pegar: hojaPegar, hacerTarjetas: hacerTarjetasDeTexto,
+    teclado: (px) => { tecladoSimulado = px || null; ajustarTeclado(); },      // (para las capturas: simula el teclado abierto)
     archivar: (nombre, valor) => { const b = Org.buscarMateriaOMazo(E, nombre); if (b) { Org.archivar(E, b.tabla, b.fila.id, valor !== false, DISP); cambio(); } return !!b; },
     sabida: (n) => { const t = Org.vivos(E.tarjetas).find((x) => Org.lim(x.pregunta).includes(Org.lim(n))); if (t) { Org.marcarSabida(E, t.id, true, DISP); cambio(); } return !!t; } };
 })();
