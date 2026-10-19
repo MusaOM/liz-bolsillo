@@ -6,8 +6,8 @@
   if (typeof module === 'object' && module.exports) module.exports = fabrica();
   else raiz.LizVersion = fabrica();
 })(typeof self !== 'undefined' ? self : this, function () {
-  const liz = '1.1';
-  const bolsillo = 9;
+  const liz = '1.2';
+  const bolsillo = 10;
   return {
     liz,
     bolsillo,
@@ -16,13 +16,15 @@
     larga: 'Liz ' + liz + ' · bolsillo ' + bolsillo,
     // Lo nuevo de ESTA versión, en simple (sale en "Acerca de Liz")
     novedades: [
-      '¿Cómo te sientes hoy? Liz te pregunta una vez al día y se adapta a cómo estás.',
-      '“Cómo te has sentido”: tu semana y tu mes en colores, en Progreso.',
-      'Sorpresas de vez en cuando… (no te digo más 💜).',
-      '“Acerca de Liz”: quién es, de dónde viene y quién la hizo posible.',
-      'El chat del celular: la parte de arriba queda fija y los mensajes no se esconden detrás de la barra.',
+      'Todo más ordenado: cada cosa en un solo lugar y pantallas con menos espacio vacío.',
+      '“Más” compacto, como los Ajustes del iPhone, con los interruptores ahí mismo.',
+      'Recordatorios ahora está en Agenda (Mes · Semana · Recordatorios).',
+      'Archivados tiene su propia pantalla en Más, y nuevo: “Reducir movimiento”.',
+      'El menú de abajo queda fijo, pegado al borde: ya no salta (ni con el teclado).',
+      'De la 1.1: “¿Cómo te sientes hoy?”, tu diario de ánimo y alguna sorpresa de vez en cuando 💜.',
     ],
     historial: [
+      { v: '1.2', fecha: '2026-10-21', que: 'App del celular más simple: sin accesos repetidos, "Más" compacto, Recordatorios en Agenda, Archivados en Más, reducir movimiento; menú de abajo fijo.' },
       { v: '1.1', fecha: '2026-10-21', que: 'Diario de ánimo, frases de cariño, Acerca de Liz, versión visible y arreglos del chat del celular.' },
       { v: '1.0', fecha: '2026-10-19', que: 'La primera Liz: voz propia, estudio con tarjetas, laboratorio, biblioteca de microbiología y la Liz de bolsillo.' },
     ],

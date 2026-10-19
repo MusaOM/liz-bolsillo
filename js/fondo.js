@@ -110,6 +110,7 @@
     function cuadro(ahora) {
       pedido = 0;
       if (document.hidden) return;                     // pausa: vuelve con visibilitychange
+      if (document.body.classList.contains('quieto')) return;      // (21-oct-2026: "Reducir movimiento" en Más; vuelve con 'liz-movimiento')
       pedido = requestAnimationFrame(cuadro);
       acum += ahora - ultimo; ultimo = ahora;
       if (acum < 48) return;                           // ~20 cuadros por segundo
@@ -119,6 +120,7 @@
     else {
       pedido = requestAnimationFrame(cuadro);
       document.addEventListener('visibilitychange', () => { if (!document.hidden && !pedido) { ultimo = performance.now(); pedido = requestAnimationFrame(cuadro); } });
+      document.addEventListener('liz-movimiento', () => { if (!pedido) { ultimo = performance.now(); pedido = requestAnimationFrame(cuadro); } });
     }
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', crear); else crear();

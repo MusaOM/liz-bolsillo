@@ -469,8 +469,8 @@ body.enCharla #vista { flex: 1; min-height: 0; display: flex; flex-direction: co
 #mensajes > :first-child { margin-top: auto; }      /* (con pocos mensajes, quedan abajo, cerca de la barra, como en un chat) */
 /* Más aire entre un mensaje de Liz y uno de él (y al revés) */
 .msg.liz + .msg.el, .msg.el + .msg.liz { margin-top: 8px; }
-/* Con el teclado abierto (charla): el menú de abajo se esconde y la barra de escribir va pegada arriba del teclado (app.js, visualViewport) */
-body.teclado #menu { display: none !important; }
+/* Con el teclado abierto (charla): SOLO la barra de escribir sube, pegada arriba del teclado (app.js, visualViewport). El menú de
+   abajo NO se toca (21-oct-2026: antes se escondía y volvía a aparecer, y en el iPhone "saltaba"; ahora queda quieto, tapado por el teclado) */
 body.teclado #escribirLiz { bottom: auto; }
 .bienvenida { display: flex; align-items: flex-end; gap: 4px; margin: 0 0 4px; min-height: 150px; transition: min-height .35s var(--suave); }
 .bienvenida .marcoLiz { position: relative; width: 120px; flex: none; display: grid; place-items: end center; transition: width .35s var(--suave); }
@@ -634,3 +634,51 @@ ul.nuevo li::before { content: '✦'; position: absolute; left: 0; top: 7px; col
 .creditos summary { color: var(--t-acento); font-weight: 900; padding: 8px 0; cursor: pointer; }
 .creditos details p { margin: 0 0 8px; font-size: 13px; line-height: 1.45; color: var(--t-texto-suave); }
 .creditos details b { color: var(--t-texto); }
+/* ---------- (21-oct-2026) Simplificar y ordenar: menos espacio vacío, "Más" compacto tipo Ajustes del iPhone ---------- */
+/* Liz arriba de cada pantalla: más chica (antes 84 px y una caja de 96 px de alto) */
+.escena { min-height: 0; margin: 0 0 10px; gap: 10px; }
+.escena .marcoLiz { width: 58px; height: 58px; }
+.escena .marcoLiz .aura { width: 104px; height: 104px; left: -23px; top: -23px; }
+.escena .marcoLiz .lizFoto { width: 58px; }
+.escena .comic { font-size: 15px; padding: 10px 14px; margin-left: 6px; }
+h3 { margin: 18px 6px 8px; }
+.panel { margin: 8px 0; }
+.subir { padding: 12px 14px; gap: 12px; border-radius: 20px; }
+.subir .e { font-size: 30px; }
+.subir .txt b { font-size: 17px; }
+.subir .txt span { font-size: 13px; }
+.pastillas { margin: 10px 0 4px; }
+/* "Más": filas compactas (ícono chico, nombre, el dato en gris a la derecha, flechita o interruptor) */
+.panel.compacta { padding: 2px 0; }
+.compacta .item { min-height: 46px; padding: 7px 14px; gap: 12px; border-radius: 0; }
+.compacta li + li .item::before { content: ''; position: absolute; left: 56px; right: 0; top: 0; height: 1px; background: rgba(169, 139, 255, .14); }
+.compacta li:first-child .item { border-radius: 22px 22px 0 0; }
+.compacta li:last-child .item { border-radius: 0 0 22px 22px; }
+.compacta li:only-child .item { border-radius: 22px; }
+.compacta .item .ico { width: 30px; height: 30px; border-radius: 9px; font-size: 16px; }
+.compacta .item .txt b { font-size: 16px; font-weight: 800; }
+.compacta .item .dato { color: var(--t-texto-suave); font-size: 14.5px; font-weight: 700; white-space: nowrap; }
+.compacta .item .chev { font-size: 20px; margin-left: -4px; }
+.compacta .interruptor { transform: scale(.9); }
+/* Agenda: Mes · Semana · Recordatorios */
+.seg.tres button { font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 5px; white-space: nowrap; }
+.seg.tres .punto-n { min-width: 20px; padding: 1px 6px; font-size: 11.5px; box-shadow: none; }
+/* Reducir movimiento */
+body.quieto .respira, body.quieto .aura, body.quieto .vista, body.quieto .msg, body.quieto .comic { animation: none !important; }
+body.quieto .corazonCel, body.quieto .clip { display: none !important; }#cabeza .titulo.largo { font-size: 24px; }
+
+/* ---------- (21-oct-2026) MENÚ DE ABAJO FIJO, pegado al borde (el diseño de siempre: vidrio oscuro, borde morado, brillo, íconos) ----------
+   Siempre position: fixed; bottom: 0. La barrita de inicio del iPhone (safe-area-inset-bottom) se suma UNA sola vez, como relleno de abajo
+   del propio menú: así su fondo llega hasta el borde (sin franja vacía debajo). Nada lo mueve, lo recalcula ni lo anima con JavaScript.
+   --menu = el alto del menú SIN la barrita de inicio. Todo lo que va encima (el contenido, la barra de escribir, el botón +, los avisos)
+   se mide desde ahí. */
+:root { --menu: 70px; }
+html { background: #0e0b13; min-height: 100%; }
+body { min-height: 100vh; min-height: 100dvh; }
+#menu { left: 0; right: 0; bottom: 0; top: auto; transform: none; max-width: 640px; margin: 0 auto;
+  padding: 6px calc(8px + var(--der)) calc(6px + var(--abajo)) calc(8px + var(--izq));
+  border-radius: 28px 28px 0 0; border-bottom: 0; box-shadow: 0 -10px 30px rgba(0, 0, 0, .5), 0 0 24px rgba(142, 107, 255, .15); }
+#app { padding-bottom: calc(var(--menu) + var(--abajo) + 26px); }
+#escribirLiz { bottom: calc(var(--menu) + var(--abajo) + 8px); }
+.fab { bottom: calc(var(--menu) + var(--abajo) + 16px); }
+#aviso { bottom: calc(var(--menu) + var(--abajo) + 14px); }
