@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <radialGradient id="f" cx="50%" cy="40%" r="70%">
+      <stop offset="0" stop-color="#3a2f4a"/>
+      <stop offset="1" stop-color="#1a1520"/>
+    </radialGradient>
+    <radialGradient id="agar" cx="45%" cy="40%" r="60%">
+      <stop offset="0" stop-color="#4a3a66"/>
+      <stop offset="1" stop-color="#2c2338"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#f)"/>
+  <!-- placa de Petri -->
+  <circle cx="256" cy="256" r="178" fill="url(#agar)" stroke="#a98bff" stroke-width="14"/>
+  <circle cx="256" cy="256" r="160" fill="none" stroke="#a98bff" stroke-opacity=".35" stroke-width="5"/>
+  <!-- colonias -->
+  <circle cx="190" cy="200" r="30" fill="#f72585" opacity=".9"/>
+  <circle cx="300" cy="180" r="18" fill="#4cc9f0" opacity=".9"/>
+  <circle cx="320" cy="300" r="34" fill="#a98bff" opacity=".9"/>
+  <circle cx="210" cy="320" r="20" fill="#7cf29a" opacity=".85"/>
+  <circle cx="260" cy="250" r="12" fill="#ff8fbf"/>
+  <!-- bacilo -->
+  <rect x="150" y="262" width="70" height="22" rx="11" fill="#ff8fbf" transform="rotate(-25 185 273)"/>
+  <!-- brillo -->
+  <path d="M150 140 A140 140 0 0 1 250 98" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="12" stroke-linecap="round"/>
+</svg>
