@@ -2434,7 +2434,9 @@
   // cambiaba, si se borró la fila o si se reinstaló la app, el servidor mandaba los avisos a una dirección muerta y no llegaba nada.
   // (iOS no deja suscribirse sin que él toque algo: si ya no hay suscripción, queda "⚠ Toca para reactivar" en Más → Avisos.)
   let avisosEstado = 'apagados';      // 'activados' | 'reactivar' | 'apagados'
-  async function refrescarAvisos() {
+  // (19-oct-2026, optimización) Se vuelve a guardar en el servidor solo si cambió (la suscripción o sus horas) o si pasó un día: antes se
+  // escribía en Supabase CADA vez que se abría la app. forzar = "Probar aviso" (siempre la guarda antes de probar).
+  async function refrescarAvisos(forzar) {
     if (DEMO || !sb || !('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return avisosEstado;
     let id = null;
     try { id = localStorage.getItem('liz-aviso-id'); } catch (e) {}
@@ -2444,8 +2446,13 @@
       const s = await conTope((await navigator.serviceWorker.ready).pushManager.getSubscription(), 8000, 'la suscripción');
       if (!s) return (avisosEstado = 'reactivar');
       const p = estudioPref(), hora = +(localStorage.getItem('liz-aviso-hora') || 8);
+      const firma = JSON.stringify([id, s.endpoint, hora, !!p.on, p.hora]);
+      let guardada = null;
+      try { guardada = JSON.parse(localStorage.getItem('liz-aviso-guardado') || 'null'); } catch (e) {}
+      if (!forzar && guardada && guardada.firma === firma && Date.now() - guardada.ms < DIA) { avisosEstado = 'activados'; if (vista === 'mas') pintarSuave(); return avisosEstado; }
       let r = await sb.from('avisos_push').upsert({ id, suscripcion: s.toJSON(), hora, estudio: !!p.on, hora_estudio: p.hora === '' ? null : Number(p.hora) });
       if (r.error) r = await sb.from('avisos_push').upsert({ id, suscripcion: s.toJSON(), hora });       // (sin avisos.sql nuevo: sin esas columnas)
+      if (!r.error) try { localStorage.setItem('liz-aviso-guardado', JSON.stringify({ firma, ms: Date.now() })); } catch (e) {}
       avisosEstado = r.error ? avisosEstado : 'activados';
     } catch (e) { console.warn('Avisos:', e); }
     if (vista === 'mas') pintarSuave();
@@ -2506,7 +2513,7 @@
       const b = ev.target, err = $('#aErr', h);
       if (DEMO) { avisar('En el modo de prueba no hay avisos.'); return; }
       b.disabled = true; b.textContent = 'Mandando el aviso…'; err.textContent = '';
-      await refrescarAvisos();
+      await refrescarAvisos(true);
       let id = null;
       try { id = localStorage.getItem('liz-aviso-id'); } catch (e) {}
       const r = await cerebro('probarAviso', { id });

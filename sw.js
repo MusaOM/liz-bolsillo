@@ -3,7 +3,7 @@
 // Al tocar un aviso, se abre la pantalla que corresponde (url: ./#recordatorios, ./#repasar, ./#mazo=<id>...).
 // Al cambiar archivos de la app, el celular baja la versión nueva porque cambia VERSION. (21-oct-2026) El número sale de
 // js/version.js ("bolsillo"): herramientas/preparar-publicacion.js lo copia aquí solo (no hace falta cambiarlo a mano).
-const VERSION = 'liz-bolsillo-18';
+const VERSION = 'liz-bolsillo-19';
 const ARCHIVOS = [
   './', 'index.html', 'manifest.webmanifest', 'css/estilo.css',
   'js/config.js', 'js/nucleo.js', 'js/sincro.js', 'js/organizar.js', 'js/agenda.js', 'js/frases.js', 'js/almacen.js', 'js/fondo.js', 'js/app.js',

@@ -10,7 +10,7 @@
   else raiz.LizVersion = fabrica();
 })(typeof self !== 'undefined' ? self : this, function () {
   const liz = '1.0';
-  const bolsillo = 18;
+  const bolsillo = 19;
   return {
     liz,
     bolsillo,
