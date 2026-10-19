@@ -60,7 +60,7 @@
     const imgs = {};
     for (const [k, f] of Object.entries(FORMAS)) imgs[k] = cs.map((c) => f(c));
     const nuevo = (tipo, x, y, extra) => Object.assign({ tipo, ci: Math.floor(Math.random() * cs.length), x, y, ang: azar(0, TAU),
-      vx: azar(-1, 1) * azar(3, 7), vy: azar(-1, 1) * azar(3, 7), va: azar(-0.1, 0.1), alfa: azar(0.42, 0.68), fase: azar(0, TAU), escala: azar(0.8, 1.15), aparece: 0, div: -1 }, extra || {});
+      vx: azar(-1, 1) * azar(3, 7), vy: azar(-1, 1) * azar(3, 7), va: azar(-0.1, 0.1), alfa: azar(0.32, 0.55), fase: azar(0, TAU), escala: azar(0.8, 1.15), aparece: 0, div: -1 }, extra || {});
     let cosas = [];
     medir();
     cosas.push(nuevo('placa', azar(0, W), azar(0, H * 0.4), { alfa: 0.16, vx: azar(-2, 2), vy: azar(-2, 2), va: 0.02, escala: 1.3 }));

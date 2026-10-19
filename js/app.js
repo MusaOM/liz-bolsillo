@@ -25,6 +25,7 @@
   let perfil = { nombre: '' };
   let liz2d = {};                           // las poses de Liz (privadas, guardadas en el celular): 'saludo-g' → imagen
   let animos = {};                          // las fotos de su cara con cada ánimo (privadas): 'contenta' → imagen
+  let gestos = {};                          // los clips de gestos (privados, WebP animado): 'saludo' → { url, ms }
   let animoForzado = null;                  // (para las fotos de prueba)
   let charla = [];                          // la charla con Liz en este celular: [{ id, quien: 'el'|'liz', texto, fecha, extra }]
   let vista = 'hoy';
@@ -89,6 +90,7 @@
         avisar(na ? 'La compu me pasó ' + na + (na === 1 ? ' cosa nueva' : ' cosas nuevas') + ' de tu agenda.' : nt && !r.repasosDeOtro ? 'La compu me pasó ' + nt + (nt === 1 ? ' tarjeta.' : ' tarjetas.') : F.frase('sincronice'));
       }
       if (r.bajados || r.repasosBajados || r.borrados) pintarSuave();
+      if (motivo === 'abrir') setTimeout(revisarExamenPasado, 1200);
     } catch (e) {
       ultimoError = String(e && e.message || e);
       console.warn('Sincronizar:', e);
@@ -144,6 +146,20 @@
         pintarSuave();
       }
     }
+    // (20-oct-2026) Los clips de gestos (PRIVADOS): igual, solo si cambiaron; se guardan aquí para que funcionen sin internet
+    const ge = data.datos && data.datos.gestos;
+    if (ge && ge.v && ge.v !== perfil.gestosV && ge.archivos && typeof ge.archivos === 'object') {
+      const clips = {};
+      for (const [g, n] of Object.entries(ge.archivos)) {
+        const r = await sb.storage.from('liz-privado').download(ge.carpeta + n);
+        if (r.data) clips[g] = { url: await aDataURL(r.data), ms: Number(ge.duracion && ge.duracion[g]) || 2000 };
+      }
+      if (Object.keys(clips).length) {
+        gestos = clips;
+        await Almacen.guardar(K + 'gestos', clips);
+        perfil.gestosV = ge.v;
+      }
+    }
     Almacen.guardar(K + 'perfil', perfil);
   }
   const aDataURL = (blob) => new Promise((ok, mal) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = mal; f.readAsDataURL(blob); });
@@ -161,6 +177,7 @@
       if (img) ponerFoto(img);
       liz2d = (await Almacen.leer(K + 'liz2d')) || {};
       animos = (await Almacen.leer(K + 'animos')) || {};
+      gestos = (await Almacen.leer(K + 'gestos')) || {};
       charla = (await Almacen.leer(K + 'charla')) || [];
       pintarFijas();
     } catch (e) { console.warn('Almacén', e); }
@@ -184,6 +201,7 @@
       perfil = { nombre: '' };
       liz2d = {};
       animos = {};
+      gestos = {};
       charla = [];
       await Almacen.borrarTodo().catch(() => {});
       document.documentElement.style.removeProperty('--liz');
@@ -199,6 +217,7 @@
     $('#app').hidden = false;
     $('#menu').hidden = false;
     if (!irPorEnlace(location.hash)) pintar();
+    setTimeout(() => gestoLiz(deNoche() ? 'bostezo' : 'saludo'), 1900);     // (cuando ya se fue la pantalla de carga)
     setInterval(() => sincronizar('auto'), 5 * MIN);
     setInterval(() => { if (vista === 'hoy' || vista === 'agenda' || vista === 'recordatorios') pintarSuave(); }, 60000);
   }
@@ -280,6 +299,12 @@
     let p = b.querySelector('.punto');
     if (n) { if (!p) { p = document.createElement('i'); p.className = 'punto'; b.appendChild(p); } p.textContent = n > 99 ? '99+' : n; }
     else if (p) p.remove();
+    // (20-oct-2026) Un puntito en la pestaña Liz si ella escribió algo en la charla (la pregunta después de un examen)
+    if (vista === 'charla') avisoCharla = false;
+    const bc = document.querySelector('#menu [data-v=charla]');
+    let pc = bc && bc.querySelector('.punto');
+    if (bc && avisoCharla && !pc) { pc = document.createElement('i'); pc.className = 'punto'; pc.textContent = '1'; bc.appendChild(pc); }
+    else if (pc && !avisoCharla) pc.remove();
     if (navigator.setAppBadge) (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {});
   }
   function hace(ms) {
@@ -375,6 +400,36 @@
       m.dataset.animo = clave;
     }
   }
+  // ---------- (20-oct-2026) GESTOS: clips cortitos del avatar 3D (grabados en la PC, privados, guardados en el celular) ----------
+  // Saluda al abrir (de noche bosteza), celebra al acertar, asiente con "a medias", piensa mientras responde en la charla y guiña
+  // de vez en cuando. Se ve en el círculo grande de Hoy y en la carita de arriba; al terminar vuelve a la foto de su ánimo con un
+  // fundido. Para no gastar batería: solo si se ve (pantalla encendida, el círculo en la pantalla), nunca dos a la vez, y con
+  // "reducir movimiento" no se reproducen (quedan las fotos quietas).
+  const quietoCel = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+  const deNoche = () => { const h = N.enCR(Date.now()).h; return h >= 22 || h < 5; };
+  let gestoHasta = 0, ultimoGesto = 0;
+  function gestoLiz(nombre, donde) {
+    const c = gestos[nombre];
+    if (!c || !c.url || quietoCel() || document.hidden || Date.now() < gestoHasta) return false;
+    const enPantalla = (el) => { const r = el.getBoundingClientRect(); return r.width > 0 && r.bottom > 0 && r.top < innerHeight; };
+    const marcos = [...document.querySelectorAll(donde || '.heroe .marcoFoto .lizFoto, #carita .lizFoto')].filter(enPantalla);
+    if (!marcos.length) return false;
+    const ms = Math.max(600, Math.min(4000, c.ms || 2000));
+    gestoHasta = Date.now() + ms + 500;
+    ultimoGesto = Date.now();
+    for (const m of marcos) {
+      const img = new Image();            // (una imagen nueva cada vez: así el clip empieza desde el principio)
+      img.className = 'clip';
+      img.alt = '';
+      img.src = c.url;
+      m.appendChild(img);
+      m.classList.add('conClip');
+      setTimeout(() => { m.classList.remove('conClip'); img.classList.add('sale'); setTimeout(() => img.remove(), 400); }, ms);
+    }
+    return true;
+  }
+  // De vez en cuando, en Hoy: un guiño (de noche, un bostezo). Máximo uno por minuto, y solo con la app a la vista.
+  setInterval(() => { if (vista === 'hoy' && !document.hidden && Date.now() - ultimoGesto > 60000 && Math.random() < 0.3) gestoLiz(deNoche() ? 'bostezo' : 'guino'); }, 20000);
   // Arriba de cada pantalla: la carita de Liz (con su ánimo) y su globito
   const escena = (pose, frase) => '<div class="escena"><div class="marcoLiz"><div class="aura"></div>' + fotoLiz(null, 'respira') + '</div>' +
     '<div class="comic cola-izq">' + frase + '</div></div>';
@@ -483,7 +538,7 @@
       '<div class="cara atras"><div class="m">La respuesta</div><div class="r">' + esc(t.respuesta) + '</div>' +
       (t.fuente ? '<div class="fuente">📖 ' + esc(t.fuente) + '</div>' : '') + (fig ? '<div class="pie">Figura: ' + esc(fig.fuente || 'OpenStax Microbiology') + ' (' + esc(fig.licencia || 'CC BY-NC-SA 4.0') + ')</div>' : '') + '</div></div></div>' +
       '<div class="marcas"><button class="chip' + (t.favorita ? ' on' : '') + '" data-a="marcarFav">⭐ Favorita</button><button class="chip' + (t.dificil ? ' on' : '') +
-      '" data-a="marcarDif">🔥 Difícil</button><button class="chip" data-a="editarActual" aria-label="Editar">✏️</button></div>' +
+      '" data-a="marcarDif">🔥 Difícil</button><button class="chip" data-a="yaMeLaSe" title="Ya me la sé: no vuelve a salir">🎓 Ya me la sé</button><button class="chip" data-a="editarActual" aria-label="Editar">✏️</button></div>' +
       '<div id="abajoSesion">' + botonesSesion() + '</div></div>';
     sesion.entra = false;
     sesion.reaccion = '';
@@ -565,6 +620,7 @@
     decirEnSesion('<span class="nivel ' + res + '">' + NIVEL[res] + '</span><br>' + esc(r.dice), res === 'bien' ? 'feliz' : 'animo', res === 'bien' ? 'salta' : 'ladea');
     vibrar(res);
     sonar(res);
+    if (res === 'bien') gestoLiz('celebrar'); else if (res === 'medio') gestoLiz('asentir');
     if (res === 'bien') { tj.classList.add('brilla'); confeti(); }
     $('#abajoSesion').innerHTML = botonesSesion();
   }
@@ -619,6 +675,7 @@
     // Liz reacciona con su pose: feliz al acertar, dando ánimo al fallar
     sesion.pose = res === 'bien' ? 'feliz' : 'animo';
     sesion.reaccion = res === 'bien' ? 'salta' : 'ladea';
+    if (res === 'bien') gestoLiz('celebrar'); else if (res === 'medio') gestoLiz('asentir');
     const tj = $('.tarjetaG');
     $('#lizDice').textContent = sesion.dice;
     const liz = $('#lizRep');
@@ -654,7 +711,7 @@
       '<button class="bt grande" data-a="salirSesion">Volver a Hoy</button></div>';
   }
   function confeti(n) {
-    const col = (getComputedStyle(document.documentElement).getPropertyValue('--t-micro') || '#a98bff,#4cc9f0,#f72585,#7cf29a').split(',').map((s) => s.trim()).concat(['#ffd166']);
+    const col = (getComputedStyle(document.documentElement).getPropertyValue('--t-confeti') || '#a98bff,#cdb4ff,#ffd166,#4cc9f0,#f72585,#6f5cae').split(',').map((s) => s.trim());   // (el confeti de la PC)
     for (let i = 0; i < (n || 22); i++) {
       const c = document.createElement('i');
       c.className = 'confeti';
@@ -745,7 +802,7 @@
   }
 
   // ---------- MAZOS ----------
-  const COLORES_MATERIA = ['#a98bff', '#f72585', '#4cc9f0', '#7cf29a', '#ffd166', '#ff7eb6'];
+  const COLORES_MATERIA = ['#a98bff', '#4cc9f0', '#7cf29a', '#ffd166', '#cdb4ff', '#6f5cae'];   // (sin rosados: los de la PC)
   function filaMazo(m) {
     const ts = Org.vivos(E.tarjetas).filter((t) => t.mazo_id === m.id);
     const hoy = Org.paraRepasar(E, { mazo: m.id, soloHoy: true }).length;
@@ -757,13 +814,23 @@
     const e = Sincro.estado(E, t);
     return '<li><button class="item" data-a="editarTarjeta" data-id="' + esc(t.id) + '"><span class="txt"><b>' + esc(t.pregunta) +
       '</b><small>' + esc(t.respuesta) + '</small></span><span class="suave" style="font-size:13px;white-space:nowrap">' +
-      (t.favorita ? '⭐' : '') + (t.dificil ? '🔥' : '') + ' caja ' + e.caja + '</span></button></li>';
+      (t.favorita ? '⭐' : '') + (t.dificil ? '🔥' : '') + (Org.sabida(t) ? ' 🎓 ya me la sé' : ' caja ' + e.caja) + '</span></button></li>';
+  }
+  // (20-oct-2026) 📦 Archivados: mazos y materias que ya no salen en el repaso (sus tarjetas siguen guardadas con su progreso)
+  function seccionArchivados() {
+    const l = Org.archivados(E);
+    if (!l.length) return '';
+    return '<h3>📦 Archivados</h3><p class="suave" style="margin:-4px 6px 8px;font-size:14px">No salen en el repaso ni en los avisos. Puedes repasarlos a propósito o desarchivarlos (vuelven con su progreso).</p>' +
+      '<div class="panel"><ul class="lista">' + l.map((x) => '<li><div class="item"><span class="ico">' + (x.tabla === 'materias' ? '🏷️' : '📦') + '</span><span class="txt"><b>' + esc(x.nombre) + '</b><small>' +
+        (x.tabla === 'materias' ? 'Materia · ' + x.mazos.length + ' mazos' : x.materia ? esc(x.materia) : 'Mazo') + ' · ' + x.tarjetas + ' tarjetas</small></span>' +
+        '<button class="bt chico" data-a="repasarArch" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '" aria-label="Repasar">▶</button>' +
+        '<button class="bt chico" data-a="desarchivar" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '">↩ Sacar</button></div></li>').join('') + '</ul></div>';
   }
   function pintarMazos(v) {
     if (mazoAbierto && (!E.mazos[mazoAbierto] || E.mazos[mazoAbierto].borrado_en)) mazoAbierto = null;
     if (mazoAbierto) return pintarMazo(v, E.mazos[mazoAbierto]);
     const arbol = Org.arbol(E);
-    const huerfanos = Org.vivos(E.mazos).filter((m) => !E.materias[m.materia_id] || E.materias[m.materia_id].borrado_en);
+    const huerfanos = Org.vivos(E.mazos).filter((m) => (!E.materias[m.materia_id] || E.materias[m.materia_id].borrado_en) && !Org.archivadoX(m));
     const favs = Org.paraRepasar(E, { favoritas: true }).length, difs = Org.paraRepasar(E, { dificiles: true }).length;
     const hay = arbol.length || huerfanos.length;
     v.innerHTML = (hay ? escena('microscopio', fija('pMaz', 'pMazos')) : '') +
@@ -776,7 +843,7 @@
         '<div class="panel"><ul class="lista">' + (x.mazos.length ? x.mazos.map((m) => filaMazo(m.mazo)).join('') : '<li class="suave" style="padding:12px 16px">Sin mazos</li>') + '</ul></div>').join('') +
         (huerfanos.length ? '<div class="materiaCab"><span class="bola"></span><b>Sin materia</b></div><div class="panel"><ul class="lista">' + huerfanos.map(filaMazo).join('') + '</ul></div>' : '')
         : vacio('dormida', fija('vMaz', 'vMazos'))) +
-      '<div class="acciones" style="grid-template-columns:1fr 1fr 1fr"><button class="bt chico" data-a="nuevaMateria">＋ Materia</button><button class="bt chico" data-a="nuevoMazo">＋ Mazo</button><button class="bt chico" data-a="nuevaTarjeta">＋ Tarjeta</button></div></div>';
+      '<div class="acciones" style="grid-template-columns:1fr 1fr 1fr"><button class="bt chico" data-a="nuevaMateria">＋ Materia</button><button class="bt chico" data-a="nuevoMazo">＋ Mazo</button><button class="bt chico" data-a="nuevaTarjeta">＋ Tarjeta</button></div>' + seccionArchivados() + '</div>';
     const inp = $('#buscar');
     inp.addEventListener('input', () => { buscando = inp.value; pintarBusqueda(); });
     pintarBusqueda();
@@ -790,13 +857,16 @@
   function pintarMazo(v, m) {
     const ts = Org.vivos(E.tarjetas).filter((t) => t.mazo_id === m.id).sort((a, b) => (a.creada || 0) - (b.creada || 0));
     const hoy = Org.paraRepasar(E, { mazo: m.id, soloHoy: true }).length;
+    const arch = Org.archivadoX(m) || Org.archivadoX(E.materias[m.materia_id]);
     v.innerHTML = '<button class="volverBt" data-a="cerrarMazo">‹ Mazos</button><h2>' + esc(m.nombre) + '</h2>' +
       '<p class="suave" style="margin-top:-6px">📚 ' + esc(nombreMateria(m.materia_id)) + (m.archivo ? ' · 📄 ' + esc(m.archivo) : '') + '</p>' +
+      (arch ? '<p class="estado espera" style="margin:0 0 10px">📦 Archivado: no sale en el repaso ni en los avisos</p>' : '') +
       (ts.length ? '<button class="repasarYa" data-a="repasarMazo" data-id="' + esc(m.id) + '"><span class="n">' + (hoy || ts.length) + '</span><span class="t"><b>Repasar este mazo</b>' +
         (hoy ? 'para hoy' : 'tarjetas en total') + '</span><span class="flecha">▶</span></button>' : '') +
       '<div class="acciones"><button class="bt chico" data-a="nuevaTarjeta" data-mazo="' + esc(m.id) + '">＋ Tarjeta</button><button class="bt chico" data-a="renombrarMazo">✏️ Renombrar</button>' +
-      '<button class="bt chico" data-a="moverMazo">📁 Mover</button><button class="bt chico" data-a="juntarMazo">🔗 Juntar</button></div>' +
-      '<button class="bt chico peligro" style="width:100%" data-a="borrarMazo">🗑️ Borrar mazo</button>' +
+      '<button class="bt chico" data-a="moverMazo">📁 Mover</button><button class="bt chico" data-a="juntarMazo">🔗 Juntar</button>' +
+      (arch ? '<button class="bt chico" data-a="desarchivar" data-tabla="mazos" data-id="' + esc(m.id) + '">↩ Desarchivar</button>' : '<button class="bt chico" data-a="archivarMazo">📦 Archivar</button>') +
+      '<button class="bt chico peligro" data-a="borrarMazo">🗑️ Borrar</button></div>' +
       (ts.length ? '<h3>' + ts.length + (ts.length === 1 ? ' tarjeta' : ' tarjetas') + '</h3><div class="panel"><ul class="lista">' + ts.map(filaTarjeta).join('') + '</ul></div>'
         : vacioMini('animo', fija('vMazo', 'vMazo')));
   }
@@ -804,7 +874,7 @@
   // ---------- PROGRESO ----------
   function duracion(ms) { const m = Math.round(ms / MIN); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : ''); }
   function lasQueCuestan() {
-    return Org.vivos(E.tarjetas).map((t) => ({ t, e: Sincro.estado(E, t) })).map((x) => Object.assign(x, { s: x.e.fallos * 2 + x.e.medios - x.e.aciertos }))
+    return Org.vivos(E.tarjetas).filter((t) => Org.activa(E, t)).map((t) => ({ t, e: Sincro.estado(E, t) })).map((x) => Object.assign(x, { s: x.e.fallos * 2 + x.e.medios - x.e.aciertos }))
       .filter((x) => x.e.fallos > 0 && x.s > 0).sort((a, b) => b.s - a.s).slice(0, 5);
   }
   function pintarProgreso(v) {
@@ -821,8 +891,14 @@
     const porMat = {};
     for (const r of reps) { const m = materiaDeTarjeta(r.tarjeta_id); const p = (porMat[m] = porMat[m] || { mal: 0, total: 0 }); p.total++; if (r.resultado !== 'bien') p.mal++; }
     const matDificil = Object.entries(porMat).filter(([, p]) => p.total >= 5).sort((a, b) => b[1].mal / b[1].total - a[1].mal / a[1].total)[0];
-    const cajas = [0, 0, 0, 0, 0];
-    for (const t of Org.vivos(E.tarjetas)) cajas[Math.min(5, Math.max(1, Sincro.estado(E, t).caja)) - 1]++;
+    // (20-oct-2026) Las que "ya me la sé" cuentan como APRENDIDAS (columna 🎓); las archivadas no entran en las cajas
+    const cajas = [0, 0, 0, 0, 0, 0];
+    let archivadas = 0;
+    for (const t of Org.vivos(E.tarjetas)) {
+      if (Org.sabida(t)) cajas[5]++;
+      else if (Org.archivada(E, t)) archivadas++;
+      else cajas[Math.min(5, Math.max(1, Sincro.estado(E, t).caja)) - 1]++;
+    }
     const maxC = Math.max(1, ...cajas);
     const racha = N.racha(reps);
     v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' + escena(racha >= 2 ? 'feliz' : 'animo', reps.length ? fija('pProg', 'pProgreso') : fija('pProg', 'pProgresoNada')) +
@@ -837,8 +913,9 @@
       (cuesta.length ? '<ul class="lista">' + cuesta.map((x) => filaTarjeta(x.t)).join('') + '</ul><div style="padding:6px 10px 10px"><button class="bt grande" data-a="repasarCuestan">Repasar estas ' + cuesta.length + '</button></div>'
         : '<p class="nota">Todavía nada. Cuando falles alguna, aparece aquí.</p>') + '</div>' +
       '<h3>📦 Cómo van tus tarjetas</h3><div class="panel"><div class="cajas">' + cajas.map((c) => '<div style="height:' + Math.max(4, Math.round((c / maxC) * 100)) + '%"></div>').join('') +
-      '</div><div class="cajasN">' + cajas.map((c, i) => '<span>' + c + '<br>caja ' + (i + 1) + '</span>').join('') + '</div>' +
-      '<p class="nota">Caja 1: aprendiendo · caja 5: ¡dominadas! Cada vez que la sabes, sube una caja y vuelve más tarde.</p></div>';
+      '</div><div class="cajasN">' + cajas.map((c, i) => '<span>' + c + '<br>' + (i < 5 ? 'caja ' + (i + 1) : '🎓 sabidas') + '</span>').join('') + '</div>' +
+      '<p class="nota">Caja 1: aprendiendo · caja 5: ¡dominadas! Cada vez que la sabes, sube una caja y vuelve más tarde. 🎓: las que marcaste "ya me la sé" (aprendidas).' +
+      (archivadas ? ' Además tienes ' + archivadas + ' en 📦 Archivados.' : '') + '</p></div>';
   }
 
   // ---------- MÁS: un menú con secciones, con Liz arriba ----------
@@ -867,7 +944,7 @@
       fila('sincronizarYa', '🔄', 'celeste', 'Sincronizar ahora', E.ultimaSincro ? 'Última vez: ' + hace(E.ultimaSincro) : 'Todavía no') +
       (instalada ? '' : fila('comoInstalar', '📲', '', 'Instalar en el iPhone', 'Para tenerla en la pantalla de inicio')) +
       (DEMO ? '' : sinSesion ? fila('volverEntrar', '🔑', 'oro', 'Volver a entrar', 'Con tu correo y contraseña') : fila('salir', '🚪', '', 'Cerrar sesión', 'En este celular')) + '</ul></div>' +
-      '<p class="pie">LIZ · Liz de bolsillo · versión 5</p>';
+      '<p class="pie">LIZ · Liz de bolsillo · versión 6</p>';
   }
   function pintarPapelera(v) {
     const l = Org.papelera(E);
@@ -1054,19 +1131,22 @@
       '<label for="tP">Pregunta</label><textarea id="tP" maxlength="300" required>' + esc(t ? t.pregunta : '') + '</textarea>' +
       '<label for="tR">Respuesta</label><textarea id="tR" maxlength="500" required>' + esc(t ? t.respuesta : '') + '</textarea>' +
       '<label for="tM">Mazo</label><select id="tM">' + opts + '</select>' +
-      '<div class="chips"><button type="button" class="chip' + (fav ? ' on' : '') + '" id="tFav">⭐ Favorita</button><button type="button" class="chip' + (dif ? ' on' : '') + '" id="tDif">🔥 Difícil</button></div>' +
+      '<div class="chips"><button type="button" class="chip' + (fav ? ' on' : '') + '" id="tFav">⭐ Favorita</button><button type="button" class="chip' + (dif ? ' on' : '') + '" id="tDif">🔥 Difícil</button>' +
+        (t ? '<button type="button" class="chip' + (Org.sabida(t) ? ' on' : '') + '" id="tSab">🎓 Ya me la sé</button>' : '') + '</div>' +
       (t && t.fuente ? '<p class="suave" style="font-size:14px">📖 ' + esc(t.fuente) + '</p>' : '') +
       '<p class="error" id="tErr"></p><div class="botones"><button class="bt prin grande">Guardar</button>' +
       (t ? '<button type="button" class="bt grande peligro" id="tBorrar">🗑️ Borrar tarjeta</button>' : '') +
       '<button type="button" class="bt grande" data-cerrar>Cancelar</button></div></form>');
     $('#tFav', h).onclick = (ev) => { fav = !fav; ev.target.classList.toggle('on', fav); };
     $('#tDif', h).onclick = (ev) => { dif = !dif; ev.target.classList.toggle('on', dif); };
+    let sab = t ? Org.sabida(t) : false;
+    if (t) $('#tSab', h).onclick = (ev) => { sab = !sab; ev.target.classList.toggle('on', sab); };
     if (!t) setTimeout(() => $('#tP', h).focus(), 300);
     $('#fTarjeta', h).addEventListener('submit', (ev) => {
       ev.preventDefault();
       const d = { pregunta: $('#tP', h).value, respuesta: $('#tR', h).value, mazo_id: $('#tM', h).value, favorita: fav, dificil: dif };
       let r;
-      if (t) r = Org.editarTarjeta(E, t.id, d, DISP);
+      if (t) { r = Org.editarTarjeta(E, t.id, d, DISP); if (r.ok && sab !== Org.sabida(E.tarjetas[t.id])) Org.marcarSabida(E, t.id, sab, DISP); }
       else { r = Org.crearTarjeta(E, d, DISP); if (r.ok && (fav || dif)) Org.editarTarjeta(E, r.tarjeta.id, { favorita: fav, dificil: dif }, DISP); }
       if (r.error) { $('#tErr', h).textContent = r.error.charAt(0).toUpperCase() + r.error.slice(1) + '.'; return; }
       cerrarHoja(true);
@@ -1112,7 +1192,26 @@
     if (r === 'repasar') empezar(Org.paraRepasar(E, { mazo: a.mazo_id }), nombreMazo(a.mazo_id));
     if (r === 'mazo') { vista = 'mazos'; ir('mazos'); mazoAbierto = a.mazo_id; pintar(); }
     if (r === 'ver') setTimeout(() => abrirArchivoYa(id), 350);
-    if (r === 'borrar') { Ag.borrar(E, 'archivos', id, DISP); avisar('A la papelera (lo recuperas en 30 días).'); cambio(); }
+    if (r === 'borrar') setTimeout(() => borrarArchivo(id), 350);
+  }
+  // (20-oct-2026) Borrar un archivo: pregunta qué hacer con SUS tarjetas (archivarlas / borrarlas también / dejarlas). El archivo va
+  // a la papelera (30 días; después se borra también de la nube) y la compu lo quita de Documentos\Liz-biblioteca (a la papelera de Liz).
+  async function borrarArchivo(id) {
+    const a = E.archivos[id];
+    if (!a) return;
+    const mz = a.mazo_id && E.mazos[a.mazo_id] && !E.mazos[a.mazo_id].borrado_en ? E.mazos[a.mazo_id] : null;
+    const n = mz ? Org.vivos(E.tarjetas).filter((t) => t.mazo_id === mz.id).length : 0;
+    let que = 'dejar';
+    if (n) {
+      que = await elegir('🗑️ Borrar “' + a.nombre + '”', [{ v: 'archivar', t: '📦 Archivar sus ' + n + ' tarjetas' }, { v: 'borrar', t: '🗑️ Borrarlas también (a la papelera, 30 días)', clase: 'peligro' },
+        { v: 'dejar', t: '🃏 Dejarlas como están' }], 'Tiene ' + n + ' tarjetas en el mazo “' + mz.nombre + '”. ¿Qué hago con ellas?');
+      if (!que) return;
+    } else if (!(await confirmar('¿Borrar “' + a.nombre + '”?', 'Va a la papelera (lo recuperas en 30 días). En la compu se quita de tus apuntes.', 'Borrar', true))) return;
+    if (que === 'archivar') Org.archivar(E, 'mazos', mz.id, true, DISP);
+    if (que === 'borrar') Org.borrarMazo(E, mz.id, DISP);
+    Sincro.cambiar(E, 'archivos', { id, borrado_en: Date.now(), datos: Object.assign({}, a.datos || {}, { tarjetasAlBorrar: que }) }, DISP);
+    avisar(que === 'archivar' ? 'Archivo a la papelera y sus tarjetas en 📦 Archivados.' : que === 'borrar' ? 'Archivo y tarjetas a la papelera (30 días).' : 'Archivo a la papelera; las tarjetas se quedan.');
+    cambio();
   }
   // (20-oct-2026) "Abrir": funciona en Safari y en la app instalada (también con lo que subió la PC). En el iPhone, abrir una
   // ventana DESPUÉS de esperar la descarga no está permitido (lo bloquea), así que va en dos toques: (1) "Abrir" baja el archivo
@@ -1217,7 +1316,7 @@
     const caja = $('#mensajes');
     if (!caja) return;
     const p = $('#pensandoMsg');
-    if (si && !p) { caja.insertAdjacentHTML('beforeend', '<div class="msg liz" id="pensandoMsg">' + fotoLiz('pensativa') + '<div class="burbuja">' + PENSANDO + '</div></div>'); abajoCharla(); }
+    if (si && !p) { caja.insertAdjacentHTML('beforeend', '<div class="msg liz" id="pensandoMsg">' + fotoLiz('pensativa') + '<div class="burbuja">' + PENSANDO + '</div></div>'); abajoCharla(); gestoLiz('pensar'); }
     if (!si && p) p.remove();
   }
   // Lo que la app sabe de su estudio ahora (va al cerebro como contexto)
@@ -1250,6 +1349,9 @@
       return hacerTarjetasDeTexto({ texto: texto.slice(corte > 0 ? corte + 1 : 0), nombre: '', materia: '' }, true);
     }
     agregarMsg({ quien: 'el', texto });
+    // (20-oct-2026) "Archiva las tarjetas de Micología", "desarchiva…", "ya me sé esta" y el "sí" a la pregunta después de un examen:
+    // lo hace la app (sin internet también), con las mismas reglas que la compu
+    if (archivarDesdeCharla(texto)) return;
     if (!DEMO && !navigator.onLine) { agregarMsg({ quien: 'liz', texto: F.frase('cSinInternet'), animo: 'tierna' }); return; }
     pensando(true);
     const r = await cerebro('charla', { mensajes: charla.slice(-12).map((m) => ({ quien: m.quien, texto: m.texto })), contexto: contextoTexto() });
@@ -1271,6 +1373,62 @@
     if (r.pegar) extra = { html: '<button class="bt chico prin" data-a="pegarTexto">📋 Pegar el texto</button>' };
     agregarMsg({ quien: 'liz', texto: r.dice || '…', extra, animo: r.limite ? 'dormida' : animo });
     if (r.pegar) setTimeout(() => hojaPegar(), 900);
+  }
+
+  // ---------- (20-oct-2026) ARCHIVAR desde la charla y la pregunta después de un examen ----------
+  const PIDE_ARCHIVAR = /^(?:liz,? )?(?:por favor,? |porfa,? )?(?:puedes |podrias |quiero que )?(des)?archiv(?:a|ar|ame|amelas|alas|alos|ala|alo|en)\b\s*(.*)$/;
+  let ofertaArchivar = null;          // { tabla, id, nombre, ms }
+  function archivarUno(tabla, id, valor) {
+    const x = E[tabla][id];
+    Org.archivar(E, tabla, id, valor, DISP);
+    cambio();
+    const n = Org.vivos(E.tarjetas).filter((t) => (tabla === 'materias' ? t.materia_id : t.mazo_id) === id).length;
+    return valor ? 'Listo, archivé ' + (tabla === 'materias' ? 'la materia' : 'el mazo') + ' “' + x.nombre + '”: sus ' + n + ' tarjetas ya no salen en el repaso, pero quedan en 📦 Archivados (al final de Mazos) con su progreso.'
+      : 'Listo, “' + x.nombre + '” vuelve al repaso con sus ' + n + ' tarjetas y su progreso.';
+  }
+  function archivarDesdeCharla(texto) {
+    const t = Org.lim(texto).replace(/[¿?¡!]/g, '').trim();
+    const m = t.match(PIDE_ARCHIVAR);
+    if (m && m[2] && m[2].trim().length >= 3) {
+      const b = Org.buscarMateriaOMazo(E, m[2]);
+      agregarMsg({ quien: 'liz', animo: b ? 'feliz' : 'pensativa', texto: b ? archivarUno(b.tabla, b.fila.id, !m[1]) : 'Busqué y no encontré una materia ni un mazo que se llame “' + m[2].trim() + '”. ¿Cómo se llama en tus tarjetas?' });
+      ofertaArchivar = null;
+      return true;
+    }
+    if (/^(?:liz,? )?(?:ya )?me (?:la|lo) se(?: esta| esa)?$/.test(t)) {
+      agregarMsg({ quien: 'liz', texto: 'Para marcar una tarjeta como “ya me la sé”, toca 🎓 Ya me la sé mientras repasas (o en la tarjeta, en su mazo). Así no te la vuelvo a preguntar.' });
+      return true;
+    }
+    if (ofertaArchivar && Date.now() - ofertaArchivar.ms < 30 * MIN) {
+      if (/^(?:liz,? )?(?:si|dale|claro|ok|okey|bueno|por favor|hazlo|archivalas)(?![a-z])/.test(t) || /archiv/.test(t)) {
+        const o = ofertaArchivar;
+        ofertaArchivar = null;
+        if (E[o.tabla][o.id]) { agregarMsg({ quien: 'liz', animo: 'feliz', texto: archivarUno(o.tabla, o.id, true) }); return true; }
+      } else if (/^(?:liz,? )?(?:no|todavia no|mejor no|sigamos|seguimos|dejalas)(?![a-z])/.test(t)) ofertaArchivar = null;
+    }
+    return false;
+  }
+  // Un día después de un examen (hasta 10 días), si nadie (ni la compu) preguntó todavía y su materia tiene tarjetas: Liz lo pregunta
+  // en la charla, con dos botones. La marca "preguntoArchivar" va en el examen y se sincroniza: así no preguntan los dos.
+  let avisoCharla = false;
+  function revisarExamenPasado() {
+    const ahora = Date.now(), h = N.enCR(ahora).h;
+    if (h < 8 || h >= 22) return;
+    for (const x of Org.vivos(E.examenes).sort((a, b) => b.cuando - a.cuando)) {
+      if (ahora - x.cuando < 20 * H || ahora - x.cuando > 10 * DIA || (x.datos && x.datos.preguntoArchivar)) continue;
+      const b = Org.buscarMateriaOMazo(E, x.materia || '');
+      if (!b || Org.archivadoX(b.fila)) continue;
+      const n = Org.vivos(E.tarjetas).filter((t) => (b.tabla === 'materias' ? t.materia_id : t.mazo_id) === b.fila.id && Org.activa(E, t)).length;
+      if (!n) continue;
+      Sincro.cambiar(E, 'examenes', { id: x.id, datos: Object.assign({}, x.datos || {}, { preguntoArchivar: ahora }) }, DISP);
+      cambio();
+      ofertaArchivar = { tabla: b.tabla, id: b.fila.id, nombre: b.fila.nombre, ms: ahora };
+      agregarMsg({ quien: 'liz', animo: 'tierna', texto: 'Ya pasó ' + N.nombreExamen(x) + '. ¿Cómo te fue? 💜 Y una cosa: ¿archivo esas ' + n + ' tarjetas de ' + b.fila.nombre + ' o las seguimos repasando?',
+        extra: { html: '<button class="bt chico prin" data-a="archivarOferta" data-tabla="' + b.tabla + '" data-id="' + esc(b.fila.id) + '">📦 Archivarlas</button> <button class="bt chico" data-a="seguirOferta">Seguir repasando</button>' } });
+      avisoCharla = vista !== 'charla';
+      pintarMenu();
+      return;
+    }
   }
 
   // ---------- PEGAR TEXTO → tarjetas (con Liz y su microscopio) ----------
@@ -1369,6 +1527,43 @@
     marcarFav: (d, b) => { const t = E.tarjetas[sesion.cola[sesion.i].id]; Org.marcar(E, t.id, 'favorita', !t.favorita, DISP); b.classList.toggle('on', !!E.tarjetas[t.id].favorita); guardarLocal(); pedirSincro(); },
     marcarDif: (d, b) => { const t = E.tarjetas[sesion.cola[sesion.i].id]; Org.marcar(E, t.id, 'dificil', !t.dificil, DISP); b.classList.toggle('on', !!E.tarjetas[t.id].dificil); guardarLocal(); pedirSincro(); },
     editarActual: () => editarTarjeta(sesion.cola[sesion.i].id),
+    // (20-oct-2026) "Ya me la sé": deja de salir (aquí y en la compu); se reactiva tocándola en su mazo. No cuenta como repaso.
+    archivarOferta: (d, b) => {
+      const o = d.tabla && d.id ? { tabla: d.tabla, id: d.id } : ofertaArchivar;
+      ofertaArchivar = null;
+      if (b) b.parentElement.innerHTML = '✓';
+      if (o && E[o.tabla] && E[o.tabla][o.id] && Org.archivadoX(E[o.tabla][o.id])) return;
+      if (o && E[o.tabla][o.id]) agregarMsg({ quien: 'liz', animo: 'feliz', texto: archivarUno(o.tabla, o.id, true) });
+    },
+    seguirOferta: (d, b) => { ofertaArchivar = null; if (b) b.parentElement.innerHTML = '✓'; agregarMsg({ quien: 'liz', texto: '¡Va! Las seguimos repasando. Cuando quieras archivarlas, dímelo.' }); },
+    yaMeLaSe: () => {
+      if (!sesion || respondiendo) return;
+      const id = sesion.cola[sesion.i].id;
+      Org.marcarSabida(E, id, true, DISP);
+      sesion.cola = sesion.cola.filter((x, k) => k <= sesion.i || x.id !== id);
+      guardarLocal(); pedirSincro();
+      vibrar('bien');
+      gestoLiz('celebrar');
+      avisar('🎓 ¡Esa ya te la sabes! No vuelve a salir (la reactivas en su mazo).');
+      sesion.escrito = null;
+      siguienteTarjeta();
+    },
+    archivarMazo: async () => {
+      const m = E.mazos[mazoAbierto];
+      if (!m) return;
+      const n = Org.vivos(E.tarjetas).filter((t) => t.mazo_id === m.id).length;
+      if (!(await confirmar('¿Archivar “' + m.nombre + '”?', 'Sus ' + n + ' tarjetas dejan de salir en el repaso y en los avisos, pero quedan guardadas en 📦 Archivados con su progreso (también en la compu).', '📦 Archivar'))) return;
+      Org.archivar(E, 'mazos', m.id, true, DISP);
+      mazoAbierto = null;
+      avisar('📦 Archivado. Lo encuentras al final de Mazos.');
+      cambio();
+    },
+    desarchivar: (d) => { Org.archivar(E, d.tabla, d.id, false, DISP); avisar('↩ Vuelve al repaso, con su progreso.'); cambio(); },
+    repasarArch: (d) => {
+      const f = d.tabla === 'materias' ? { materia: d.id } : { mazo: d.id };
+      const x = E[d.tabla][d.id];
+      empezar(Org.paraRepasar(E, f), (x && x.nombre) || 'Archivado');
+    },
     // Agenda
     modoAgenda: (d) => { ag.modo = d.m; ag.ref = ag.dia; pintarSuave(); },
     agendaMover: (d) => {
@@ -1413,8 +1608,9 @@
     },
     menuMateria: async (d) => {
       const ma = E.materias[d.id];
-      const r = await elegir(ma.nombre, [{ v: 'rep', t: '▶ Repasar toda la materia' }, { v: 'ren', t: '✏️ Renombrar' }, { v: 'bor', t: '🗑️ Borrar materia (con sus mazos)', clase: 'peligro' }]);
+      const r = await elegir(ma.nombre, [{ v: 'rep', t: '▶ Repasar toda la materia' }, { v: 'ren', t: '✏️ Renombrar' }, { v: 'arc', t: '📦 Archivar la materia (con sus mazos)' }, { v: 'bor', t: '🗑️ Borrar materia (con sus mazos)', clase: 'peligro' }]);
       if (r === 'rep') empezar(Org.paraRepasar(E, { materia: d.id }), ma.nombre);
+      if (r === 'arc') { Org.archivar(E, 'materias', d.id, true, DISP); avisar('📦 ' + ma.nombre + ' archivada. Está al final de Mazos.'); cambio(); }
       if (r === 'ren') { const n = await pedirTexto('Nuevo nombre', ma.nombre); if (n) { Org.renombrarMateria(E, d.id, n, DISP); cambio(); } }
       if (r === 'bor') {
         const n = Org.vivos(E.tarjetas).filter((t) => t.materia_id === d.id).length;
@@ -1573,7 +1769,16 @@
   window.addEventListener('hashchange', () => { if (E.usuario && !$('#app').hidden) irPorEnlace(location.hash); });
   window.addEventListener('online', () => sincronizar('abrir'));
   window.addEventListener('offline', pintarEstado);
-  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && E.usuario) { pintarSuave(); sincronizar('abrir'); } });
+  let ocultaDesde = 0;
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) { ocultaDesde = Date.now(); return; }
+    if (document.visibilityState === 'visible' && E.usuario) {
+      pintarSuave();
+      sincronizar('abrir');
+      // Volvió después de un rato: lo saluda (de noche, bosteza)
+      if (ocultaDesde && Date.now() - ocultaDesde > 15 * MIN) setTimeout(() => gestoLiz(deNoche() ? 'bostezo' : 'saludo'), 500);
+    }
+  });
 
   // ---------- Modo de prueba (?demo): datos de ejemplo, como si vinieran de la compu ----------
   function simularLaptop(id) {
@@ -1668,6 +1873,8 @@
 
   arrancar();
   self.LizApp = { estado: () => E, sincronizar, avisar, ir, foto: ponerFoto, liz2d: (m) => { liz2d = m || {}; pintarFijas(); pintarSuave(); }, empezar: () => A.repasarHoy(), voltear: () => A.voltear(), accion: (n) => A[n]({}), formAgenda,   // (para las pruebas y las fotos)
-    animos: (m) => { animos = m || {}; pintar(); }, animo: (a) => { animoForzado = a || null; pintar(); }, enviar: enviarCharla, escribir: (t) => { A.escribirResp(); setTimeout(() => revisarEscrito(t), 100); },
-    pegar: hojaPegar, hacerTarjetas: hacerTarjetasDeTexto };
+    animos: (m) => { animos = m || {}; pintar(); }, gestos: (m) => { gestos = m || {}; }, gesto: (n) => { gestoHasta = 0; return gestoLiz(n); }, animo: (a) => { animoForzado = a || null; pintar(); }, enviar: enviarCharla, escribir: (t) => { A.escribirResp(); setTimeout(() => revisarEscrito(t), 100); },
+    pegar: hojaPegar, hacerTarjetas: hacerTarjetasDeTexto,
+    archivar: (nombre, valor) => { const b = Org.buscarMateriaOMazo(E, nombre); if (b) { Org.archivar(E, b.tabla, b.fila.id, valor !== false, DISP); cambio(); } return !!b; },
+    sabida: (n) => { const t = Org.vivos(E.tarjetas).find((x) => Org.lim(x.pregunta).includes(Org.lim(n))); if (t) { Org.marcarSabida(E, t.id, true, DISP); cambio(); } return !!t; } };
 })();

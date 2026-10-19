@@ -33,15 +33,16 @@
   --t-intro-2: #1b1622;
   --t-intro-3: #0c0a10;
   --t-micro: #a98bff, #4cc9f0, #f72585, #7cf29a;
-  --rosa: #ff7eb6;
-  --magenta: #f72585;
+  --rosa: #a98bff;          /* (20-oct-2026) como en la PC oscura: "rosa" = el acento morado */
+  --magenta: #8e6bff;       /* = --t-acento-fuerte de la PC */
+  --t-confeti: #a98bff, #cdb4ff, #ffd166, #4cc9f0, #f72585, #6f5cae;   /* el confeti de la PC */
   --celeste: #4cc9f0;
   --verde: #7cf29a;
   --medio: #ffc857;
   --vidrio: rgba(34, 27, 44, 0.72);
   --vidrio-borde: rgba(169, 139, 255, 0.22);
   --brillo: 0 0 0 1px rgba(169, 139, 255, .35), 0 0 22px rgba(142, 107, 255, .35), 0 14px 40px rgba(0, 0, 0, .5);
-  --brillo-rosa: 0 0 0 1px rgba(247, 37, 133, .45), 0 0 26px rgba(247, 37, 133, .35), 0 14px 40px rgba(0, 0, 0, .5);
+  --brillo-rosa: 0 0 0 1px rgba(142, 107, 255, .45), 0 0 26px rgba(142, 107, 255, .35), 0 14px 40px rgba(0, 0, 0, .5);
   --arriba: env(safe-area-inset-top, 0px);
   --abajo: env(safe-area-inset-bottom, 0px);
   --izq: env(safe-area-inset-left, 0px);
@@ -83,10 +84,10 @@ svg.ic { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-wid
 @keyframes saltaLiz { 35% { transform: translateY(-16px) scale(1.04) rotate(-2deg); } }
 @keyframes ladeaLiz { 30% { transform: rotate(-5deg); } 65% { transform: rotate(3deg); } }
 .aura { position: absolute; border-radius: 50%; pointer-events: none;
-  background: radial-gradient(circle, rgba(169, 139, 255, .42) 0%, rgba(247, 37, 133, .18) 38%, transparent 68%); filter: blur(4px); animation: late 6s ease-in-out infinite; }
+  background: radial-gradient(circle, rgba(169, 139, 255, .42) 0%, rgba(142, 107, 255, .18) 38%, transparent 68%); filter: blur(4px); animation: late 6s ease-in-out infinite; }
 @keyframes late { 50% { opacity: .7; transform: scale(1.06); } }
 /* Placa de Petri decorativa detrás de Liz (como en la intro de la PC) */
-.placa { position: absolute; border-radius: 50%; border: 2px solid rgba(247, 37, 133, .25); box-shadow: inset 0 0 40px rgba(247, 37, 133, .12), 0 0 30px rgba(247, 37, 133, .12); pointer-events: none; }
+.placa { position: absolute; border-radius: 50%; border: 2px solid rgba(142, 107, 255, .25); box-shadow: inset 0 0 40px rgba(142, 107, 255, .12), 0 0 30px rgba(142, 107, 255, .12); pointer-events: none; }
 .placa::before { content: ''; position: absolute; inset: 8%; border-radius: 50%; border: 1px solid rgba(169, 139, 255, .18); }
 
 /* Globito como de cómic */
@@ -103,17 +104,21 @@ svg.ic { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-wid
 
 /* ---------- Pantalla de carga: MINIMALISTA (como el diseño 2): "Liz / DE BOLSILLO" brillando, la barra y las frases,
    con el fondo de microbiología detrás (el fondo es medio transparente para que se vean las bacterias) ---------- */
+/* (20-oct-2026) Colores EXACTOS de la carga de la Liz de la PC (src/renderer/intro.js #iCarga, tema oscuro de colores.css):
+   el fondo (--t-intro-1/2/3 en elipse al 42 %), el título en --t-acento-fuerte, la barra --t-boton sobre --t-acento-suave, la frase en
+   --t-texto y las bacterias de fondo.js con los mismos colores y la misma transparencia. Nada rosado. */
 #carga { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px;
-  text-align: center; background: radial-gradient(ellipse at 50% 42%, rgba(45, 35, 64, .55), rgba(21, 16, 28, .72) 60%, rgba(10, 8, 13, .9)); transition: opacity .7s var(--suave); }
+  text-align: center; background: none; transition: opacity .7s var(--suave); }
 #carga.fuera { opacity: 0; pointer-events: none; }
-/* Mientras carga, la app no se ve detrás (solo el fondo con las bacterias); aparece cuando la carga se desvanece */
+/* Mientras carga: el fondo de la PC va en el body (así las bacterias del lienzo #micro se ven ENCIMA del fondo) y la app no se ve */
+body.cargando { background: radial-gradient(ellipse at 50% 42%, var(--t-intro-1) 0%, var(--t-intro-2) 55%, var(--t-intro-3) 100%) fixed, var(--t-intro-3); }
 body.cargando #app, body.cargando #menu, body.cargando #entrar, body.cargando #aviso, body.cargando #escribirLiz { visibility: hidden; }
-#carga .nombre { font-size: 72px; font-weight: 900; line-height: 1; letter-spacing: .02em; color: #fff; text-shadow: 0 0 18px var(--t-acento), 0 0 46px var(--t-acento-fuerte); animation: brillo 2.6s ease-in-out infinite; }
+#carga .nombre { font-size: 72px; font-weight: 900; line-height: 1; letter-spacing: .02em; color: var(--t-acento-fuerte); text-shadow: 0 0 18px rgba(142, 107, 255, .55), 0 0 46px rgba(142, 107, 255, .35); animation: brillo 2.6s ease-in-out infinite; }
 #carga .sub { color: var(--t-texto-suave); font-size: 15px; letter-spacing: .32em; text-transform: uppercase; font-weight: 800; margin-top: -10px; }
-#carga .barra { width: min(250px, 66vw); height: 8px; border-radius: 9px; background: rgba(169, 139, 255, .15); overflow: hidden; margin-top: 6px; }
-#carga .barra i { display: block; height: 100%; width: 0; border-radius: 9px; background: linear-gradient(90deg, var(--magenta), var(--t-acento)); box-shadow: 0 0 14px var(--t-acento); transition: width .5s var(--suave); }
+#carga .barra { width: min(250px, 66vw); height: 10px; border-radius: 8px; background: var(--t-acento-suave); overflow: hidden; margin-top: 6px; }
+#carga .barra i { display: block; height: 100%; width: 0; border-radius: 9px; background: var(--t-boton); box-shadow: 0 0 14px var(--t-acento); transition: width .5s var(--suave); }
 #carga .frase { min-height: 1.5em; color: var(--t-texto); font-size: 17px; font-weight: 700; transition: opacity .35s; }
-@keyframes brillo { 50% { text-shadow: 0 0 26px var(--t-acento), 0 0 70px var(--magenta); } }
+@keyframes brillo { 50% { text-shadow: 0 0 26px rgba(169, 139, 255, .7), 0 0 70px rgba(142, 107, 255, .5); } }
 
 /* ---------- Entrar ---------- */
 #entrar { max-width: 460px; margin: 0 auto; padding: calc(40px + var(--arriba)) 22px 40px; text-align: center; }
@@ -135,7 +140,7 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
   border-radius: 999px; border: 1.5px solid var(--vidrio-borde); background: rgba(44, 36, 56, .8); color: var(--t-texto); font-weight: 800; font-size: 16px;
   transition: transform .18s var(--rebote), box-shadow .25s, background .2s; }
 .bt:active, .toque:active { transform: scale(.95); }
-.bt.prin { background: linear-gradient(135deg, #b39bff, #7c5cf0 55%, #c94bd0); border-color: transparent; color: #fff; box-shadow: 0 8px 26px rgba(124, 92, 240, .5), inset 0 1px 0 rgba(255, 255, 255, .3); }
+.bt.prin { background: linear-gradient(135deg, #a58aff, #7c5cf0); border-color: transparent; color: #fff; box-shadow: 0 8px 26px rgba(124, 92, 240, .5), inset 0 1px 0 rgba(255, 255, 255, .3); }
 .bt.grande { width: 100%; min-height: 58px; font-size: 19px; border-radius: 22px; }
 .bt.peligro { border-color: rgba(255, 138, 128, .6); color: var(--t-mal); background: var(--t-mal-suave); }
 .bt.chico { min-height: 40px; padding: 7px 14px; font-size: 15px; }
@@ -168,8 +173,13 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .lizFoto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; user-select: none; -webkit-user-drag: none; animation: fundido .5s; }
 .lizFoto.sin img { inset: 14%; width: 72%; height: 72%; object-fit: contain; }
 .lizFoto.perfil::after { content: ''; position: absolute; inset: 0; background: var(--liz) center 12%/cover no-repeat; }
-.lizFoto.grande { border-width: 3px; box-shadow: 0 0 0 7px rgba(169, 139, 255, .16), 0 0 0 9px rgba(247, 37, 133, .18), 0 0 60px rgba(169, 139, 255, .55), 0 18px 40px rgba(0, 0, 0, .5); }
+.lizFoto.grande { border-width: 3px; box-shadow: 0 0 0 7px rgba(169, 139, 255, .16), 0 0 0 9px rgba(142, 107, 255, .18), 0 0 60px rgba(169, 139, 255, .55), 0 18px 40px rgba(0, 0, 0, .5); }
 .lizFoto.salta { animation: saltaLiz .7s var(--rebote); } .lizFoto.ladea { animation: ladeaLiz .8s var(--suave); }
+/* Los gestos (clips del avatar 3D): el clip aparece encima con un fundido corto y la foto se esconde; al terminar, al revés */
+.lizFoto > img:not(.clip), .lizFoto::after { transition: opacity .3s ease; }
+.lizFoto.conClip > img:not(.clip), .lizFoto.conClip::after { opacity: 0; transition-duration: .15s; }
+.lizFoto img.clip { z-index: 1; animation: fundido .15s ease; transition: opacity .35s ease; }
+.lizFoto img.clip.sale { opacity: 0; }
 
 /* La escena de cada pantalla: la carita de Liz (con su ánimo) + su globito */
 .escena { position: relative; display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; min-height: 96px; }
@@ -206,7 +216,7 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 
 /* El botón gigante de repasar */
 .repasarYa { position: relative; display: flex; align-items: center; gap: 14px; width: 100%; padding: 16px 18px; border-radius: 26px; text-align: left; overflow: hidden;
-  background: linear-gradient(135deg, #a58aff, #7c5cf0 50%, #d14fc4); color: #fff; box-shadow: 0 12px 34px rgba(124, 92, 240, .55), 0 0 40px rgba(209, 79, 196, .3), inset 0 1px 0 rgba(255, 255, 255, .35);
+  background: linear-gradient(135deg, #a58aff, #7c5cf0); color: #fff; box-shadow: 0 12px 34px rgba(124, 92, 240, .55), 0 0 40px rgba(124, 92, 240, .3), inset 0 1px 0 rgba(255, 255, 255, .35);
   transition: transform .2s var(--rebote); }
 .repasarYa:active { transform: scale(.97); }
 .repasarYa .n { font-size: 48px; font-weight: 900; line-height: 1; text-shadow: 0 2px 12px rgba(0, 0, 0, .25); }
@@ -218,8 +228,8 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 
 /* El próximo examen: lo más importante después de repasar */
 .examenG { position: relative; display: flex; align-items: center; gap: 14px; width: 100%; text-align: left; margin: 14px 0; padding: 14px 16px; border-radius: 22px;
-  background: linear-gradient(150deg, rgba(247, 37, 133, .16), rgba(40, 30, 52, .9) 55%); border: 1.5px solid rgba(247, 37, 133, .55); box-shadow: var(--brillo-rosa); }
-.examenG .cuenta { width: 74px; height: 74px; flex: none; border-radius: 20px; display: grid; place-content: center; text-align: center; background: rgba(247, 37, 133, .18); border: 1px solid rgba(247, 37, 133, .45); }
+  background: linear-gradient(150deg, rgba(142, 107, 255, .16), rgba(40, 30, 52, .9) 55%); border: 1.5px solid rgba(142, 107, 255, .55); box-shadow: var(--brillo-rosa); }
+.examenG .cuenta { width: 74px; height: 74px; flex: none; border-radius: 20px; display: grid; place-content: center; text-align: center; background: rgba(142, 107, 255, .18); border: 1px solid rgba(142, 107, 255, .45); }
 .examenG .cuenta b { font-size: 32px; font-weight: 900; line-height: 1; color: #fff; }
 .examenG .cuenta small { font-size: 11px; font-weight: 900; color: var(--rosa); text-transform: uppercase; letter-spacing: .08em; }
 .examenG .txt small { display: block; color: var(--rosa); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .1em; }
@@ -249,13 +259,13 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .item .num { font-weight: 900; color: var(--t-acento); white-space: nowrap; }
 .item .ico { width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center; flex: none; font-size: 21px;
   background: linear-gradient(145deg, rgba(169, 139, 255, .28), rgba(169, 139, 255, .08)); border: 1px solid rgba(169, 139, 255, .3); }
-.item .ico.rosa { background: linear-gradient(145deg, rgba(247, 37, 133, .3), rgba(247, 37, 133, .08)); border-color: rgba(247, 37, 133, .4); }
+.item .ico.rosa { background: linear-gradient(145deg, rgba(142, 107, 255, .3), rgba(142, 107, 255, .08)); border-color: rgba(142, 107, 255, .4); }
 .item .ico.celeste { background: linear-gradient(145deg, rgba(76, 201, 240, .3), rgba(76, 201, 240, .08)); border-color: rgba(76, 201, 240, .4); }
 .item .ico.oro { background: linear-gradient(145deg, rgba(255, 209, 102, .3), rgba(255, 209, 102, .08)); border-color: rgba(255, 209, 102, .4); }
 .item .ico.verde { background: linear-gradient(145deg, rgba(124, 242, 154, .28), rgba(124, 242, 154, .08)); border-color: rgba(124, 242, 154, .38); }
 .item .chev { color: var(--t-acento-claro); font-size: 22px; font-weight: 900; }
 .item.hecho .txt b { text-decoration: line-through; opacity: .5; }
-.punto-n { display: inline-block; min-width: 26px; padding: 2px 9px; border-radius: 12px; font-size: 13px; font-weight: 900; text-align: center; background: var(--magenta); color: #fff; box-shadow: 0 0 12px rgba(247, 37, 133, .6); }
+.punto-n { display: inline-block; min-width: 26px; padding: 2px 9px; border-radius: 12px; font-size: 13px; font-weight: 900; text-align: center; background: var(--magenta); color: #fff; box-shadow: 0 0 12px rgba(142, 107, 255, .6); }
 .estado { display: inline-flex; align-items: center; gap: 4px; margin-top: 5px; padding: 3px 10px; border-radius: 12px; font-size: 12.5px; font-weight: 800; background: var(--t-acento-suave); color: var(--t-acento); }
 .estado.listo { background: rgba(76, 214, 154, .15); color: var(--t-bien); }
 .estado.malo { background: var(--t-mal-suave); color: var(--t-mal); }
@@ -295,7 +305,7 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .sesionCab { display: flex; align-items: center; gap: 10px; }
 .sesionCab strong { flex: 1; font-size: 17px; font-weight: 900; }
 .barraProg { height: 8px; border-radius: 8px; background: rgba(169, 139, 255, .15); overflow: hidden; margin: 10px 0 6px; }
-.barraProg i { display: block; height: 100%; border-radius: 8px; background: linear-gradient(90deg, var(--magenta), var(--t-acento)); box-shadow: 0 0 12px var(--t-acento); transition: width .6s var(--suave); }
+.barraProg i { display: block; height: 100%; border-radius: 8px; background: var(--t-boton); box-shadow: 0 0 12px var(--t-acento); transition: width .6s var(--suave); }
 .lizRep { display: flex; align-items: flex-end; gap: 4px; min-height: 104px; margin-bottom: -18px; position: relative; z-index: 2; pointer-events: none; }
 .lizRep .marcoLiz { position: relative; width: 92px; flex: none; display: grid; place-items: end center; }
 .lizRep .marcoLiz .aura { width: 130px; height: 130px; left: -18px; bottom: -20px; }
@@ -321,9 +331,10 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .cara .fuente { color: var(--t-texto-suave); font-size: 14px; font-weight: 700; }
 .cara img { max-width: 100%; max-height: 150px; margin: 0 auto; border-radius: 14px; background: #fff; object-fit: contain; box-shadow: 0 6px 16px rgba(0, 0, 0, .45); }
 .cara .pie { font-size: 11px; color: var(--t-texto-suave); }
-.cara.atras { transform: rotateY(180deg); border-color: var(--rosa); box-shadow: var(--brillo-rosa); background: linear-gradient(165deg, #3a2741, #1f1928); }
+.cara.atras { transform: rotateY(180deg); border-color: var(--rosa); box-shadow: var(--brillo-rosa); background: linear-gradient(165deg, #2f2839, #241e2c); }
 .tarjetaG.brilla .cara.atras { border-color: var(--t-oro); box-shadow: 0 0 0 5px rgba(255, 209, 102, .5), 0 0 70px rgba(255, 209, 102, .6); }
-.marcas { display: flex; justify-content: center; gap: 8px; margin-bottom: 10px; }
+.marcas { display: flex; justify-content: center; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.marcas .chip { padding: 7px 11px; font-size: 14px; white-space: nowrap; }
 .respuestas { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; }
 .respuestas button { position: relative; overflow: hidden; min-height: 78px; border-radius: 22px; font-weight: 900; font-size: 15px; line-height: 1.15; color: #1c1622; transition: transform .18s var(--rebote); }
 .respuestas button:active { transform: scale(.93); }
@@ -350,7 +361,7 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
   transition: background .25s, transform .18s var(--rebote); }
 .rejilla .d:active { transform: scale(.9); }
 .rejilla .d.fuera { opacity: .3; }
-.rejilla .d.hoy { color: #fff; background: rgba(247, 37, 133, .18); box-shadow: inset 0 0 0 2px var(--magenta), 0 0 16px rgba(247, 37, 133, .45); }
+.rejilla .d.hoy { color: #fff; background: rgba(142, 107, 255, .18); box-shadow: inset 0 0 0 2px var(--magenta), 0 0 16px rgba(142, 107, 255, .45); }
 .rejilla .d.hoy::before { content: 'HOY'; position: absolute; top: 2px; font-size: 8px; letter-spacing: .1em; color: var(--rosa); }
 .rejilla .d.sel { background: linear-gradient(135deg, #a58aff, #7c5cf0); color: #fff; box-shadow: 0 4px 16px rgba(124, 92, 240, .55); }
 .rejilla .d .pts { display: flex; gap: 3px; height: 7px; margin-top: 3px; }
@@ -359,7 +370,7 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .semana { display: grid; gap: 8px; }
 .semana .dia { display: flex; gap: 12px; align-items: flex-start; padding: 10px 12px; border-radius: 20px; background: var(--vidrio); border: 1px solid var(--vidrio-borde); text-align: left; width: 100%; transition: transform .18s var(--rebote); }
 .semana .dia:active { transform: scale(.98); }
-.semana .dia.hoy { border-color: var(--magenta); box-shadow: 0 0 18px rgba(247, 37, 133, .35); }
+.semana .dia.hoy { border-color: var(--magenta); box-shadow: 0 0 18px rgba(142, 107, 255, .35); }
 .semana .dia.sel { border-color: var(--t-acento); box-shadow: var(--brillo); }
 .semana .dia .f { width: 46px; text-align: center; flex: none; }
 .semana .dia .f b { display: block; font-size: 24px; font-weight: 900; line-height: 1; }
@@ -368,7 +379,7 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .semana .dia .cosas div { display: flex; align-items: center; gap: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 2px 0; }
 .semana .dia .cosas .nada { color: var(--t-texto-suave); }
 .fab { position: fixed; right: calc(18px + var(--der)); bottom: calc(100px + var(--abajo)); z-index: 25; width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center;
-  background: linear-gradient(135deg, #b39bff, #7c5cf0 55%, #c94bd0); color: #fff; box-shadow: 0 10px 28px rgba(124, 92, 240, .6), 0 0 0 6px rgba(169, 139, 255, .16); font-size: 34px; font-weight: 400; transition: transform .2s var(--rebote); }
+  background: linear-gradient(135deg, #a58aff, #7c5cf0); color: #fff; box-shadow: 0 10px 28px rgba(124, 92, 240, .6), 0 0 0 6px rgba(169, 139, 255, .16); font-size: 34px; font-weight: 400; transition: transform .2s var(--rebote); }
 .fab:active { transform: scale(.88) rotate(90deg); }
 .espacioFab { height: 80px; }
 
@@ -394,9 +405,10 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .barras .b .fila { font-size: 15px; font-weight: 800; }
 .barras .b .t { height: 10px; border-radius: 9px; background: rgba(169, 139, 255, .14); overflow: hidden; margin-top: 6px; }
 .barras .b .t i { display: block; height: 100%; border-radius: 9px; background: linear-gradient(90deg, var(--celeste), var(--t-acento)); box-shadow: 0 0 10px rgba(169, 139, 255, .5); }
-.cajas { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; align-items: end; height: 120px; margin: 10px 12px 0; }
+.cajas div:last-child { background: linear-gradient(0deg, #2f9e6f, var(--t-bien)); box-shadow: 0 0 14px rgba(76, 214, 154, .4); }
+.cajas { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; align-items: end; height: 120px; margin: 10px 12px 0; }
 .cajas div { border-radius: 10px 10px 4px 4px; min-height: 6px; background: linear-gradient(0deg, var(--t-acento-fuerte), var(--rosa)); box-shadow: 0 0 14px rgba(169, 139, 255, .4); }
-.cajasN { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; text-align: center; font-size: 12.5px; font-weight: 800; color: var(--t-texto-suave); margin: 6px 12px 0; }
+.cajasN { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; text-align: center; font-size: 12.5px; font-weight: 800; color: var(--t-texto-suave); margin: 6px 12px 0; }
 .nota { font-size: 14px; color: var(--t-texto-suave); padding: 4px 14px 10px; margin: 0; }
 
 /* ---------- Más: un menú con secciones ---------- */
@@ -408,7 +420,7 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .interruptor::after { content: ''; position: absolute; top: 3px; left: 3px; width: 26px; height: 26px; border-radius: 50%; background: #fff; transition: transform .3s var(--rebote); box-shadow: 0 2px 6px rgba(0, 0, 0, .4); }
 .interruptor.on { background: linear-gradient(135deg, #a58aff, #7c5cf0); box-shadow: 0 0 12px rgba(169, 139, 255, .5); }
 .interruptor.on::after { transform: translateX(20px); }
-.pronto { font-size: 11px; font-weight: 900; color: var(--rosa); letter-spacing: .1em; border: 1px solid rgba(247, 37, 133, .45); padding: 2px 8px; border-radius: 999px; }
+.pronto { font-size: 11px; font-weight: 900; color: var(--rosa); letter-spacing: .1em; border: 1px solid rgba(142, 107, 255, .45); padding: 2px 8px; border-radius: 999px; }
 .pie { text-align: center; font-size: 13px; color: var(--t-texto-suave); margin-top: 22px; }
 
 /* ---------- Responder ESCRIBIENDO (lo califica Liz, como en el juego de la PC) ---------- */
@@ -440,7 +452,7 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .msg .burbuja { max-width: 80%; padding: 10px 15px; border-radius: 22px; font-weight: 700; font-size: 16.5px; line-height: 1.42; white-space: pre-wrap; overflow-wrap: anywhere; }
 .msg.liz .burbuja { background: linear-gradient(170deg, #fbf6ff, #ece2fb); color: #2a1f3a; border-bottom-left-radius: 6px; box-shadow: 0 0 0 2px rgba(169, 139, 255, .45), 0 8px 20px rgba(0, 0, 0, .35); }
 .msg.el { justify-content: flex-end; }
-.msg.el .burbuja { background: linear-gradient(135deg, #a58aff, #7c5cf0 60%, #b44fcf); color: #fff; border-bottom-right-radius: 6px; box-shadow: 0 8px 20px rgba(124, 92, 240, .35); }
+.msg.el .burbuja { background: linear-gradient(135deg, #a58aff, #7c5cf0); color: #fff; border-bottom-right-radius: 6px; box-shadow: 0 8px 20px rgba(124, 92, 240, .35); }
 .msg .extra { display: block; margin-top: 8px; padding: 7px 11px; border-radius: 14px; background: rgba(124, 92, 240, .12); color: #4b2fa8; font-size: 14px; font-weight: 800; }
 .msg .extra .bt { margin-top: 6px; min-height: 38px; }
 .msg .hora { display: block; margin-top: 3px; font-size: 11px; opacity: .55; font-weight: 800; }
@@ -452,7 +464,7 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
 #escribirLiz textarea { min-height: 46px; max-height: 140px; padding: 11px 14px; border-radius: 20px; font-size: 16.5px; resize: none; border: 0; background: rgba(51, 43, 62, .9); }
 #escribirLiz button { width: 46px; height: 46px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 20px; color: #fff;
-  background: linear-gradient(135deg, #b39bff, #7c5cf0 55%, #c94bd0); box-shadow: 0 4px 14px rgba(124, 92, 240, .5); }
+  background: linear-gradient(135deg, #a58aff, #7c5cf0); box-shadow: 0 4px 14px rgba(124, 92, 240, .5); }
 #escribirLiz button[disabled] { opacity: .5; }
 
 /* ---------- Pegar texto y "te hice N tarjetas" (Liz con el microscopio) ---------- */
@@ -482,13 +494,13 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 #menu button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 58px; padding: 6px 0; font-size: 11.5px; font-weight: 900; color: var(--t-texto-suave); border-radius: 24px; transition: color .25s, background .35s var(--suave), transform .18s var(--rebote); }
 #menu button:active { transform: scale(.9); }
 #menu button svg { width: 25px; height: 25px; transition: transform .35s var(--rebote); }
-#menu button.activo { color: #fff; background: linear-gradient(160deg, rgba(169, 139, 255, .38), rgba(209, 79, 196, .2)); box-shadow: inset 0 0 0 1px rgba(169, 139, 255, .45); }
+#menu button.activo { color: #fff; background: linear-gradient(160deg, rgba(169, 139, 255, .38), rgba(124, 92, 240, .2)); box-shadow: inset 0 0 0 1px rgba(169, 139, 255, .45); }
 #menu button.activo svg { transform: translateY(-2px) scale(1.12); stroke: #d8c8ff; filter: drop-shadow(0 0 7px rgba(169, 139, 255, .9)); }
 #menu button { font-size: 11px; }
 /* La pestaña de Liz: su carita (con su ánimo) en vez de un dibujo */
 #menu .caraMenu { width: 27px; height: 27px; border-width: 1.5px; box-shadow: 0 0 10px rgba(169, 139, 255, .5); }
 #menu button.activo .caraMenu { transform: translateY(-2px) scale(1.12); box-shadow: 0 0 0 2px rgba(255, 255, 255, .5), 0 0 14px rgba(169, 139, 255, .9); }
-#menu .punto { position: absolute; top: 3px; right: calc(50% - 24px); min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--magenta); color: #fff; font-size: 12px; line-height: 20px; font-weight: 900; box-shadow: 0 0 12px rgba(247, 37, 133, .7); }
+#menu .punto { position: absolute; top: 3px; right: calc(50% - 24px); min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--magenta); color: #fff; font-size: 12px; line-height: 20px; font-weight: 900; box-shadow: 0 0 12px rgba(142, 107, 255, .7); }
 
 /* ---------- Hoja que sube desde abajo ---------- */
 #velo { position: fixed; inset: 0; z-index: 40; background: rgba(6, 4, 10, .66); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); animation: fundido .25s; }

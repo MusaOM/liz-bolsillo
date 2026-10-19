@@ -138,11 +138,67 @@
     return { ok: true };
   }
 
+  // ---------- (20-oct-2026) "Ya me la sé" y ARCHIVAR ----------
+  // Van en el campo "datos" de cada fila (tarjeta: datos.sabida; mazo y materia: datos.archivado = la fecha), así se sincronizan
+  // con las reglas de siempre (cada cambio con su fecha; gana el más reciente) sin tocar la sincronización. No se borra nada:
+  // dejan de salir en el repaso, en "Las de hoy", en los avisos y en lo que Liz recuerda; se pueden volver a activar con su progreso.
+  const sabida = (t) => !!(t && t.datos && t.datos.sabida);
+  const archivadoX = (x) => !!(x && x.datos && x.datos.archivado);
+  const archivada = (E, t) => !!t && (archivadoX(E.mazos[t.mazo_id]) || archivadoX(E.materias[t.materia_id]));
+  const activa = (E, t) => !!t && !t.borrado_en && !sabida(t) && !archivada(E, t);
+  const conDatos = (x, cambio) => Object.assign({}, x.datos || {}, cambio);
+  function marcarSabida(E, id, valor, disp) {
+    const t = E.tarjetas[id];
+    if (!t) return { error: 'no encontré esa tarjeta' };
+    return { ok: true, tarjeta: Sincro.cambiar(E, 'tarjetas', { id, datos: conDatos(t, { sabida: valor ? Date.now() : null }) }, disp) };
+  }
+  function archivar(E, tabla, id, valor, disp) {
+    if (tabla !== 'mazos' && tabla !== 'materias') return { error: 'solo se archivan mazos o materias' };
+    const x = E[tabla][id];
+    if (!x) return { error: 'no encontré eso' };
+    Sincro.cambiar(E, tabla, { id, datos: conDatos(x, { archivado: valor ? Date.now() : null }) }, disp);
+    // Desarchivar un mazo de una materia archivada: la materia vuelve también (si no, el mazo seguiría escondido)
+    if (!valor && tabla === 'mazos' && archivadoX(E.materias[x.materia_id])) {
+      const ma = E.materias[x.materia_id];
+      Sincro.cambiar(E, 'materias', { id: ma.id, datos: conDatos(ma, { archivado: null }) }, disp);
+    }
+    return { ok: true };
+  }
+  // Lo archivado, para la sección "📦 Archivados": materias archivadas (con sus mazos) y mazos archivados sueltos
+  function archivados(E) {
+    const cuenta = (filtro) => vivos(E.tarjetas).filter(filtro).length;
+    const materias = vivos(E.materias).filter(archivadoX).map((ma) => ({ tabla: 'materias', id: ma.id, nombre: ma.nombre, cuando: ma.datos.archivado,
+      tarjetas: cuenta((t) => t.materia_id === ma.id), mazos: vivos(E.mazos).filter((m) => m.materia_id === ma.id).map((m) => m.nombre) }));
+    const mazos = vivos(E.mazos).filter((m) => archivadoX(m) && !archivadoX(E.materias[m.materia_id])).map((m) => ({ tabla: 'mazos', id: m.id, nombre: m.nombre,
+      materia: (E.materias[m.materia_id] || {}).nombre || '', cuando: m.datos.archivado, tarjetas: cuenta((t) => t.mazo_id === m.id) }));
+    return materias.concat(mazos).sort((a, b) => b.cuando - a.cuando);
+  }
+
+  // Una materia o un mazo por cómo lo dijo él ("micología", "las tarjetas de bacterio", "el mazo de tinciones")
+  function buscarMateriaOMazo(E, texto) {
+    const q = lim(texto).replace(/[¿?¡!.,]/g, ' ').replace(/^\s*(todas )?(las |los |la |el |mis |tus )?(tarjetas|mazos?|materias?|curso|cosas)?\s*(de los |de las |de la |del |de )?/, '')
+      .replace(/\s+(por favor|porfa|liz)\s*$/, '').trim();
+    if (q.length < 3) return null;
+    const mats = vivos(E.materias), mazos = vivos(E.mazos);
+    const igual = (n) => lim(n) === q;
+    const contiene = (n) => lim(n).includes(q) || (q.length >= 5 && q.includes(lim(n)));
+    const raiz = (n) => q.length >= 5 && lim(n).slice(0, 5) === q.slice(0, 5);
+    for (const prueba of [igual, contiene, raiz]) {
+      const ma = mats.find((m) => prueba(m.nombre));
+      if (ma) return { tabla: 'materias', fila: ma };
+      const mz = mazos.find((m) => prueba(m.nombre));
+      if (mz) return { tabla: 'mazos', fila: mz };
+    }
+    return null;
+  }
+
   // ---------- Para mostrar ----------
-  function arbol(E) {
-    return vivos(E.materias).sort((a, b) => a.nombre.localeCompare(b.nombre)).map((ma) => ({
+  // (lo archivado no sale aquí: va en archivados(); con { conArchivados: true }, sí)
+  function arbol(E, op) {
+    const ver = (x) => (op && op.conArchivados) || !archivadoX(x);
+    return vivos(E.materias).filter(ver).sort((a, b) => a.nombre.localeCompare(b.nombre)).map((ma) => ({
       materia: ma,
-      mazos: vivos(E.mazos).filter((m) => m.materia_id === ma.id).sort((a, b) => a.nombre.localeCompare(b.nombre))
+      mazos: vivos(E.mazos).filter((m) => m.materia_id === ma.id && ver(m)).sort((a, b) => a.nombre.localeCompare(b.nombre))
         .map((m) => ({ mazo: m, tarjetas: vivos(E.tarjetas).filter((t) => t.mazo_id === m.id) })),
     }));
   }
@@ -152,9 +208,13 @@
     return vivos(E.tarjetas).filter((t) => lim(t.pregunta + ' ' + t.respuesta + ' ' + (t.fuente || '')).includes(q));
   }
   // Las que tocan (ahora), las favoritas, las difíciles, las de un mazo o una materia
+  // (20-oct-2026) Sin las que "ya me la sé" ni las de un mazo/materia archivados. Excepción: si se pide un mazo o una materia
+  // que ESTÁ archivado, es "repasarlo a propósito" (desde 📦 Archivados) y sí salen. { conSabidas: true } incluye las sabidas.
   function paraRepasar(E, filtro, ahora) {
     ahora = ahora || Date.now();
-    let l = vivos(E.tarjetas);
+    const aProposito = filtro && ((filtro.mazo && (archivadoX(E.mazos[filtro.mazo]) || archivadoX(E.materias[(E.mazos[filtro.mazo] || {}).materia_id]))) ||
+      (filtro.materia && archivadoX(E.materias[filtro.materia])));
+    let l = vivos(E.tarjetas).filter((t) => (aProposito || !archivada(E, t)) && ((filtro && filtro.conSabidas) || !sabida(t)));
     if (filtro && filtro.mazo) l = l.filter((t) => t.mazo_id === filtro.mazo);
     if (filtro && filtro.materia) l = l.filter((t) => t.materia_id === filtro.materia);
     if (filtro && filtro.favoritas) l = l.filter((t) => t.favorita);
@@ -167,5 +227,6 @@
   }
 
   return { lim, vivos, crearMateria, crearMazo, crearTarjeta, editarTarjeta, marcar, borrarTarjeta, borrarMazo, borrarMateria, restaurar, papelera,
-    renombrarMazo, renombrarMateria, moverMazo, juntarMazos, arbol, buscar, paraRepasar };
+    renombrarMazo, renombrarMateria, moverMazo, juntarMazos, arbol, buscar, paraRepasar,
+    sabida, archivada, archivadoX, activa, marcarSabida, archivar, archivados, buscarMateriaOMazo };
 });

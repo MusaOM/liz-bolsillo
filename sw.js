@@ -2,7 +2,7 @@
 // y muestra los AVISOS que manda Supabase aunque la app esté cerrada (recordatorios, exámenes, "Tienes N tarjetas para hoy 🧫"...).
 // Al tocar un aviso, se abre la pantalla que corresponde (url: ./#recordatorios, ./#repasar, ./#mazo=<id>...).
 // Al cambiar archivos de la app, subir VERSION: así el celular baja la versión nueva.
-const VERSION = 'liz-bolsillo-5';
+const VERSION = 'liz-bolsillo-6';
 const ARCHIVOS = [
   './', 'index.html', 'manifest.webmanifest', 'css/estilo.css',
   'js/config.js', 'js/nucleo.js', 'js/sincro.js', 'js/organizar.js', 'js/agenda.js', 'js/frases.js', 'js/almacen.js', 'js/fondo.js', 'js/app.js',
