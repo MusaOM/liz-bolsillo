@@ -64,7 +64,7 @@
     clearTimeout(tGuardar);
     tGuardar = setTimeout(() => Almacen.guardar(K + 'E', E).catch((e) => console.warn('No pude guardar', e)), 250);
   }
-  function pedirSincro() { clearTimeout(tSincro); tSincro = setTimeout(() => sincronizar('cambio'), 3000); }
+  function pedirSincro() { clearTimeout(tSincro); tSincro = setTimeout(() => sincronizar('cambio'), 1500); }     // (20-oct-2026: antes 3 s)
   const porSubir = () => E.pendientes.length + Sincro.TABLAS.reduce((s, t) => s + (E.sucios[t] || []).length, 0);
   function cambio() { guardarLocal(); pedirSincro(); pintar(); }
 
@@ -81,6 +81,7 @@
         sinSesion = false;
       }
       const r = await Sincro.sincronizar(E, cli, { dispositivo: DISP });
+      escucharCambios();
       ultimoError = '';
       guardarLocal();
       if (!DEMO) await traerPerfil().catch((e) => console.warn('perfil', e));
@@ -99,6 +100,24 @@
       pintarEstado();
       if (otraVez) { otraVez = false; setTimeout(() => sincronizar('otra'), 800); }
     }
+  }
+  // ---------- (20-oct-2026) TIEMPO REAL: lo que la compu guarda llega al instante ----------
+  // Antes el celular revisaba la nube cada 5 minutos (y al abrir). Ahora Supabase AVISA cuando cambia algo de sus tablas
+  // (supabase/tiempo-real.sql) y el celular se sincroniza enseguida, con las MISMAS reglas de siempre (solo cambia CUÁNDO).
+  // Lo que el propio celular guardó vuelve como aviso: eso se ignora. Sin el SQL, o sin conexión, todo sigue como antes.
+  const TABLAS_RT = ['materias', 'mazos', 'tarjetas', 'repasos', 'eventos', 'recordatorios', 'examenes', 'archivos', 'avisos', 'perfil'];
+  let canal = null, tRT = 0;
+  function escucharCambios() {
+    if (DEMO || !sb || canal) return;
+    canal = sb.channel('liz-cambios-celular');
+    for (const t of TABLAS_RT) {
+      canal.on('postgres_changes', { event: '*', schema: 'public', table: t }, (p) => {
+        if (p && p.new && p.new.dispositivo === DISP) return;          // (lo mío, de vuelta)
+        clearTimeout(tRT);
+        tRT = setTimeout(() => sincronizar('tiempo real'), 700);        // (varios cambios juntos → una sola sincronización)
+      });
+    }
+    canal.subscribe((estado) => { if (estado !== 'SUBSCRIBED') console.warn('Tiempo real:', estado); });
   }
   async function traerPerfil() {
     const { data, error } = await sb.from('perfil').select('nombre, avatar, actualizado, datos').maybeSingle();
@@ -944,7 +963,7 @@
       fila('sincronizarYa', '🔄', 'celeste', 'Sincronizar ahora', E.ultimaSincro ? 'Última vez: ' + hace(E.ultimaSincro) : 'Todavía no') +
       (instalada ? '' : fila('comoInstalar', '📲', '', 'Instalar en el iPhone', 'Para tenerla en la pantalla de inicio')) +
       (DEMO ? '' : sinSesion ? fila('volverEntrar', '🔑', 'oro', 'Volver a entrar', 'Con tu correo y contraseña') : fila('salir', '🚪', '', 'Cerrar sesión', 'En este celular')) + '</ul></div>' +
-      '<p class="pie">LIZ · Liz de bolsillo · versión 6</p>';
+      '<p class="pie">LIZ · Liz de bolsillo · versión 7</p>';
   }
   function pintarPapelera(v) {
     const l = Org.papelera(E);
