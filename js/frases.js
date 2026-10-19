@@ -28,6 +28,25 @@
     agendaUna: ['Hoy tienes una cosa en tu agenda.'],
     examenPronto: ['Ojo: {que} es {cuando}. ¡Vamos con todo!', 'Se acerca {que}: {cuando}. Yo te ayudo a repasar.'],
     subido: ['¡Listo! Cuando prendas la compu, lo leo y te hago tarjetas.', 'Subido. Apenas la laptop despierte, me pongo a leerlo.'],
+    // (diseño 3) Lo que dice Liz arriba de cada pantalla, en su globito
+    pRepasar: ['¿Repasamos? Te tocan <b>{n}</b> hoy. Yo te acompaño.', 'Tengo <b>{n}</b> tarjetas listas en la placa. ¿Empezamos?'],
+    pRepasarNada: ['¡Al día! Si quieres, repasamos tus difíciles igual.', 'Hoy no te toca nada. Un repaso libre nunca está de más.'],
+    pAgenda: ['Aquí está tu calendario. Yo te aviso a tiempo, prometido.', '¿Anotamos algo? Toca el ＋ y yo me encargo de recordártelo.'],
+    pMazos: ['Tus mazos, ordenaditos como placas en la incubadora.', 'Cada mazo es un cultivo: si lo repasas, crece.'],
+    pMas: ['Aquí ajustas todo. Yo sigo aquí si me necesitas.', 'Tu rincón de ajustes. ¿Qué revisamos?'],
+    pRecordatorios: ['Lo que anotes aquí te lo recuerdo a su hora, aquí y en la compu.', 'Marca ✓ cuando lo hagas y no te lo vuelvo a decir.'],
+    pArchivos: ['Súbeme tus apuntes y, cuando prendas la laptop, te hago tarjetas.', 'PDF, Word, PowerPoint o fotos: yo los leo por ti.'],
+    pProgreso: ['Mira cuánto has avanzado. Estoy orgullosa.', 'Tus números de científico. Cada repaso cuenta.'],
+    pProgresoNada: ['Cuando empieces a repasar, aquí te muestro cómo vas. Yo anoto todo.'],
+    pPapelera: ['Lo borrado espera aquí 30 días, por si te arrepientes.', 'Nada se pierde de verdad hasta 30 días después.'],
+    // Estados vacíos
+    vDia: ['Nada este día. ¿Un descansito? Si quieres anotar algo, toca ＋.', 'Día libre en la agenda. Yo lo cuido igual.'],
+    vRecordatorios: ['Todavía no hay recordatorios. Pídemelos aquí o en la compu y yo te aviso.'],
+    vArchivos: ['Aún no hay apuntes. Súbeme el primero y lo convierto en tarjetas.'],
+    vMazos: ['Aquí van a vivir tus mazos. Los que hago de tus apuntes en la compu llegan solitos.'],
+    vBuscar: ['No encontré nada con eso. ¿Probamos otra palabra?'],
+    vPapelera: ['La papelera está vacía. Todo en su lugar.'],
+    vMazo: ['Este mazo está vacío. ¿Le agregamos una tarjeta?'],
   };
   const azar = (l) => l[Math.floor(Math.random() * l.length)];
   function frase(tipo, datos) {

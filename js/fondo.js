@@ -1,6 +1,6 @@
 // fondo.js — el fondo de MICROBIOLOGÍA de la Liz de bolsillo: la versión liviana para el celular del de la PC
 // (src/renderer/fondo-micro.js). Bacilos, cocos y espirilos que flotan despacio y a veces se dividen; una placa de Petri y una
-// molécula muy tenues. Para no gastar batería: pocas formas (10), 20 cuadros por segundo, cada forma se dibuja UNA vez con su
+// molécula muy tenues. Para no gastar batería: pocas formas (~17), 20 cuadros por segundo, cada forma se dibuja UNA vez con su
 // brillo y después solo se mueve, se PAUSA cuando la app no se ve, y con "reducir movimiento" queda quieto.
 (function () {
   const TAU = Math.PI * 2;
@@ -27,6 +27,14 @@
     bacilo: (c) => sprite(44, 15, 9, (g) => capsula(g, 44, 14, c), c),
     coco: (c) => sprite(18, 18, 8, (g) => circulo(g, 0, 0, 8, c), c),
     diplococo: (c) => sprite(34, 18, 8, (g) => { circulo(g, -8, 0, 8, c); circulo(g, 8, 0, 8, c); }, c),
+    estrepto: (c) => sprite(64, 16, 8, (g) => { for (let i = 0; i < 4; i++) circulo(g, -24 + i * 16, Math.sin(i * 1.3) * 3, 7, c); }, c),
+    estafilo: (c) => sprite(40, 36, 8, (g) => { [[-9, -7], [7, -9], [-12, 7], [4, 6], [16, 2]].forEach(([x, y]) => circulo(g, x, y, 7, c)); }, c),
+    molecula: (c) => sprite(100, 84, 5, (g) => {
+      const p = []; for (let i = 0; i < 6; i++) p.push([Math.cos((i / 6) * TAU) * 20, Math.sin((i / 6) * TAU) * 20]);
+      g.globalAlpha = 0.6; g.strokeStyle = c; g.lineWidth = 2; g.beginPath(); p.forEach(([x, y], i) => (i ? g.lineTo(x, y) : g.moveTo(x, y))); g.closePath(); g.stroke();
+      g.beginPath(); g.moveTo(p[0][0], p[0][1]); g.lineTo(p[0][0] + 20, p[0][1] - 10); g.moveTo(p[3][0], p[3][1]); g.lineTo(p[3][0] - 20, p[3][1] + 12); g.stroke();
+      p.forEach(([x, y]) => { g.globalAlpha = 0.7; g.fillStyle = c; g.beginPath(); g.arc(x, y, 3, 0, TAU); g.fill(); }); g.globalAlpha = 1;
+    }, c),
     espirilo: (c) => sprite(60, 18, 8, (g) => {
       g.beginPath(); for (let x = -28; x <= 28; x += 1.5) { const y = Math.sin((x / 56) * TAU * 2.5) * 5.5; x === -28 ? g.moveTo(x, y) : g.lineTo(x, y); }
       g.globalAlpha = 0.9; g.strokeStyle = c; g.lineWidth = 4; g.stroke(); g.globalAlpha = 1;
@@ -37,7 +45,7 @@
       g.globalAlpha = 1;
     }, c),
   };
-  const BACT = ['bacilo', 'bacilo', 'coco', 'diplococo', 'espirilo'];
+  const BACT = ['bacilo', 'bacilo', 'bacilo', 'coco', 'diplococo', 'estrepto', 'estafilo', 'espirilo', 'espirilo'];
 
   function crear() {
     const lienzo = document.createElement('canvas');
@@ -52,23 +60,25 @@
     const imgs = {};
     for (const [k, f] of Object.entries(FORMAS)) imgs[k] = cs.map((c) => f(c));
     const nuevo = (tipo, x, y, extra) => Object.assign({ tipo, ci: Math.floor(Math.random() * cs.length), x, y, ang: azar(0, TAU),
-      vx: azar(-1, 1) * azar(3, 7), vy: azar(-1, 1) * azar(3, 7), va: azar(-0.1, 0.1), alfa: azar(0.28, 0.45), fase: azar(0, TAU), escala: azar(0.8, 1.15), aparece: 0, div: -1 }, extra || {});
+      vx: azar(-1, 1) * azar(3, 7), vy: azar(-1, 1) * azar(3, 7), va: azar(-0.1, 0.1), alfa: azar(0.42, 0.68), fase: azar(0, TAU), escala: azar(0.8, 1.15), aparece: 0, div: -1 }, extra || {});
     let cosas = [];
     medir();
-    cosas.push(nuevo('placa', azar(0, W), azar(0, H), { alfa: 0.1, vx: azar(-2, 2), vy: azar(-2, 2), va: 0.02, escala: 1.2 }));
-    for (let i = 0; i < 9; i++) cosas.push(nuevo(elegir(BACT), azar(0, W), azar(0, H)));
+    cosas.push(nuevo('placa', azar(0, W), azar(0, H * 0.4), { alfa: 0.16, vx: azar(-2, 2), vy: azar(-2, 2), va: 0.02, escala: 1.3 }));
+    cosas.push(nuevo('placa', azar(0, W), azar(H * 0.6, H), { alfa: 0.13, ci: 2, vx: azar(-2, 2), vy: azar(-2, 2), va: -0.02, escala: 0.9 }));
+    cosas.push(nuevo('molecula', azar(0, W), azar(0, H), { alfa: 0.2, vx: azar(-3, 3), vy: azar(-3, 3), va: 0.05 }));
+    for (let i = 0; i < 13; i++) cosas.push(nuevo(elegir(BACT), azar(0, W), azar(0, H)));
     addEventListener('resize', medir);
 
     let ultimo = performance.now(), acum = 0, t = 0, proxDiv = 5, pedido = 0;
     function dibujar(dt) {
       t += dt;
       if ((proxDiv -= dt) <= 0) {
-        proxDiv = azar(6, 10);
+        proxDiv = azar(4, 7);
         const c = cosas.filter((x) => (x.tipo === 'bacilo' || x.tipo === 'coco') && x.div < 0 && x.aparece >= 1);
         if (c.length) {
           elegir(c).div = 0;
-          const bact = cosas.filter((x) => x.tipo !== 'placa' && !x.sale);
-          if (bact.length > 11) { const v = elegir(bact.filter((x) => x.div < 0)); if (v) v.sale = 0.001; }
+          const bact = cosas.filter((x) => x.tipo !== 'placa' && x.tipo !== 'molecula' && !x.sale);
+          if (bact.length > 15) { const v = elegir(bact.filter((x) => x.div < 0)); if (v) v.sale = 0.001; }
         }
       }
       g.clearRect(0, 0, W, H);

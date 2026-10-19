@@ -19,6 +19,7 @@
 <body>
 <!-- Pantalla de carga (como la de la PC: frases de laboratorio) -->
 <div id="carga" role="status" aria-live="polite">
+  <div class="escenaCarga" data-liz="microscopio"><div class="aura"></div></div>
   <div class="nombre">Liz</div>
   <div class="sub">de bolsillo</div>
   <div class="barra"><i></i></div>
@@ -27,7 +28,7 @@
 
 <!-- Entrar (una sola vez): su correo y su contraseña (la cuenta se crea en Supabase; no se manda ningún correo) -->
 <section id="entrar" hidden>
-  <div class="logo" aria-hidden="true"></div>
+  <div class="escenaEntrar" data-liz="saludo"><div class="aura"></div></div>
   <h1>Liz de bolsillo</h1>
   <p class="suave" id="entrarTexto">Tus tarjetas, tu calendario y tus apuntes, también en el celular. Entra con tu correo y tu contraseña (solo esta vez).</p>
   <form id="formEntrar">
@@ -40,8 +41,8 @@
 
 <main id="app" hidden>
   <header id="cabeza">
-    <button class="liz-foto" id="lizMini" aria-label="Ir a Hoy"></button>
-    <div class="titulo"><strong id="tituloVista">Hoy</strong><span id="estadoSync"></span></div>
+    <div class="titulo" id="tituloVista">Hoy</div>
+    <span id="estadoSync"></span>
   </header>
   <section id="vista" class="vista"></section>
 </main>
@@ -57,6 +58,7 @@
 <div id="velo" hidden></div>
 <div id="hoja" hidden role="dialog" aria-modal="true"></div>
 <div id="aviso" role="status" aria-live="polite"></div>
+<label id="haptico" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
 <input type="file" id="elegirArchivo" accept=".pdf,.docx,.pptx,.txt,.md,image/*,application/pdf" hidden>
 
 <script src="vendor/supabase.js"></script>

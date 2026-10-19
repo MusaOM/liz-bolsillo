@@ -21,6 +21,7 @@
   let E = Sincro.vacio();
   let sb = null, cli = null;
   let perfil = { nombre: '' };
+  let liz2d = {};                           // las poses de Liz (privadas, guardadas en el celular): 'saludo-g' → imagen
   let vista = 'hoy';
   let sesion = null;                        // la ronda de repaso en curso
   let mazoAbierto = null, buscando = '';
@@ -92,7 +93,7 @@
     }
   }
   async function traerPerfil() {
-    const { data, error } = await sb.from('perfil').select('nombre, avatar, actualizado').maybeSingle();
+    const { data, error } = await sb.from('perfil').select('nombre, avatar, actualizado, datos').maybeSingle();
     if (error || !data) return;
     const cambioFoto = data.actualizado !== perfil.actualizado || !perfil.tieneImg;
     perfil = Object.assign(perfil, { nombre: data.nombre || '', avatar: data.avatar || '', actualizado: data.actualizado });
@@ -104,6 +105,22 @@
         await Almacen.guardar(K + 'liz-img', url);
         ponerFoto(url);
         perfil.tieneImg = true;
+      }
+    }
+    // Las poses 2D de Liz (las sube la PC al almacenamiento PRIVADO): se bajan solo si cambiaron y se guardan aquí
+    const l2 = data.datos && data.datos.liz2d;
+    if (l2 && l2.v && l2.v !== perfil.liz2dV && Array.isArray(l2.archivos)) {
+      const imgs = {};
+      for (const n of l2.archivos) {
+        const r = await sb.storage.from('liz-privado').download(l2.carpeta + n);
+        if (r.data) imgs[n.replace(/\.webp$/, '')] = await aDataURL(r.data);
+      }
+      if (Object.keys(imgs).length) {
+        liz2d = imgs;
+        await Almacen.guardar(K + 'liz2d', imgs);
+        perfil.liz2dV = l2.v;
+        pintarFijas();
+        pintarSuave();
       }
     }
     Almacen.guardar(K + 'perfil', perfil);
@@ -121,6 +138,8 @@
       perfil = (await Almacen.leer(K + 'perfil')) || perfil;
       const img = await Almacen.leer(K + 'liz-img');
       if (img) ponerFoto(img);
+      liz2d = (await Almacen.leer(K + 'liz2d')) || {};
+      pintarFijas();
     } catch (e) { console.warn('Almacén', e); }
     cargaAvance(55);
     if (DEMO) return arrancarDemo();
@@ -140,6 +159,7 @@
     if (E.usuario && E.usuario !== user.id) {     // otra cuenta en este celular: no mezclar
       E = Sincro.vacio();
       perfil = { nombre: '' };
+      liz2d = {};
       await Almacen.borrarTodo().catch(() => {});
       document.documentElement.style.removeProperty('--liz');
       document.body.classList.add('sin-foto');
@@ -235,12 +255,12 @@
     const p = porSubir();
     let t, c = '';
     if (DEMO) { t = 'Modo de prueba'; c = 'espera'; }
-    else if (sinSesion) { t = 'Vuelve a entrar para sincronizar'; c = 'mal'; }
+    else if (sinSesion) { t = 'Vuelve a entrar'; c = 'mal'; }
     else if (sincronizando) { t = 'Sincronizando…'; c = 'espera'; }
-    else if (!navigator.onLine) { t = 'Sin internet' + (p ? ' · ' + p + ' por subir' : ' · todo guardado'); c = 'espera'; }
-    else if (ultimoError) { t = 'No pude sincronizar; lo intento luego'; c = 'mal'; }
-    else if (E.ultimaSincro) t = 'Al día con la compu · ' + hace(E.ultimaSincro);
-    else { t = 'Todavía sin sincronizar'; c = 'espera'; }
+    else if (!navigator.onLine) { t = 'Sin internet' + (p ? ' · ' + p + ' por subir' : ''); c = 'espera'; }
+    else if (ultimoError) { t = 'Lo intento luego'; c = 'mal'; }
+    else if (E.ultimaSincro) t = 'Al día · ' + hace(E.ultimaSincro);
+    else { t = 'Sin sincronizar'; c = 'espera'; }
     el.textContent = t;
     el.className = c;
   }
@@ -260,27 +280,50 @@
   const nombreMazo = (id) => (E.mazos[id] && E.mazos[id].nombre) || 'Sin mazo';
   const nombreMateria = (id) => (E.materias[id] && E.materias[id].nombre) || 'Sin materia';
   const materiaDeTarjeta = (tid) => { const t = E.tarjetas[tid]; return t ? nombreMateria(t.materia_id) : 'Sin materia'; };
-  const vacio = (ic, titulo, texto, boton) => '<div class="vacio"><span class="grande-ic">' + ic + '</span><b>' + esc(titulo) + '</b>' + (texto ? esc(texto) : '') + (boton || '') + '</div>';
   const enDias = (ms) => {
     const d = Math.round((N.inicioDiaCR(ms) - N.inicioDiaCR(Date.now())) / DIA);
     return d === 0 ? 'hoy' : d === 1 ? 'mañana' : d === -1 ? 'ayer' : d > 1 ? 'en ' + d + ' días' : 'hace ' + -d + ' días';
   };
+
+  // ---------- Liz: sus poses 2D (privadas: se bajan del almacenamiento privado y se guardan aquí) ----------
+  // saludo, feliz, animo, dormida, microscopio; -g grande, -c chica. Sin ellas (antes de entrar), la placa de Petri.
+  function lizImg(pose, tam, clase) {
+    const src = liz2d[pose + '-' + (tam || 'g')] || liz2d[pose + '-' + (tam === 'c' ? 'g' : 'c')];
+    return src ? '<img class="liz2d ' + (clase || '') + '" src="' + src + '" alt="Liz">'
+      : '<div class="liz2d sin ' + (clase || '') + '"><img src="iconos/icono.svg" alt=""></div>';
+  }
+  // Arriba de cada pantalla: Liz (chica) y su globito
+  const escena = (pose, frase) => '<div class="escena"><div class="marcoLiz"><div class="aura"></div>' + lizImg(pose, 'c', 'respira') + '</div>' +
+    '<div class="comic cola-izq">' + frase + '</div></div>';
+  // Estado vacío: siempre Liz con una frase suya
+  const vacio = (pose, frase, boton) => '<div class="vacio"><div class="comic cola-abajo">' + frase + '</div><div class="marcoLiz"><div class="aura"></div>' +
+    lizImg(pose, 'c', 'respira') + '</div>' + (boton || '') + '</div>';
+  // Vacío chiquito: dentro de una pantalla que ya tiene a Liz arriba (su carita y su frase)
+  const vacioMini = (pose, frase) => '<div class="vacio mini"><div class="cara-liz">' + lizImg(pose, 'c') + '</div><div class="comic cola-izq">' + frase + '</div></div>';
+  function pintarFijas() {
+    for (const [sel, pose] of [['#carga .escenaCarga', 'microscopio'], ['#entrar .escenaEntrar', 'saludo']]) {
+      const el = $(sel);
+      if (el) el.innerHTML = '<div class="aura"></div>' + lizImg(pose, 'g', 'respira');
+    }
+  }
   const ICONO = { evento: '📅', recordatorio: '⏰', examen: '📝', parcial: '📝', entrega: '📦', quiz: '📝' };
-  function filaAgenda(x, conDia) {
+  const COLOR = { evento: 'celeste', recordatorio: 'oro', examen: 'rosa', parcial: 'rosa', entrega: 'rosa', quiz: 'rosa' };
+  const tipoDe = (x) => (x.tabla === 'examenes' ? 'examen' : x.tipo);
+  function filaAgenda(x, conDia, linea) {
     const sub = [];
-    sub.push('<span class="hora">' + N.horaCR(x.ms) + '</span>');
+    if (!linea) sub.push('<span class="hora">' + N.horaCR(x.ms) + '</span>');
     if (conDia) sub.push(enDias(x.ms));
     if (x.materia && x.tabla !== 'examenes') sub.push(esc(x.materia));
     if (x.repite) sub.push('🔁 ' + x.repite);
     if (x.fila && x.fila.dispositivo === 'pc') sub.push('💻');
     const titulo = x.tabla === 'examenes' ? x.titulo.charAt(0).toUpperCase() + x.titulo.slice(1) : x.titulo;
-    return '<li><div class="item' + (x.hecho ? ' hecho' : '') + '">' +
+    return '<li><div class="item' + (x.hecho ? ' hecho' : '') + '">' + (linea ? '<span class="hora">' + N.horaCR(x.ms) + '</span>' : '') +
       (x.tabla === 'recordatorios' ? '<button class="check' + (x.hecho ? ' on' : '') + '" data-a="hecho" data-id="' + esc(x.id) + '" aria-label="Hecho">✓</button>'
-        : '<div class="ico">' + (ICONO[x.tipo] || '📅') + '</div>') +
-      '<button class="txt" style="text-align:left" data-a="editarAgenda" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '"><b>' + esc(titulo) + '</b><small>' + sub.join(' · ') + '</small></button></div></li>';
+        : '<div class="ico ' + (COLOR[x.tipo] || 'celeste') + '">' + (ICONO[x.tipo] || '📅') + '</div>') +
+      '<button class="txt" style="text-align:left" data-a="editarAgenda" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '"><b>' + esc(titulo) + '</b><small>' + (sub.join(' · ') || '&nbsp;') + '</small></button></div></li>';
   }
 
-  // ---------- HOY ----------
+  // ---------- HOY: Liz grande, su globito, y debajo lo del día ----------
   function pintarHoy(v) {
     const ahora = Date.now();
     const tocan = Org.paraRepasar(E, { soloHoy: true });
@@ -290,22 +333,28 @@
     const hoyN = reps.filter((r) => r.fecha >= N.inicioDiaCR(ahora)).length;
     const msg = !total ? fija('hoy', 'sinTarjetas') : tocan.length > 1 ? fija('hoy', 'hayHoy', { n: '<b>' + tocan.length + '</b>' })
       : tocan.length === 1 ? fija('hoy', 'hayUna') : fija('hoy', 'nadaHoy');
+    // Su pose según el momento: mucho que repasar → microscopio; nada → dormida; con racha → feliz; si no, saluda
+    const pose = tocan.length >= 10 ? 'microscopio' : total && !tocan.length ? 'dormida' : racha >= 3 ? 'feliz' : 'saludo';
     const hoyAg = Ag.delDia(E, ahora);
-    const exs = Ag.proximosExamenes(E, ahora).filter((x) => x.cuando < ahora + 21 * DIA).slice(0, 3);
+    const exs = Ag.proximosExamenes(E, ahora).filter((x) => x.cuando < ahora + 30 * DIA);
+    const ex = exs[0];
+    const dEx = ex ? Math.round((N.inicioDiaCR(ex.cuando) - N.inicioDiaCR(ahora)) / DIA) : 0;
     const favs = Org.paraRepasar(E, { favoritas: true }).length, difs = Org.paraRepasar(E, { dificiles: true }).length;
     v.innerHTML =
-      '<div class="liz-habla"><div class="liz-foto grande' + (tocan.length ? '' : ' salta') + '"></div><div class="globo">' + esc(saludoFijo()) + '<br>' + msg +
-      (racha >= 2 ? '<small>' + esc(fija('racha', 'racha', { n: racha })) + '</small>' : '') + '</div></div>' +
-      (tocan.length ? '<button class="bt prin grande" data-a="repasarHoy">🧫 Repasar las ' + tocan.length + ' de hoy</button>' : '') +
-      '<div class="caja brilla"><h4>📅 Hoy en tu agenda <span class="suave" style="font-weight:600;font-size:14px;margin-left:auto">' + esc(N.fechaTxt(ahora, { weekday: 'short' })) + '</span></h4>' +
-      (hoyAg.length ? '<ul class="lista">' + hoyAg.map((x) => filaAgenda(x)).join('') + '</ul>' : '<p class="suave" style="margin:4px 0 10px">Nada en tu agenda hoy. 🌙</p>') +
-      '<div class="fila" style="gap:8px;margin-top:6px"><button class="bt chico" data-a="nuevoAgenda" data-tipo="recordatorios">＋ Recordatorio</button><button class="bt chico" data-a="ir" data-v="agenda">Ver calendario</button></div></div>' +
-      (exs.length ? '<div class="caja"><h4>📝 Se vienen</h4><ul class="lista">' + exs.map((x) => filaAgenda({ tabla: 'examenes', id: x.id, ms: x.cuando, titulo: N.nombreExamen(x).replace(/^(el|la) /, ''), tipo: x.que, fila: x }, true)).join('') + '</ul></div>' : '') +
-      '<div class="caja tres"><div><div class="n oro">' + racha + '</div><small>🔥 racha</small></div><div><div class="n">' + hoyN + '</div><small>repasadas hoy</small></div>' +
-      '<div><div class="n">' + total + '</div><small>tarjetas</small></div></div>' +
-      (total && (favs || difs) ? '<div class="chips">' + (favs ? '<button class="chip" data-a="repasarFav">⭐ Favoritas (' + favs + ')</button>' : '') +
-        (difs ? '<button class="chip" data-a="repasarDif">🔥 Difíciles (' + difs + ')</button>' : '') + '</div>' : '') +
-      (!total ? '<button class="bt grande" data-a="nuevaTarjeta">➕ Crear mi primera tarjeta</button>' : '');
+      '<div class="heroe"><div class="aura"></div><div class="placa"></div><div class="placa chica"></div>' + lizImg(pose, 'g', 'respira') +
+      '<div class="comic cola-der">' + esc(saludoFijo()) + '<br>' + msg + (racha >= 2 ? '<small>🔥 ' + esc(fija('racha', 'racha', { n: racha })) + '</small>' : '') + '</div><div class="degrade"></div></div>' +
+      (tocan.length ? '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + tocan.length + '</span><span class="t"><b>Repasar ahora</b>' +
+        (tocan.length === 1 ? 'tarjeta te toca hoy' : 'tarjetas te tocan hoy') + '</span><span class="flecha">▶</span></button>' : '') +
+      (ex ? '<button class="examenG" data-a="editarAgenda" data-tabla="examenes" data-id="' + esc(ex.id) + '"><span class="cuenta">' +
+        (dEx <= 0 ? '<b>¡Hoy!</b>' : dEx === 1 ? '<b>1</b><small>día</small>' : '<b>' + dEx + '</b><small>días</small>') + '</span><span class="txt"><small>Próximo ' + esc(ex.que || 'examen') + '</small><b>' +
+        esc(ex.materia) + '</b><span>' + esc(N.fechaTxt(ex.cuando)) + ' · ' + N.horaCR(ex.cuando) + '</span></span></button>' : '') +
+      '<div class="pastillas"><span class="pastilla oro">🔥 <b>' + racha + '</b> racha</span><span class="pastilla">✅ <b>' + hoyN + '</b> hoy</span><span class="pastilla">🃏 <b>' + total + '</b> tarjetas</span>' +
+      (favs ? '<button class="pastilla toque" data-a="repasarFav">⭐ <b>' + favs + '</b></button>' : '') + (difs ? '<button class="pastilla toque" data-a="repasarDif">🔥 <b>' + difs + '</b> difíciles</button>' : '') + '</div>' +
+      '<h3>Hoy, ' + esc(N.fechaTxt(ahora, { weekday: 'long', month: undefined, day: 'numeric' })) + '</h3>' +
+      (hoyAg.length ? '<div class="panel tiempo"><ul class="lista">' + hoyAg.map((x) => filaAgenda(x, false, true)).join('') + '</ul></div>' : '<p class="suave" style="margin:0 6px">Nada en tu agenda hoy. 🌙</p>') +
+      '<div class="fila" style="gap:8px;margin:10px 2px"><button class="bt chico" data-a="nuevoAgenda" data-tipo="recordatorios">＋ Recordatorio</button><button class="bt chico" data-a="ir" data-v="agenda">📅 Calendario</button></div>' +
+      (exs.length > 1 ? '<h3>Se vienen</h3><div class="panel"><ul class="lista">' + exs.slice(1, 4).map((x) => filaAgenda({ tabla: 'examenes', id: x.id, ms: x.cuando, titulo: N.nombreExamen(x).replace(/^(el|la) /, ''), tipo: x.que, fila: x }, true)).join('') + '</ul></div>' : '') +
+      (!total ? '<button class="bt prin grande" style="margin-top:14px" data-a="nuevaTarjeta">➕ Crear mi primera tarjeta</button>' : '');
   }
 
   // ---------- REPASAR ----------
@@ -313,7 +362,7 @@
     const ids = lista.map((x) => (x.t ? x.t.id : x)).filter((id) => E.tarjetas[id] && !E.tarjetas[id].borrado_en);
     if (!ids.length) { avisar('No hay tarjetas ahí todavía.'); return; }
     sesion = { titulo, cola: ids.slice(0, 40).map((id) => ({ id, repetida: false })), i: 0, volteada: false, bien: 0, primeras: Math.min(ids.length, 40),
-      dice: '¡Vamos! Toca la tarjeta cuando quieras ver la respuesta.', reaccion: '', fin: false, entra: true };
+      dice: '¡Vamos! Toca la tarjeta cuando quieras ver la respuesta.', reaccion: '', pose: 'microscopio', fin: false, entra: true };
     ir('repasar');
   }
   let respondiendo = false;
@@ -321,13 +370,14 @@
     if (!sesion) {
       const hoy = Org.paraRepasar(E, { soloHoy: true }).length, favs = Org.paraRepasar(E, { favoritas: true }).length;
       const difs = Org.paraRepasar(E, { dificiles: true }).length, todas = Org.vivos(E.tarjetas).length;
-      const op = (a, ic, t, n, sub2) => '<li><button class="item" data-a="' + a + '"' + (n ? '' : ' disabled style="opacity:.45"') + '><span class="ico">' + ic + '</span><span class="txt"><b>' + t + '</b>' +
-        (sub2 ? '<small>' + sub2 + '</small>' : '') + '</span><span class="num">' + n + '</span></button></li>';
-      v.innerHTML = '<div class="lado" style="margin:4px 0 14px"><div class="liz-foto mediana"></div><div class="globo">' + (hoy ? '¿Repasamos? Te tocan <b>' + hoy + '</b> hoy.' : '¡Al día! Si quieres, repasa tus difíciles.') + '</div></div>' +
-        '<ul class="lista">' + op('repasarHoy', '🧫', 'Las de hoy', hoy, 'Las que tocan según tu repaso espaciado') +
-        op('repasarFav', '⭐', 'Mis favoritas', favs) + op('repasarDif', '🔥', 'Las difíciles', difs, 'Las que marcaste como difíciles') +
-        op('repasarTodas', '🔀', 'Repaso libre', todas, 'Primero las que tocan, después las que más te cuestan') + '</ul>' +
-        '<p class="suave" style="text-align:center">Para repasar un mazo en particular, búscalo en Mazos.</p>';
+      const op = (a, ic, color, t, n, sub2) => '<li><button class="item" data-a="' + a + '"' + (n ? '' : ' disabled style="opacity:.45"') + '><span class="ico ' + color + '">' + ic + '</span><span class="txt"><b>' + t + '</b>' +
+        (sub2 ? '<small>' + sub2 + '</small>' : '') + '</span><span class="num">' + n + '</span><span class="chev">›</span></button></li>';
+      v.innerHTML = escena(hoy ? 'microscopio' : 'dormida', hoy ? fija('pRep', 'pRepasar', { n: hoy }) : fija('pRep', 'pRepasarNada')) +
+        (hoy ? '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + hoy + '</span><span class="t"><b>Las de hoy</b>según tu repaso espaciado</span><span class="flecha">▶</span></button>' : '') +
+        '<h3>Otras rondas</h3><div class="panel"><ul class="lista">' +
+        op('repasarFav', '⭐', 'oro', 'Mis favoritas', favs) + op('repasarDif', '🔥', 'rosa', 'Las difíciles', difs, 'Las que marcaste como difíciles') +
+        op('repasarTodas', '🔀', '', 'Repaso libre', todas, 'Primero las que tocan, después las que más cuestan') + '</ul></div>' +
+        '<p class="suave" style="text-align:center;font-size:14px">Para repasar un mazo en particular, búscalo en Mazos.</p>';
       return;
     }
     if (sesion.fin) return pintarFin(v);
@@ -336,14 +386,15 @@
     if (!t || t.borrado_en) { sesion.i++; if (sesion.i >= sesion.cola.length) sesion.fin = true; return pintarRepasar(v); }
     const pct = Math.round((sesion.i / sesion.cola.length) * 100);
     const fig = t.datos && t.datos.figura && t.datos.figura.src ? t.datos.figura : null;
-    v.innerHTML = '<div class="sesion"><div class="fila entre"><strong>' + esc(sesion.titulo) + '</strong><span class="suave">' + (sesion.i + 1) + ' de ' + sesion.cola.length +
+    v.innerHTML = '<div class="sesion"><div class="sesionCab"><strong>' + esc(sesion.titulo) + '</strong><span class="suave">' + (sesion.i + 1) + ' de ' + sesion.cola.length +
       '</span><button class="bt chico" data-a="salirSesion">Terminar</button></div>' +
       '<div class="barraProg"><i style="width:' + pct + '%"></i></div>' +
-      '<div class="lado" style="margin-bottom:6px"><div class="liz-foto mediana ' + sesion.reaccion + '" id="lizRep"></div><div class="globo" id="lizDice">' + esc(sesion.dice) + '</div></div>' +
+      '<div class="lizRep"><div class="marcoLiz"><div class="aura"></div><span id="lizRep">' + lizImg(sesion.pose, 'c', sesion.reaccion || 'respira') + '</span></div>' +
+      '<div class="comic cola-izq" id="lizDice">' + esc(sesion.dice) + '</div></div>' +
       '<div class="tarjetaG' + (sesion.volteada ? ' volteada' : '') + (sesion.entra ? ' entra' : '') + '" data-a="voltear"><div class="giro">' +
       '<div class="cara frente"><div class="m">' + esc(nombreMazo(t.mazo_id)) + (c.repetida ? ' · otra vez' : '') + '</div><div class="p">' + esc(t.pregunta) + '</div>' +
       (fig ? '<img src="' + esc(fig.src) + '" alt="" loading="lazy" onerror="this.remove()">' : '') +
-      '<div class="toca">Toca para ver la respuesta</div></div>' +
+      '<div class="toca">👆 Toca para ver la respuesta</div></div>' +
       '<div class="cara atras"><div class="m">La respuesta</div><div class="r">' + esc(t.respuesta) + '</div>' +
       (t.fuente ? '<div class="fuente">📖 ' + esc(t.fuente) + '</div>' : '') + (fig ? '<div class="pie">Figura: ' + esc(fig.fuente || 'OpenStax Microbiology') + ' (' + esc(fig.licencia || 'CC BY-NC-SA 4.0') + ')</div>' : '') + '</div></div></div>' +
       '<div class="marcas"><button class="chip' + (t.favorita ? ' on' : '') + '" data-a="marcarFav">⭐ Favorita</button><button class="chip' + (t.dificil ? ' on' : '') +
@@ -368,12 +419,15 @@
       if (res !== 'bien') sesion.cola.push({ id: c.id, repetida: true });
     }
     sesion.dice = F.frase(res);
-    sesion.reaccion = res === 'bien' ? 'salta' : res === 'mal' ? 'triste' : '';
-    // Liz reacciona; la tarjeta brilla (bien) o tiembla (mal) y se va; después entra la siguiente
+    // Liz reacciona con su pose: feliz al acertar, dando ánimo al fallar
+    sesion.pose = res === 'bien' ? 'feliz' : 'animo';
+    sesion.reaccion = res === 'bien' ? 'salta' : 'ladea';
     const tj = $('.tarjetaG');
     $('#lizDice').textContent = sesion.dice;
     const liz = $('#lizRep');
-    if (liz && sesion.reaccion) { liz.classList.remove('salta', 'triste'); void liz.offsetWidth; liz.classList.add(sesion.reaccion); }
+    if (liz) liz.innerHTML = lizImg(sesion.pose, 'c', sesion.reaccion);
+    vibrar(res);
+    sonar(res);
     if (res === 'bien') { tj.classList.add('brilla'); confeti(); }
     else if (res === 'mal') tj.classList.add('tiembla');
     setTimeout(() => tj.classList.add('vuela'), res === 'bien' ? 380 : 450);
@@ -391,22 +445,23 @@
     const perfecto = sesion.bien === sesion.primeras;
     if (!sesion.txtFin) {
       sesion.txtFin = F.frase(perfecto ? 'finPerfecto' : 'fin', { bien: sesion.bien, total: sesion.primeras, nombre: perfil.nombre });
-      if (sesion.bien / sesion.primeras >= 0.7) setTimeout(() => confeti(40), 200);
+      if (sesion.bien / sesion.primeras >= 0.7) { setTimeout(() => confeti(40), 200); sonar('fin'); }
     }
     const quedan = Org.paraRepasar(E, { soloHoy: true }).length;
-    v.innerHTML = '<div class="liz-habla"><div class="liz-foto grande salta"></div><div class="globo">' + esc(sesion.txtFin) + '</div></div>' +
-      '<div class="caja tres"><div><div class="n oro">' + sesion.bien + '</div><small>a la primera</small></div>' +
-      '<div><div class="n">' + (sesion.primeras - sesion.bien) + '</div><small>para repasar</small></div>' +
-      '<div><div class="n">' + N.racha(Object.values(E.repasos)) + '</div><small>🔥 racha</small></div></div>' +
-      '<div style="display:grid;gap:10px;margin-top:8px">' + (quedan ? '<button class="bt prin grande" data-a="repasarHoy">Seguir con las de hoy (' + quedan + ')</button>' : '') +
+    const bueno = sesion.bien / sesion.primeras >= 0.6;
+    v.innerHTML = '<div class="heroe" style="height:330px"><div class="aura"></div><div class="placa"></div>' + lizImg(bueno ? 'feliz' : 'animo', 'g', 'salta') +
+      '<div class="comic cola-der">' + esc(sesion.txtFin) + '</div><div class="degrade"></div></div>' +
+      '<div class="grandes"><div><b>' + sesion.bien + '</b><small>a la primera</small></div><div><b>' + (sesion.primeras - sesion.bien) + '</b><small>para repasar</small></div>' +
+      '<div><b>' + N.racha(Object.values(E.repasos)) + '</b><small>🔥 racha</small></div></div>' +
+      '<div style="display:grid;gap:10px;margin-top:8px">' + (quedan ? '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + quedan + '</span><span class="t"><b>Seguir</b>con las de hoy</span><span class="flecha">▶</span></button>' : '') +
       '<button class="bt grande" data-a="salirSesion">Volver a Hoy</button></div>';
   }
   function confeti(n) {
     const col = (getComputedStyle(document.documentElement).getPropertyValue('--t-micro') || '#a98bff,#4cc9f0,#f72585,#7cf29a').split(',').map((s) => s.trim()).concat(['#ffd166']);
-    for (let i = 0; i < (n || 18); i++) {
+    for (let i = 0; i < (n || 22); i++) {
       const c = document.createElement('i');
       c.className = 'confeti';
-      const a = Math.random() * Math.PI * 2, d = 90 + Math.random() * 160;
+      const a = Math.random() * Math.PI * 2, d = 90 + Math.random() * 170;
       c.style.setProperty('--x', Math.cos(a) * d + 'px');
       c.style.setProperty('--y', Math.sin(a) * d - 60 + 'px');
       c.style.setProperty('--r', (Math.random() * 720 - 360) + 'deg');
@@ -431,7 +486,7 @@
       cuerpo = '<div class="rejilla">' + DIAS.map((d) => '<div class="dn">' + d + '</div>').join('') +
         Array.from({ length: 42 }, (_, i) => {
           const ms = N.deCR(c.y, c.m, 1 - desfase + i), k = N.diaCR(ms), cc = N.enCR(ms), cosas = porDia[k] || [];
-          const tipos = [...new Set(cosas.map((x) => (x.tabla === 'examenes' ? 'examen' : x.tipo)))].slice(0, 3);
+          const tipos = ['examen', 'evento', 'recordatorio'].filter((t) => cosas.some((x) => tipoDe(x) === t));
           return '<button class="d' + (cc.m !== c.m ? ' fuera' : '') + (k === hoy ? ' hoy' : '') + (k === sel ? ' sel' : '') + '" data-a="elegirDia" data-ms="' + ms + '">' + cc.d +
             '<span class="pts">' + tipos.map((t) => '<i class="t-' + t + '"></i>').join('') + '</span></button>';
         }).join('') + '</div>';
@@ -442,16 +497,18 @@
         const ms = lun + i * DIA, k = N.diaCR(ms), cosas = Ag.delDia(E, ms);
         return '<button class="dia' + (k === hoy ? ' hoy' : '') + (k === sel ? ' sel' : '') + '" data-a="elegirDia" data-ms="' + ms + '"><div class="f"><small>' +
           esc(new Date(ms).toLocaleDateString('es', { weekday: 'short', timeZone: N.ZONA }).replace('.', '')) + '</small><b>' + N.enCR(ms).d + '</b></div><div class="cosas">' +
-          (cosas.length ? cosas.slice(0, 3).map((x) => '<div>' + (ICONO[x.tipo] || '📅') + ' <span class="hora">' + N.horaCR(x.ms) + '</span> ' + esc(x.titulo) + '</div>').join('') +
+          (cosas.length ? cosas.slice(0, 3).map((x) => '<div><i class="tipoPunto t-' + tipoDe(x) + '"></i><span class="hora">' + N.horaCR(x.ms) + '</span> ' + esc(x.titulo) + '</div>').join('') +
             (cosas.length > 3 ? '<div class="nada">y ' + (cosas.length - 3) + ' más</div>' : '') : '<div class="nada">—</div>') + '</div></button>';
       }).join('') + '</div>';
     }
     const delDia = Ag.delDia(E, ag.dia);
-    v.innerHTML = '<div class="seg"><button class="' + (ag.modo === 'mes' ? 'on' : '') + '" data-a="modoAgenda" data-m="mes">Mes</button><button class="' + (ag.modo === 'semana' ? 'on' : '') +
+    v.innerHTML = escena('saludo', fija('pAg', 'pAgenda')) +
+      '<div class="seg"><button class="' + (ag.modo === 'mes' ? 'on' : '') + '" data-a="modoAgenda" data-m="mes">Mes</button><button class="' + (ag.modo === 'semana' ? 'on' : '') +
       '" data-a="modoAgenda" data-m="semana">Semana</button></div>' +
       '<div class="mesCab"><button data-a="agendaMover" data-d="-1" aria-label="Antes">‹</button><strong>' + esc(cab) + '</strong><button data-a="agendaMover" data-d="1" aria-label="Después">›</button></div>' +
+      '<div class="leyenda"><span><i class="tipoPunto t-examen"></i>Examen</span><span><i class="tipoPunto t-evento"></i>Evento</span><span><i class="tipoPunto t-recordatorio"></i>Recordatorio</span></div>' +
       cuerpo + '<h3>' + esc(N.fechaTxt(ag.dia)) + '</h3>' +
-      (delDia.length ? '<ul class="lista">' + delDia.map((x) => filaAgenda(x)).join('') + '</ul>' : vacio('🗓️', 'Nada este día', 'Toca ＋ para anotar un evento, un examen o un recordatorio.')) +
+      (delDia.length ? '<div class="panel"><ul class="lista">' + delDia.map((x) => filaAgenda(x)).join('') + '</ul></div>' : vacioMini('dormida', fija('vDia', 'vDia'))) +
       '<div class="espacioFab"></div><button class="fab" data-a="nuevoAgenda" aria-label="Agregar">＋</button>';
   }
 
@@ -461,11 +518,9 @@
     const l = Ag.listaRecordatorios(E, ahora);
     const hoy = l.filter((x) => !x.hecho && x.vez < fin0), prox = l.filter((x) => !x.hecho && x.vez >= fin0), hechos = l.filter((x) => x.hecho);
     const fila = (x) => filaAgenda({ tabla: 'recordatorios', id: x.r.id, ms: x.vez, titulo: x.r.texto, tipo: 'recordatorio', materia: x.r.materia, repite: x.r.repite, hecho: x.hecho, fila: x.r }, true);
+    const grupo = (t, xs) => (xs.length ? '<h3>' + t + '</h3><div class="panel"><ul class="lista">' + xs.map(fila).join('') + '</ul></div>' : '');
     v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' +
-      (l.length ? (hoy.length ? '<h3>Para hoy</h3><ul class="lista">' + hoy.map(fila).join('') + '</ul>' : '') +
-        (prox.length ? '<h3>Próximos</h3><ul class="lista">' + prox.map(fila).join('') + '</ul>' : '') +
-        (hechos.length ? '<h3>Hechos</h3><ul class="lista">' + hechos.map(fila).join('') + '</ul>' : '')
-        : vacio('⏰', 'Sin recordatorios', 'Lo que anotes aquí (o le pidas a Liz en la compu) te lo avisa a su hora, en la compu y en el celular.')) +
+      (l.length ? escena(hechos.length && !hoy.length ? 'feliz' : 'saludo', fija('pRec', 'pRecordatorios')) + grupo('Para hoy', hoy) + grupo('Próximos', prox) + grupo('Hechos', hechos) : vacio('dormida', fija('vRec', 'vRecordatorios'))) +
       '<div class="espacioFab"></div><button class="fab" data-a="nuevoAgenda" data-tipo="recordatorios" aria-label="Nuevo recordatorio">＋</button>';
   }
 
@@ -479,26 +534,26 @@
     const l = Org.vivos(E.archivos).sort((a, b) => (b.creada || 0) - (a.creada || 0));
     const usado = l.filter((a) => a.ruta).reduce((s, a) => s + (a.tamano || 0), 0);
     const pct = Math.min(100, Math.max(usado ? 1 : 0, Math.round((usado / ESPACIO_GRATIS) * 100)));
-    v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' +
-      '<div class="subir"><div style="font-size:46px">📚</div><b style="font-size:19px">Sube tus apuntes</b><span class="suave" style="font-size:15px">PDF, Word, PowerPoint o fotos. Cuando prendas la laptop, Liz los lee y te hace tarjetas.</span>' +
-      '<button class="bt prin" data-a="subirArchivo">⬆ Subir apuntes</button></div>' +
-      '<div class="caja"><div class="fila entre"><b>Espacio</b><span class="suave">' + tamTxt(usado) + ' de 1 GB</span></div><div class="espacio"><i style="width:' + pct + '%"></i></div>' +
-      '<small class="suave">Te quedan ' + tamTxt(ESPACIO_GRATIS - usado) + '. Máximo 50 MB por archivo (plan gratis).</small></div>' +
-      '<h3>Tus archivos</h3>' + (l.length ? '<ul class="lista">' + l.map((a) => {
+    v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' + escena('microscopio', fija('pArch', 'pArchivos')) +
+      '<button class="subir toque" data-a="subirArchivo"><span class="e">📚</span><span class="txt"><b>Subir apuntes</b><span>PDF, Word, PowerPoint o fotos (hasta 50 MB)</span></span><span class="bt prin chico">⬆</span></button>' +
+      '<div class="fila entre" style="margin:12px 6px 0;font-size:13px"><span class="suave">Espacio usado: ' + tamTxt(usado) + ' de 1 GB</span><span class="suave">Te quedan ' + tamTxt(ESPACIO_GRATIS - usado) + '</span></div>' +
+      '<div class="espacio" style="margin:6px 6px 0"><i style="width:' + pct + '%"></i></div>' +
+      (l.length ? '<h3>Tus archivos</h3><div class="panel"><ul class="lista">' + l.map((a) => {
         const es = a.estado === 'listo' ? ['listo', '✅ Listo: ' + (a.tarjetas || 0) + ' tarjetas'] : ESTADO_ARCH[a.estado] || ['', a.estado];
         return '<li><button class="item" data-a="archivo" data-id="' + esc(a.id) + '"><span class="ico">' + icoArch(a.nombre) + '</span><span class="txt"><b>' + esc(a.nombre) + '</b><small>' +
-          [a.materia ? esc(a.materia) : 'Sin materia', a.tamano ? tamTxt(a.tamano) : '', a.origen === 'pc' ? '💻 subido en la compu' : '📱 ' + enDias(a.creada || Date.now())].filter(Boolean).join(' · ') +
+          [a.materia ? esc(a.materia) : 'Sin materia', a.tamano ? tamTxt(a.tamano) : '', a.origen === 'pc' ? '💻 de la compu' : '📱 ' + enDias(a.creada || Date.now())].filter(Boolean).join(' · ') +
           '</small><span class="estado ' + es[0] + '">' + esc(es[1]) + '</span>' + (a.mensaje && a.estado !== 'listo' ? '<small>' + esc(a.mensaje) + '</small>' : '') + '</span></button></li>';
-      }).join('') + '</ul>' : vacio('📭', 'Todavía no hay archivos', 'Lo que subas aquí o en la compu aparece en esta lista.'));
+      }).join('') + '</ul></div>' : vacioMini('animo', fija('vArch', 'vArchivos')));
   }
 
   // ---------- MAZOS ----------
+  const COLORES_MATERIA = ['#a98bff', '#f72585', '#4cc9f0', '#7cf29a', '#ffd166', '#ff7eb6'];
   function filaMazo(m) {
     const ts = Org.vivos(E.tarjetas).filter((t) => t.mazo_id === m.id);
     const hoy = Org.paraRepasar(E, { mazo: m.id, soloHoy: true }).length;
-    return '<li><button class="item" data-a="abrirMazo" data-id="' + esc(m.id) + '"><span class="ico">🗂️</span><span class="txt"><b>' + esc(m.nombre) +
-      '</b><small>' + (m.archivo ? '📄 ' + esc(m.archivo) : 'Hecho a mano') + ' · ' + ts.length + ' tarjetas</small></span>' +
-      (hoy ? '<span class="pastilla">' + hoy + '</span>' : '') + '</button></li>';
+    return '<li><button class="item" data-a="abrirMazo" data-id="' + esc(m.id) + '"><span class="ico">' + (m.archivo ? '📄' : '🗂️') + '</span><span class="txt"><b>' + esc(m.nombre) +
+      '</b><small>' + ts.length + ' tarjetas' + (m.archivo ? ' · ' + esc(m.archivo) : '') + '</small></span>' +
+      (hoy ? '<span class="punto-n">' + hoy + '</span>' : '') + '<span class="chev">›</span></button></li>';
   }
   function filaTarjeta(t) {
     const e = Sincro.estado(E, t);
@@ -512,13 +567,16 @@
     const arbol = Org.arbol(E);
     const huerfanos = Org.vivos(E.mazos).filter((m) => !E.materias[m.materia_id] || E.materias[m.materia_id].borrado_en);
     const favs = Org.paraRepasar(E, { favoritas: true }).length, difs = Org.paraRepasar(E, { dificiles: true }).length;
-    v.innerHTML = '<input type="search" id="buscar" placeholder="🔎 Buscar en mis tarjetas" value="' + esc(buscando) + '" autocomplete="off">' +
+    const hay = arbol.length || huerfanos.length;
+    v.innerHTML = (hay ? escena('microscopio', fija('pMaz', 'pMazos')) : '') +
+      '<input type="search" id="buscar" placeholder="🔎 Buscar en mis tarjetas" value="' + esc(buscando) + '" autocomplete="off">' +
       '<div id="resBusca"></div><div id="arbol">' +
       '<div class="chips"><button class="chip" data-a="repasarFav">⭐ Favoritas (' + favs + ')</button><button class="chip" data-a="repasarDif">🔥 Difíciles (' + difs + ')</button></div>' +
-      (arbol.length || huerfanos.length ? arbol.map((x) => '<div class="materia"><h3>📚 ' + esc(x.materia.nombre) + '</h3><button class="bt chico" data-a="menuMateria" data-id="' + esc(x.materia.id) +
-        '" aria-label="Opciones de la materia">⋯</button></div><ul class="lista">' + (x.mazos.length ? x.mazos.map((m) => filaMazo(m.mazo)).join('') : '<li class="suave" style="padding:6px 4px">Sin mazos</li>') + '</ul>').join('') +
-        (huerfanos.length ? '<div class="materia"><h3>Sin materia</h3></div><ul class="lista">' + huerfanos.map(filaMazo).join('') + '</ul>' : '')
-        : vacio('🗂️', 'Todavía no hay mazos', 'Los que la Liz de tu compu hace de tus apuntes aparecen aquí solitos.')) +
+      (arbol.length || huerfanos.length ? arbol.map((x, i) => '<div class="materiaCab" style="color:' + COLORES_MATERIA[i % COLORES_MATERIA.length] + '"><span class="bola"></span><b style="color:var(--t-texto)">' +
+        esc(x.materia.nombre) + '</b><button class="bt chico" data-a="menuMateria" data-id="' + esc(x.materia.id) + '" aria-label="Opciones de la materia">⋯</button></div>' +
+        '<div class="panel"><ul class="lista">' + (x.mazos.length ? x.mazos.map((m) => filaMazo(m.mazo)).join('') : '<li class="suave" style="padding:12px 16px">Sin mazos</li>') + '</ul></div>').join('') +
+        (huerfanos.length ? '<div class="materiaCab"><span class="bola"></span><b>Sin materia</b></div><div class="panel"><ul class="lista">' + huerfanos.map(filaMazo).join('') + '</ul></div>' : '')
+        : vacio('saludo', fija('vMaz', 'vMazos'))) +
       '<div class="acciones" style="grid-template-columns:1fr 1fr 1fr"><button class="bt chico" data-a="nuevaMateria">＋ Materia</button><button class="bt chico" data-a="nuevoMazo">＋ Mazo</button><button class="bt chico" data-a="nuevaTarjeta">＋ Tarjeta</button></div></div>';
     const inp = $('#buscar');
     inp.addEventListener('input', () => { buscando = inp.value; pintarBusqueda(); });
@@ -527,20 +585,21 @@
   function pintarBusqueda() {
     const r = buscando.trim() ? Org.buscar(E, buscando) : null;
     $('#arbol').hidden = !!r;
-    $('#resBusca').innerHTML = r ? (r.length ? '<p class="suave">' + r.length + ' encontradas</p><ul class="lista">' + r.slice(0, 80).map(filaTarjeta).join('') + '</ul>'
-      : vacio('🔎', 'No encontré nada', 'con “' + buscando + '”.')) : '';
+    $('#resBusca').innerHTML = r ? (r.length ? '<h3>' + r.length + ' encontradas</h3><div class="panel"><ul class="lista">' + r.slice(0, 80).map(filaTarjeta).join('') + '</ul></div>'
+      : vacioMini('animo', fija('vBus', 'vBuscar'))) : '';
   }
   function pintarMazo(v, m) {
     const ts = Org.vivos(E.tarjetas).filter((t) => t.mazo_id === m.id).sort((a, b) => (a.creada || 0) - (b.creada || 0));
     const hoy = Org.paraRepasar(E, { mazo: m.id, soloHoy: true }).length;
     v.innerHTML = '<button class="volverBt" data-a="cerrarMazo">‹ Mazos</button><h2>' + esc(m.nombre) + '</h2>' +
       '<p class="suave" style="margin-top:-6px">📚 ' + esc(nombreMateria(m.materia_id)) + (m.archivo ? ' · 📄 ' + esc(m.archivo) : '') + '</p>' +
-      (ts.length ? '<button class="bt prin grande" data-a="repasarMazo" data-id="' + esc(m.id) + '">▶ Repasar este mazo' + (hoy ? ' (' + hoy + ' para hoy)' : '') + '</button>' : '') +
+      (ts.length ? '<button class="repasarYa" data-a="repasarMazo" data-id="' + esc(m.id) + '"><span class="n">' + (hoy || ts.length) + '</span><span class="t"><b>Repasar este mazo</b>' +
+        (hoy ? 'para hoy' : 'tarjetas en total') + '</span><span class="flecha">▶</span></button>' : '') +
       '<div class="acciones"><button class="bt chico" data-a="nuevaTarjeta" data-mazo="' + esc(m.id) + '">＋ Tarjeta</button><button class="bt chico" data-a="renombrarMazo">✏️ Renombrar</button>' +
       '<button class="bt chico" data-a="moverMazo">📁 Mover</button><button class="bt chico" data-a="juntarMazo">🔗 Juntar</button></div>' +
       '<button class="bt chico peligro" style="width:100%" data-a="borrarMazo">🗑️ Borrar mazo</button>' +
-      '<h3>' + ts.length + (ts.length === 1 ? ' tarjeta' : ' tarjetas') + '</h3>' +
-      (ts.length ? '<ul class="lista">' + ts.map(filaTarjeta).join('') + '</ul>' : vacio('🃏', 'Este mazo está vacío', ''));
+      (ts.length ? '<h3>' + ts.length + (ts.length === 1 ? ' tarjeta' : ' tarjetas') + '</h3><div class="panel"><ul class="lista">' + ts.map(filaTarjeta).join('') + '</ul></div>'
+        : vacioMini('animo', fija('vMazo', 'vMazo')));
   }
 
   // ---------- PROGRESO ----------
@@ -566,49 +625,101 @@
     const cajas = [0, 0, 0, 0, 0];
     for (const t of Org.vivos(E.tarjetas)) cajas[Math.min(5, Math.max(1, Sincro.estado(E, t).caja)) - 1]++;
     const maxC = Math.max(1, ...cajas);
-    v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' +
-      '<div class="caja tres"><div><div class="n oro">' + N.racha(reps) + '</div><small>🔥 días seguidos</small></div><div><div class="n">' + pct + '%</div><small>la sabía (30 días)</small></div>' +
-      '<div><div class="n">' + r30.length + '</div><small>repasos (30 días)</small></div></div>' +
-      '<div class="caja"><h4>⏱️ Tiempo repasando</h4><div class="barras">' +
+    const racha = N.racha(reps);
+    v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' + escena(racha >= 2 ? 'feliz' : 'animo', reps.length ? fija('pProg', 'pProgreso') : fija('pProg', 'pProgresoNada')) +
+      '<div class="grandes"><div><b>' + racha + '</b><small>🔥 días seguidos</small></div><div><b>' + pct + '%</b><small>la sabía (30 días)</small></div>' +
+      '<div><b>' + r30.length + '</b><small>repasos (30 días)</small></div></div>' +
+      '<h3>⏱️ Tiempo repasando</h3><div class="panel"><div class="barras">' +
       (Object.keys(siempre).length ? Object.entries(siempre).sort((a, b) => b[1] - a[1]).map(([m, ms]) => '<div class="b"><div class="fila entre"><span>' + esc(m) +
         '</span><span class="suave">' + duracion(semana[m] || 0) + ' esta semana · ' + duracion(ms) + '</span></div><div class="t"><i style="width:' + Math.round((ms / maxS) * 100) + '%"></i></div></div>').join('')
-        : '<p class="suave">Cuando repases, aquí sale cuánto tiempo le dedicas a cada materia.</p>') + '</div></div>' +
-      '<div class="caja"><h4>🧗 Lo que más te cuesta</h4>' +
-      (matDificil ? '<p style="margin-top:0">La materia que más te cuesta: <b>' + esc(matDificil[0]) + '</b> (' + Math.round((matDificil[1].mal / matDificil[1].total) * 100) + '% de las veces no la sabías del todo).</p>' : '') +
-      (cuesta.length ? '<ul class="lista">' + cuesta.map((x) => filaTarjeta(x.t)).join('') + '</ul><button class="bt grande" data-a="repasarCuestan">Repasar estas ' + cuesta.length + '</button>'
-        : '<p class="suave">Todavía nada. Cuando falles alguna, aparece aquí.</p>') + '</div>' +
-      '<div class="caja"><h4>📦 Cómo van tus tarjetas</h4><div class="cajas">' + cajas.map((c) => '<div style="height:' + Math.max(4, Math.round((c / maxC) * 100)) + '%"></div>').join('') +
+        : '<p class="nota">Cuando repases, aquí sale cuánto tiempo le dedicas a cada materia.</p>') + '</div></div>' +
+      '<h3>🧗 Lo que más te cuesta</h3><div class="panel">' +
+      (matDificil ? '<p class="nota" style="padding-top:10px">La materia que más te cuesta: <b style="color:var(--rosa)">' + esc(matDificil[0]) + '</b> (' + Math.round((matDificil[1].mal / matDificil[1].total) * 100) + '% de las veces no la sabías del todo).</p>' : '') +
+      (cuesta.length ? '<ul class="lista">' + cuesta.map((x) => filaTarjeta(x.t)).join('') + '</ul><div style="padding:6px 10px 10px"><button class="bt grande" data-a="repasarCuestan">Repasar estas ' + cuesta.length + '</button></div>'
+        : '<p class="nota">Todavía nada. Cuando falles alguna, aparece aquí.</p>') + '</div>' +
+      '<h3>📦 Cómo van tus tarjetas</h3><div class="panel"><div class="cajas">' + cajas.map((c) => '<div style="height:' + Math.max(4, Math.round((c / maxC) * 100)) + '%"></div>').join('') +
       '</div><div class="cajasN">' + cajas.map((c, i) => '<span>' + c + '<br>caja ' + (i + 1) + '</span>').join('') + '</div>' +
-      '<p class="suave" style="font-size:14px;margin-bottom:0">Caja 1: aprendiendo · caja 5: ¡dominadas! Cada vez que la sabes, sube una caja y vuelve más tarde.</p></div>';
+      '<p class="nota">Caja 1: aprendiendo · caja 5: ¡dominadas! Cada vez que la sabes, sube una caja y vuelve más tarde.</p></div>';
   }
 
-  // ---------- MÁS ----------
+  // ---------- MÁS: un menú con secciones, con Liz arriba ----------
   function pintarMas(v) {
     const pap = Org.papelera(E).length;
     const recHoy = Ag.listaRecordatorios(E).filter((x) => !x.hecho && x.vez < N.inicioDiaCR(Date.now()) + DIA).length;
     const esperando = Org.vivos(E.archivos).filter((a) => a.estado === 'esperando' || a.estado === 'leyendo').length;
     const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
-    const mos = (a, e, t, s, extra) => '<button class="mos" data-a="' + a + '"' + (extra || '') + '><span class="e">' + e + '</span><b>' + t + '</b><small>' + s + '</small></button>';
-    v.innerHTML = '<div class="mosaico">' +
-      mos('ir', '⏰', 'Recordatorios', recHoy ? recHoy + ' para hoy' : 'Lo que te aviso', ' data-v="recordatorios"') +
-      mos('ir', '📚', 'Archivos', esperando ? esperando + ' esperando a la laptop' : 'Sube tus apuntes', ' data-v="archivos"') +
-      mos('ir', '📈', 'Progreso', 'Racha, tiempo y lo que cuesta', ' data-v="progreso"') +
-      mos('ir', '🗑️', 'Papelera', pap ? pap + ' cosas (30 días)' : 'Vacía', ' data-v="papelera"') +
-      mos('avisos', '🔔', 'Avisos', 'Recordatorios, exámenes y tarjetas') +
-      mos('sincronizarYa', '🔄', 'Sincronizar', E.ultimaSincro ? 'Última: ' + hace(E.ultimaSincro) : 'Todavía no') +
-      '<div class="mos" style="opacity:.75"><span class="e">💬</span><b>Charlar con Liz</b><small class="pronto">PRONTO</small></div>' +
-      (instalada ? '' : mos('comoInstalar', '📲', 'Instalar', 'En la pantalla de inicio')) +
-      (DEMO ? '' : sinSesion ? mos('volverEntrar', '🔑', 'Volver a entrar', 'Con tu correo') : mos('salir', '🚪', 'Cerrar sesión', 'En este celular')) + '</div>' +
-      '<p class="suave" style="text-align:center;font-size:13px;margin-top:22px">Liz de bolsillo · versión 2</p>';
+    const fila = (a, ic, color, t, s, extra, datos) => '<li><button class="item" data-a="' + a + '"' + (datos || '') + '><span class="ico ' + color + '">' + ic + '</span><span class="txt"><b>' + t + '</b>' +
+      (s ? '<small>' + s + '</small>' : '') + '</span>' + (extra || '<span class="chev">›</span>') + '</button></li>';
+    const interruptor = (a, ic, color, t, s, on) => '<li><button class="item" data-a="' + a + '"><span class="ico ' + color + '">' + ic + '</span><span class="txt"><b>' + t + '</b><small>' + s + '</small></span>' +
+      '<span class="interruptor' + (on ? ' on' : '') + '"></span></button></li>';
+    v.innerHTML = escena('saludo', fija('pMas', 'pMas')) +
+      '<h3>Tu estudio</h3><div class="panel"><ul class="lista">' +
+      fila('ir', '⏰', 'oro', 'Recordatorios', recHoy ? recHoy + ' para hoy' : 'Lo que te aviso a su hora', recHoy ? '<span class="punto-n">' + recHoy + '</span><span class="chev">›</span>' : '', ' data-v="recordatorios"') +
+      fila('ir', '📚', 'celeste', 'Archivos', esperando ? esperando + ' esperando a la laptop' : 'Sube tus apuntes', '', ' data-v="archivos"') +
+      fila('ir', '📈', 'verde', 'Mi progreso', 'Racha, tiempo y lo que más cuesta', '', ' data-v="progreso"') +
+      fila('ir', '🗑️', '', 'Papelera', pap ? pap + ' cosas (se guardan 30 días)' : 'Vacía', '', ' data-v="papelera"') + '</ul></div>' +
+      '<h3>Tu Liz</h3><div class="panel"><ul class="lista">' +
+      fila('avisos', '🔔', 'rosa', 'Avisos', 'Recordatorios, exámenes y tarjetas del día') +
+      interruptor('alternarVibra', '📳', '', 'Vibración', 'Al acertar o fallar una tarjeta', pref.vibra) +
+      interruptor('alternarSonido', '🔊', '', 'Sonidos', 'Un sonidito al acertar (apagado al principio)', pref.sonido) +
+      '<li><div class="item" style="opacity:.8"><span class="ico rosa">💬</span><span class="txt"><b>Charlar con Liz</b><small>Calificar con IA y hablar con ella</small></span><span class="pronto">PRONTO</span></div></li></ul></div>' +
+      '<h3>Tu cuenta</h3><div class="panel"><ul class="lista">' +
+      fila('sincronizarYa', '🔄', 'celeste', 'Sincronizar ahora', E.ultimaSincro ? 'Última vez: ' + hace(E.ultimaSincro) : 'Todavía no') +
+      (instalada ? '' : fila('comoInstalar', '📲', '', 'Instalar en el iPhone', 'Para tenerla en la pantalla de inicio')) +
+      (DEMO ? '' : sinSesion ? fila('volverEntrar', '🔑', 'oro', 'Volver a entrar', 'Con tu correo y contraseña') : fila('salir', '🚪', '', 'Cerrar sesión', 'En este celular')) + '</ul></div>' +
+      '<p class="pie">Liz de bolsillo · versión 4</p>';
   }
   function pintarPapelera(v) {
     const l = Org.papelera(E);
     const tipo = { tarjetas: '🃏 Tarjeta', mazos: '🗂️ Mazo', materias: '📚 Materia', eventos: '📅 Evento', examenes: '📝 Examen', recordatorios: '⏰ Recordatorio', archivos: '📄 Archivo' };
-    v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button><p class="suave" style="margin-top:0">Lo que borras queda aquí 30 días; después se borra de verdad (en el celular y en la compu).</p>' +
-      (l.length ? '<ul class="lista">' + l.map((x) => '<li class="item"><span class="txt"><b>' + esc(x.nombre) + '</b><small>' + tipo[x.tabla] + ' · quedan ' + x.quedan + ' días</small></span>' +
-        '<button class="bt chico" data-a="restaurar" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '">↩️ Recuperar</button></li>').join('') + '</ul>'
-        : vacio('✨', 'La papelera está vacía', ''));
+    v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' +
+      (l.length ? escena('animo', fija('pPap', 'pPapelera')) + '<div class="panel"><ul class="lista">' + l.map((x) => '<li><div class="item"><span class="txt"><b>' + esc(x.nombre) + '</b><small>' + tipo[x.tabla] + ' · quedan ' + x.quedan + ' días</small></span>' +
+        '<button class="bt chico" data-a="restaurar" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '">↩️ Recuperar</button></div></li>').join('') + '</ul></div>'
+        : vacio('feliz', fija('vPap', 'vPapelera')));
   }
+
+  // ---------- Detalles que dan vida: vibración, sonido y el brillo al tocar ----------
+  const pref = { vibra: true, sonido: false };
+  try { pref.vibra = localStorage.getItem('liz-vibra') !== '0'; pref.sonido = localStorage.getItem('liz-sonido') === '1'; } catch (e) {}
+  function vibrar(tipo) {
+    if (!pref.vibra) return;
+    try {
+      if (navigator.vibrate) { navigator.vibrate(tipo === 'bien' ? 18 : [25, 50, 25]); return; }
+      // iPhone (iOS 18+): tocar un interruptor nativo hace vibrar suave
+      const l = $('#haptico');
+      l.click();
+      if (tipo !== 'bien') setTimeout(() => l.click(), 110);
+    } catch (e) {}
+  }
+  let audio = null;
+  function sonar(tipo) {
+    if (!pref.sonido) return;
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      const notas = tipo === 'bien' ? [[880, 0], [1318.5, 0.09]] : tipo === 'fin' ? [[784, 0], [988, 0.1], [1318.5, 0.2]] : [[330, 0], [262, 0.12]];
+      for (const [f, t] of notas) {
+        const o = audio.createOscillator(), g = audio.createGain();
+        o.type = tipo === 'bien' || tipo === 'fin' ? 'sine' : 'triangle';
+        o.frequency.value = f;
+        const t0 = audio.currentTime + t;
+        g.gain.setValueAtTime(0, t0);
+        g.gain.linearRampToValueAtTime(0.12, t0 + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.35);
+        o.connect(g).connect(audio.destination);
+        o.start(t0);
+        o.stop(t0 + 0.4);
+      }
+    } catch (e) {}
+  }
+  document.addEventListener('pointerdown', (ev) => {
+    const b = ev.target.closest('.bt, .toque');
+    if (!b) return;
+    const r = b.getBoundingClientRect();
+    b.style.setProperty('--tx', ((ev.clientX - r.left) / r.width) * 100 + '%');
+    b.style.setProperty('--ty', ((ev.clientY - r.top) / r.height) * 100 + '%');
+    b.classList.add('toco');
+    setTimeout(() => b.classList.remove('toco'), 60);
+  });
 
   // ---------- Hoja de abajo: preguntar, elegir, confirmar ----------
   let alCerrar = null;
@@ -916,6 +1027,8 @@
     restaurar: (d) => { const r = Org.restaurar(E, d.tabla, d.id, DISP); avisar(r.ok ? 'Recuperado.' : r.error); cambio(); },
     sincronizarYa: () => { if (!navigator.onLine) return avisar(F.frase('sinInternet')); sincronizar('abrir'); avisar('Sincronizando…'); },
     avisos: () => hojaAvisos(),
+    alternarVibra: (d, b) => { pref.vibra = !pref.vibra; try { localStorage.setItem('liz-vibra', pref.vibra ? '1' : '0'); } catch (e) {} b.querySelector('.interruptor').classList.toggle('on', pref.vibra); if (pref.vibra) vibrar('bien'); },
+    alternarSonido: (d, b) => { pref.sonido = !pref.sonido; try { localStorage.setItem('liz-sonido', pref.sonido ? '1' : '0'); } catch (e) {} b.querySelector('.interruptor').classList.toggle('on', pref.sonido); if (pref.sonido) sonar('bien'); },
     comoInstalar: () => abrirHoja('<h2>Instalar en el iPhone</h2><ol style="padding-left:22px;line-height:1.8"><li>Abre esta página en <b>Safari</b>.</li>' +
       '<li>Toca <b>Compartir</b> (el cuadrito con la flecha hacia arriba).</li><li>Elige <b>Agregar a pantalla de inicio</b> y toca <b>Agregar</b>.</li>' +
       '<li>Abre Liz desde el ícono nuevo (la placa de Petri).</li></ol><div class="botones"><button class="bt grande" data-cerrar>Entendido</button></div>'),
@@ -934,7 +1047,6 @@
     A[b.dataset.a](b.dataset, b);
   });
   for (const b of document.querySelectorAll('#menu button')) b.addEventListener('click', () => ir(b.dataset.v));   // (la ronda en curso se conserva)
-  $('#lizMini').addEventListener('click', () => ir('hoy'));
 
   // ---------- Avisos (notificaciones; en el iPhone, solo con la app en la pantalla de inicio) ----------
   function b64aBytes(b64) {
@@ -989,7 +1101,7 @@
   let tAviso = 0;
   function avisar(t) {
     const a = $('#aviso');
-    a.textContent = t;
+    a.innerHTML = lizImg('saludo', 'c') + '<span>' + esc(t) + '</span>';
     a.classList.add('ver');
     clearTimeout(tAviso);
     tAviso = setTimeout(() => a.classList.remove('ver'), 3000);
@@ -1058,5 +1170,5 @@
   }
 
   arrancar();
-  self.LizApp = { estado: () => E, sincronizar, avisar, ir, foto: ponerFoto, empezar: () => A.repasarHoy(), voltear: () => A.voltear(), accion: (n) => A[n]({}), formAgenda };   // (para las pruebas y las fotos)
+  self.LizApp = { estado: () => E, sincronizar, avisar, ir, foto: ponerFoto, liz2d: (m) => { liz2d = m || {}; pintarFijas(); pintarSuave(); }, empezar: () => A.repasarHoy(), voltear: () => A.voltear(), accion: (n) => A[n]({}), formAgenda };   // (para las pruebas y las fotos)
 })();
