@@ -682,3 +682,112 @@ body { min-height: 100vh; min-height: 100dvh; }
 #escribirLiz { bottom: calc(var(--menu) + var(--abajo) + 8px); }
 .fab { bottom: calc(var(--menu) + var(--abajo) + 16px); }
 #aviso { bottom: calc(var(--menu) + var(--abajo) + 14px); }
+/* ---------- (21-oct-2026, Liz 1.3) Menú de 5 pestañas (Hoy · Estudiar · Liz · Agenda · Más): más aire, el MISMO diseño, sigue fijo abajo ---------- */
+:root { --menu: 74px; }
+#menu { grid-template-columns: repeat(5, 1fr); gap: 4px; padding-top: 7px; padding-left: calc(10px + var(--izq)); padding-right: calc(10px + var(--der)); padding-bottom: calc(7px + var(--abajo)); }
+#menu button { min-height: 60px; gap: 4px; font-size: 12.5px; letter-spacing: .01em; }
+#menu button svg { width: 28px; height: 28px; }
+#menu .caraMenu { width: 30px; height: 30px; }
+#menu .punto { right: calc(50% - 27px); }
+/* Estudiar: "Repasar · Mazos" (como el selector de la Agenda) */
+.seg.estudiar { margin-bottom: 12px; }
+.seg.estudiar button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+.seg.estudiar .punto-n { min-width: 20px; padding: 1px 6px; font-size: 11.5px; box-shadow: none; }
+/* ---------- (21-oct-2026, Liz 1.3) LA PÁGINA NUNCA SE CORRE ----------
+   Pasaba en el iPhone: "a veces TODA la app queda subida unos centímetros, con un espacio negro debajo del menú" (después de abrir y cerrar el
+   teclado: iOS deja la página desplazada). De raíz: html y body tienen el alto de la pantalla y NO se pueden desplazar; cada pantalla
+   se desplaza POR DENTRO de #app (una caja fija del tamaño de la pantalla). Así no hay "página" que iOS pueda dejar corrida; y app.js
+   (enderezar) la vuelve a su lugar al cerrar el teclado, al volver a la app, al girar el celular y al cambiar de pestaña. */
+html, body { height: 100%; min-height: 0; overflow: hidden; overscroll-behavior: none; }
+body { position: fixed; inset: 0; width: 100%; }
+#app { position: fixed; top: 0; bottom: 0; left: 0; right: 0; overflow-x: hidden; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; }
+body.enCharla #app { overflow: hidden; }
+#entrar { position: fixed; inset: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+/* ---------- (21-oct-2026, Liz 1.3) Mazos: "Pegar texto" y "Subir archivo" juntos arriba (las dos formas de crear tarjetas) ---------- */
+.crear { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 0 0 12px; }
+.subir.mitad { flex-direction: column; align-items: flex-start; gap: 6px; padding: 12px 13px 13px; min-height: 0; }
+.subir.mitad .e { font-size: 28px; line-height: 1; }
+.subir.mitad .txt b { font-size: 16.5px; }
+.subir.mitad .txt span { font-size: 12.5px; line-height: 1.3; display: block; margin-top: 2px; }
+/* ---------- (21-oct-2026) MENÚ FLOTANTE (el diseño elegido) + un FONDO SÓLIDO debajo ----------
+   El menú vuelve a FLOTAR: barra redondeada con margen (12 px a los lados, 10 px sobre la rayita del iPhone), con su vidrio, borde y brillo,
+   Liz en el centro. Debajo de él (sus costados, el espacio hasta el borde de abajo con la rayita) y, en la charla, hasta la barra de
+   escribir, va un "zócalo" del color oscuro de la app (body::after): así NUNCA se ve contenido por ahí. Sigue siendo position: fixed y la
+   rayita (safe-area-inset-bottom) se suma UNA vez. --menu = el alto del menú; --zocalo = todo lo que ocupa abajo (menú + margen + rayita). */
+:root { --menu: 74px; --zocalo: calc(var(--menu) + 10px + var(--abajo)); --oscuro: #0e0b13; }
+#menu { left: calc(12px + var(--izq)); right: calc(12px + var(--der)); bottom: calc(10px + var(--abajo)); max-width: 620px; margin: 0 auto;
+  padding: 7px 8px; border-radius: 30px; border: 1px solid rgba(169, 139, 255, .3);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, .6), 0 0 24px rgba(142, 107, 255, .15); }
+body::after { content: ''; position: fixed; left: 0; right: 0; bottom: 0; z-index: 28; pointer-events: none;
+  height: calc(var(--zocalo) + 14px); background: linear-gradient(to bottom, rgba(14, 11, 19, 0), var(--oscuro) 14px); }
+body.cargando::after, body:not(:has(#menu:not([hidden])))::after { display: none; }
+/* En la charla, el zócalo sube hasta la barra de escribir (app.js medirCharla pone --zocaloCharla) */
+body.enCharla::after { height: calc(var(--zocaloCharla, calc(var(--zocalo) + 70px)) + 14px); }
+/* Lo último de cada pantalla se lee completo ARRIBA del menú, con espacio de sobra */
+#app { padding-bottom: calc(var(--zocalo) + 34px); }
+#escribirLiz { bottom: calc(var(--zocalo) + 10px); z-index: 29; }
+.fab { bottom: calc(var(--zocalo) + 16px); z-index: 29; }
+#aviso { bottom: calc(var(--zocalo) + 14px); }
+/* El primer mensaje nunca queda tapado por la parte de arriba fija (el difuminado de arriba es más corto que el margen) */
+#mensajes { padding-top: 16px; -webkit-mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 10px), transparent); mask-image: linear-gradient(transparent, #000 10px, #000 calc(100% - 10px), transparent); }
+/* ---------- (21-oct-2026) BARRA DE ARRIBA DELGADA + "MÁS" ORDENADO ----------
+   Arriba: una franja fija y delgada que solo dice "Liz" (respeta la hora y la batería del iPhone: va DEBAJO de --arriba) y un puntito que
+   aparece solo si hay un problema de sincronización (ámbar: sin internet / sin sincronizar; rojo: hay que volver a entrar o falló).
+   Antes: la foto redonda de Liz + el título grande + "Al día · hace 2 min" (terminaba a 111 px en el iPhone; ahora a 47 + 30). */
+:root { --barra: 30px; }
+body::before { display: none; }
+#cabeza { position: fixed; top: 0; left: 0; right: 0; z-index: 36; margin: 0; min-height: 0; height: calc(var(--arriba) + var(--barra));
+  padding: var(--arriba) calc(16px + var(--der)) 0 calc(16px + var(--izq)); display: flex; align-items: center; justify-content: center; gap: 0;
+  background: rgba(14, 11, 19, .9); backdrop-filter: blur(14px) saturate(1.3); -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  border-bottom: 1px solid rgba(169, 139, 255, .14); }
+#cabeza .marca { display: inline-flex; align-items: center; gap: 7px; }
+#cabeza .titulo, body.teclado #cabeza .titulo, #cabeza .titulo.largo { flex: none; font-size: 16px; font-weight: 900; letter-spacing: .14em; line-height: 1;
+  color: #d8c8ff; text-shadow: 0 0 12px rgba(169, 139, 255, .55); }
+body.teclado #cabeza { min-height: 0; padding-top: var(--arriba); }
+#puntoSync { width: 7px; height: 7px; border-radius: 50%; background: var(--medio); box-shadow: 0 0 8px var(--medio); }
+#puntoSync.mal { background: var(--t-mal); box-shadow: 0 0 8px var(--t-mal); }
+#app { padding-top: calc(var(--arriba) + var(--barra) + 12px); }
+/* (Las pantallas con "‹ Más" y el chat empiezan igual, justo debajo de la franja) */
+/* "Más": la versión pequeñita y "Cerrar sesión" separado, en un color de advertencia suave */
+.versionLiz { text-align: center; font-size: 12.5px; font-weight: 800; letter-spacing: .08em; color: var(--t-texto-suave); opacity: .75; margin: 22px 0 10px; }
+.salirBt { display: block; width: 100%; margin: 6px 0 4px; min-height: 48px; border-radius: 16px; font-weight: 900; font-size: 16px;
+  background: rgba(255, 92, 116, .08); border: 1px solid rgba(255, 92, 116, .35); color: #ff9aa8; }
+.salirBt:active { background: rgba(255, 92, 116, .16); }
+/* ---------- (21-oct-2026) Autora y derechos en "Acerca de Liz" ---------- */
+.autoraLiz { margin: 10px 0 0; font-size: 14.5px; font-weight: 700; color: var(--t-texto-suave); }
+.autoraLiz b { color: var(--t-texto); font-weight: 900; }
+.acerca .dedica { margin-top: 8px; }
+.creditos details h4 { margin: 14px 0 6px; font-size: 12px; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; color: var(--t-acento); }
+.derechos { text-align: center; font-size: 12px; font-weight: 700; color: var(--t-texto-suave); opacity: .75; margin: 4px 0 8px; }
+/* ---------- (21-oct-2026) ARRIBA SIN FRANJA ----------
+   La franja oscura con línea se veía "pegada encima": ahora NO hay franja ni línea. El fondo de la app (morado oscuro con las bacterias)
+   sigue de corrido hasta arriba del todo, detrás de la hora y la batería. Para que lo que se desplaza no se lea detrás del título, un
+   degradado MUY suave (del color del fondo a transparente), sin bordes. El nombre de la pantalla vuelve, a la izquierda y más chico que el
+   de antes (22 px; antes 30), sin la foto redonda; en la charla no sale. El puntito de sincronización, junto al título, solo si hay un problema. */
+#cabeza { justify-content: flex-start; height: calc(var(--arriba) + var(--barra) + 22px); padding: var(--arriba) calc(18px + var(--der)) 22px calc(18px + var(--izq));
+  background: linear-gradient(to bottom, rgba(14, 11, 19, .78) 0%, rgba(14, 11, 19, .5) 55%, rgba(14, 11, 19, 0) 100%);
+  backdrop-filter: none; -webkit-backdrop-filter: none; border-bottom: 0; pointer-events: none; }
+#cabeza .marca { pointer-events: auto; gap: 8px; }
+#cabeza .titulo, body.teclado #cabeza .titulo, #cabeza .titulo.largo { font-size: 22px; font-weight: 900; letter-spacing: -.01em; line-height: 1;
+  color: var(--t-texto); text-shadow: 0 2px 14px rgba(0, 0, 0, .55); }
+body.enCharla #cabeza .titulo { display: none; }
+/* (21-oct-2026) El degradado de arriba SOLO cuando la pantalla está desplazada (body.desplazado): quieta, no hay nada y el fondo sigue de
+   corrido hasta arriba; al bajar, aparece suave (del color del fondo a transparente, sin borde) para que el contenido no se mezcle con el título */
+#cabeza { background: none; }
+#cabeza::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none; opacity: 0; transition: opacity .25s;
+  background: linear-gradient(to bottom, rgba(24, 18, 31, .96) 0%, rgba(24, 18, 31, .9) 70%, rgba(24, 18, 31, 0) 100%); }
+body.desplazado #cabeza::before { opacity: 1; }#cabeza::before { bottom: -12px; background: linear-gradient(to bottom, rgba(24, 18, 31, .98) 0%, rgba(24, 18, 31, .96) 72%, rgba(24, 18, 31, 0) 100%); }
+/* ---------- (21-oct-2026) SIN BARRA ARRIBA: el título es parte del contenido ----------
+   Nada fijo arriba ni espacio vacío: el contenido empieza justo debajo de la zona de la hora y la batería (solo el margen seguro de iOS,
+   --arriba, + 4 px). El título de cada pantalla (Hoy, Estudiar, Agenda, Más, Acerca de Liz…) va DENTRO del contenido y se desplaza con
+   todo lo demás. Solo detrás de la zona de la hora, un degradado muy suave del color del fondo (body::before), sin borde, que aparece al
+   bajar (quieta, el fondo sigue de corrido). En la charla no hay título ni espacio: el encabezado de Liz 2D empieza ahí mismo y queda fijo. */
+#cabeza { position: static; height: auto; min-height: 0; margin: 0; padding: 2px 2px 8px; background: none; border: 0; z-index: auto;
+  pointer-events: auto; justify-content: flex-start; }
+#cabeza::before { display: none; }
+#app { padding-top: calc(var(--arriba) + 4px); }
+body.enCharla #cabeza { display: none; }
+body::before { display: block; content: ''; position: fixed; left: 0; right: 0; top: 0; height: calc(var(--arriba) + 10px); z-index: 36;
+  pointer-events: none; opacity: 0; transition: opacity .25s;
+  background: linear-gradient(to bottom, rgba(24, 18, 31, .97) 0%, rgba(24, 18, 31, .93) 72%, rgba(24, 18, 31, 0) 100%); }
+body.desplazado::before { opacity: 1; }

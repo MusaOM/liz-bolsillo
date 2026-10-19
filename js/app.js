@@ -1,5 +1,5 @@
 // app.js — la LIZ DE BOLSILLO (diseño 2 + Parte 2, 19-oct-2026): app web para el celular (se instala en el iPhone desde Safari).
-// Pantallas (menú de abajo): Hoy · Repasar · Agenda (calendario) · Mazos · Más (Recordatorios, Archivos, Progreso, Papelera...).
+// Pantallas (menú de abajo, desde el 21-oct-2026): Hoy · Estudiar (Repasar | Mazos) · Liz · Agenda (Mes | Semana | Recordatorios) · Más.
 // Todo se guarda EN EL CELULAR (almacen.js) y se sincroniza con Supabase (sincro.js) cuando hay internet; las reglas del repaso,
 // de organizar y de la agenda son LAS MISMAS que en la Liz de la compu (nucleo.js, organizar.js, agenda.js). Lo que dice Liz sale
 // de frases.js (lista fija, sin inteligencia artificial). Las horas, en hora de Costa Rica.
@@ -32,14 +32,17 @@
   let charla = [];                        // la charla con Liz en este celular: [{ id, quien: 'el'|'liz', texto, fecha, extra }]
   let vista = 'hoy';
   let sesion = null;                        // la ronda de repaso en curso
-  let mazoAbierto = null, buscando = '';
+  let mazoAbierto = null, buscando = '', mazoPendiente = null;
   const ag = { modo: 'mes', ref: Date.now(), dia: N.inicioDiaCR(Date.now()) };
   let sincronizando = false, otraVez = false, ultimoError = '', sinSesion = false;
-  const TITULOS = { hoy: 'Hoy', repasar: 'Repasar', charla: 'Liz', agenda: 'Agenda', mazos: 'Mis mazos', mas: 'Más', recordatorios: 'Agenda', archivos: 'Archivos',
+  const TITULOS = { hoy: 'Hoy', repasar: 'Estudiar', charla: 'Liz', agenda: 'Agenda', mazos: 'Estudiar', mas: 'Más', recordatorios: 'Agenda', archivos: 'Archivos',
     progreso: 'Mi progreso', papelera: 'Papelera', acerca: 'Acerca de Liz', archivados: 'Archivados' };
   // (21-oct-2026) Cada cosa en UN solo lugar: Recordatorios vive en Agenda (pestaña "Recordatorios"); Archivados, en Más
   const DE_MAS = ['archivos', 'progreso', 'papelera', 'acerca', 'archivados'];
   const DE_AGENDA = ['recordatorios'];
+  // (21-oct-2026, Liz 1.3) La pestaña "Estudiar" junta Repasar y Mazos (un selector de 2 partes arriba); recuerda dónde quedó
+  const DE_ESTUDIAR = ['repasar', 'mazos'];
+  const modoEstudio = () => { try { return localStorage.getItem('liz-estudiar') === 'mazos' ? 'mazos' : 'repasar'; } catch (e) { return 'repasar'; } };
 
   // ---------- Pantalla de carga (frases de laboratorio, como en la PC) ----------
   const carga = { t0: Date.now(), frases: [], tFrase: 0 };
@@ -96,6 +99,7 @@
         avisar(na ? 'La compu me pasó ' + na + (na === 1 ? ' cosa nueva' : ' cosas nuevas') + ' de tu agenda.' : nt && !r.repasosDeOtro ? 'La compu me pasó ' + nt + (nt === 1 ? ' tarjeta.' : ' tarjetas.') : F.frase('sincronice'));
       }
       if (r.bajados || r.repasosBajados || r.borrados) pintarSuave();
+      if (mazoPendiente && E.mazos[mazoPendiente] && !E.mazos[mazoPendiente].borrado_en && vista === 'mazos') { mazoAbierto = mazoPendiente; mazoPendiente = null; pintar(); }
       if (motivo === 'abrir') setTimeout(revisarExamenPasado, 1200);
       if (motivo === 'abrir') setTimeout(revisarAnimoDia, 1800);            // (21-oct-2026: ya se sabe si lo marcó en la compu)
       if (r.cambiosDe.animo && $('#hoja:not([hidden]) .caritas') && Animo.deHoy(E).length) cerrarHoja(null);   // (lo marcó en la compu)
@@ -287,12 +291,15 @@
   });
   // ---------- Navegar y pintar ----------
   function ir(v) {
+    if (v === 'estudiar') v = sesion && !sesion.fin ? 'repasar' : modoEstudio();      // (una ronda a medias: vuelve a ella)
+    if (DE_ESTUDIAR.includes(v)) { try { localStorage.setItem('liz-estudiar', v); } catch (e) {} }
     if (!PINTA[v]) v = 'hoy';
     vista = v;
-    if (v !== 'mazos') mazoAbierto = null;
-    const tab = DE_MAS.includes(v) ? 'mas' : DE_AGENDA.includes(v) ? 'agenda' : v;
+    if (v !== 'mazos') { mazoAbierto = null; mazoPendiente = null; }
+    const tab = DE_MAS.includes(v) ? 'mas' : DE_AGENDA.includes(v) ? 'agenda' : DE_ESTUDIAR.includes(v) ? 'estudiar' : v;
     for (const b of document.querySelectorAll('#menu button')) b.classList.toggle('activo', b.dataset.v === tab);
-    if (v !== 'charla') window.scrollTo({ top: 0 });
+    if (v !== 'charla') arribaDeTodo();
+    enderezar();
     pintar();
   }
   const PINTA = { hoy: pintarHoy, repasar: pintarRepasar, charla: pintarCharla, agenda: pintarAgenda, mazos: pintarMazos, mas: pintarMas, recordatorios: pintarRecordatorios,
@@ -301,8 +308,11 @@
     const v = $('#vista');
     v.classList.remove('vista'); void v.offsetWidth; v.classList.add('vista');      // (la animación de entrada, suave)
     PINTA[vista](v);
-    $('#tituloVista').textContent = vista === 'mazos' && mazoAbierto && E.mazos[mazoAbierto] ? 'Mazo' : TITULOS[vista];
-    $('#tituloVista').classList.toggle('largo', $('#tituloVista').textContent.length > 9);      // (21-oct-2026: "Acerca de Liz" en una línea)
+    // (21-oct-2026) Arriba, el nombre de la pantalla, chiquito y a la izquierda (sin la foto redonda); en la charla no hace falta (ahí
+    // está Liz saludando con su globito)
+    const titulo = vista === 'mazos' && mazoAbierto && E.mazos[mazoAbierto] ? 'Mazo' : TITULOS[vista];
+    $('#tituloVista').textContent = vista === 'charla' ? '' : titulo;
+    document.title = 'LIZ · ' + titulo;
     $('#escribirLiz').hidden = vista !== 'charla';
     document.body.classList.toggle('enCharla', vista === 'charla');      // (la barra de arriba fija, solo en la charla)
     if (vista !== 'charla') ajustarTeclado();
@@ -323,16 +333,17 @@
   }
   // Un enlace a una pantalla (lo usan los avisos al tocarlos): #hoy, #repasar, #charla, #agenda, #recordatorios, #archivos, #mazo=<id>
   function irPorEnlace(h) {
-    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados)$|^mazo=([\w-]+)$/);
+    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados)$|^mazo=([\w-]+)$/);
     if (!m) return false;
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
-    if (m[2]) { if (!E.mazos[m[2]]) { ir('mazos'); return true; } vista = 'mazos'; ir('mazos'); mazoAbierto = m[2]; pintar(); return true; }
+    // (21-oct-2026) Si el mazo todavía no llegó (el aviso "Ya te hice N tarjetas" puede llegar antes que la sincronización), se abre al llegar
+    if (m[2]) { if (!E.mazos[m[2]]) { mazoPendiente = m[2]; ir('mazos'); return true; } vista = 'mazos'; ir('mazos'); mazoAbierto = m[2]; pintar(); return true; }
     ir(m[1]);
     return true;
   }
   function pintarMenu() {
     const n = Org.paraRepasar(E, { soloHoy: true }).length;
-    const b = document.querySelector('#menu [data-v=repasar]');
+    const b = document.querySelector('#menu [data-v=estudiar]');
     let p = b.querySelector('.punto');
     if (n) { if (!p) { p = document.createElement('i'); p.className = 'punto'; b.appendChild(p); } p.textContent = n > 99 ? '99+' : n; }
     else if (p) p.remove();
@@ -351,20 +362,24 @@
     if (s < 86400) return 'hace ' + Math.round(s / 3600) + ' h';
     return 'hace ' + Math.round(s / 86400) + ' d';
   }
-  function pintarEstado() {
-    const el = $('#estadoSync');
-    if (!el) return;
+  // El estado de la sincronización, en palabras: {t, c} (c: '' bien, 'espera', 'mal'; problema: true si hay que avisar con el puntito)
+  function estadoSync() {
     const p = porSubir();
-    let t, c = '';
-    if (DEMO) { t = 'Modo de prueba'; c = 'espera'; }
-    else if (sinSesion) { t = 'Vuelve a entrar'; c = 'mal'; }
-    else if (sincronizando) { t = 'Sincronizando…'; c = 'espera'; }
-    else if (!navigator.onLine) { t = 'Sin internet' + (p ? ' · ' + p + ' por subir' : ''); c = 'espera'; }
-    else if (ultimoError) { t = 'Lo intento luego'; c = 'mal'; }
-    else if (E.ultimaSincro) t = 'Al día · ' + hace(E.ultimaSincro);
-    else { t = 'Sin sincronizar'; c = 'espera'; }
-    el.textContent = t;
-    el.className = c;
+    if (DEMO) return { t: 'Modo de prueba', c: '' };
+    if (sinSesion) return { t: 'Vuelve a entrar', c: 'mal', problema: true };
+    if (sincronizando) return { t: 'Sincronizando…', c: 'espera' };
+    if (!navigator.onLine) return { t: 'Sin internet' + (p ? ' · ' + p + ' por subir' : ''), c: 'espera', problema: true };
+    if (ultimoError) return { t: 'Lo intento luego', c: 'mal', problema: true };
+    if (E.ultimaSincro) return { t: 'Al día · ' + hace(E.ultimaSincro), c: '' };
+    return { t: 'Sin sincronizar', c: 'espera', problema: true };
+  }
+  // (21-oct-2026) Arriba solo un puntito, y SOLO si hay un problema; el texto completo va en Más ("Sincronización: al día · hace 2 min")
+  function pintarEstado() {
+    const s = estadoSync();
+    const pt = $('#puntoSync');
+    if (pt) { pt.hidden = !s.problema; pt.className = s.c; pt.title = s.t; pt.setAttribute('aria-label', 'Sincronización: ' + s.t); }
+    const fila = $('#filaSync .dato');
+    if (fila) fila.textContent = s.t;
   }
   // Una frase que no cambie en cada repintado
   const fijas = {};
@@ -662,7 +677,7 @@
       const difs = Org.paraRepasar(E, { dificiles: true }).length, todas = Org.vivos(E.tarjetas).length;
       const op = (a, ic, color, t, n, sub2) => '<li><button class="item" data-a="' + a + '"' + (n ? '' : ' disabled style="opacity:.45"') + '><span class="ico ' + color + '">' + ic + '</span><span class="txt"><b>' + t + '</b>' +
         (sub2 ? '<small>' + sub2 + '</small>' : '') + '</span><span class="num">' + n + '</span><span class="chev">›</span></button></li>';
-      v.innerHTML = escena(hoy ? 'microscopio' : 'dormida', hoy ? fija('pRep', 'pRepasar', { n: hoy }) : fija('pRep', 'pRepasarNada')) +
+      v.innerHTML = segEstudiar('repasar') + escena(hoy ? 'microscopio' : 'dormida', hoy ? fija('pRep', 'pRepasar', { n: hoy }) : fija('pRep', 'pRepasarNada')) +
         // (las 3 rondas viven SOLO aquí: antes también estaban en Hoy y en Mazos)
         (hoy ? '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + hoy + '</span><span class="t"><b>Las de hoy</b>según tu repaso espaciado</span><span class="flecha">▶</span></button>' : '') +
         '<h3>Otras rondas</h3><div class="panel"><ul class="lista">' +
@@ -914,6 +929,12 @@
       '<div class="espacioFab"></div><button class="fab" data-a="nuevoAgenda" aria-label="Agregar">＋</button>';
   }
 
+  // (21-oct-2026, Liz 1.3) Estudiar: "Repasar · Mazos", como el selector de la Agenda (cambia al instante, sin salir de la pestaña)
+  function segEstudiar(on) {
+    const n = Org.paraRepasar(E, { soloHoy: true }).length;
+    return '<div class="seg estudiar"><button class="' + (on === 'repasar' ? 'on' : '') + '" data-a="modoEstudio" data-m="repasar">Repasar' +
+      (n ? ' <span class="punto-n">' + n + '</span>' : '') + '</button><button class="' + (on === 'mazos' ? 'on' : '') + '" data-a="modoEstudio" data-m="mazos">Mazos</button></div>';
+  }
   // (21-oct-2026) Mes · Semana · Recordatorios: los recordatorios viven en Agenda (antes también en Más)
   function segAgenda(on) {
     const b = (k, t, a) => '<button class="' + (on === k ? 'on' : '') + '" data-a="' + a + '"' + (a === 'modoAgenda' ? ' data-m="' + k + '"' : ' data-v="recordatorios"') + '>' + t + '</button>';
@@ -943,17 +964,28 @@
     const l = Org.vivos(E.archivos).sort((a, b) => (b.creada || 0) - (a.creada || 0));
     const usado = l.filter((a) => a.ruta).reduce((s, a) => s + (a.tamano || 0), 0);
     const pct = Math.min(100, Math.max(usado ? 1 : 0, Math.round((usado / ESPACIO_GRATIS) * 100)));
-    v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' + escena('microscopio', fija('pArch', 'pArchivos')) +
-      '<button class="subir toque" data-a="subirArchivo"><span class="e">📚</span><span class="txt"><b>Subir apuntes</b><span>PDF, Word, PowerPoint o fotos (hasta 50 MB)</span></span><span class="bt prin chico">⬆</span></button>' +
+    // (21-oct-2026, Liz 1.3) Aquí está la lista completa (ver, abrir, borrar); el botón para SUBIR vive en Estudiar → Mazos, junto a "Pegar texto"
+    v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' +
+      escena('microscopio', 'Aquí están todos tus apuntes. Para subir uno nuevo: <b>Estudiar → Mazos → Subir archivo</b>.') +
       '<div class="fila entre" style="margin:12px 6px 0;font-size:13px"><span class="suave">Espacio usado: ' + tamTxt(usado) + ' de 1 GB</span><span class="suave">Te quedan ' + tamTxt(ESPACIO_GRATIS - usado) + '</span></div>' +
       '<div class="espacio" style="margin:6px 6px 0"><i style="width:' + pct + '%"></i></div>' +
-      (l.length ? '<h3>Tus archivos</h3><div class="panel"><ul class="lista">' + l.map((a) => {
-        const es = a.estado === 'listo' ? ['listo', '✅ Listo: ' + (a.tarjetas || 0) + ' tarjetas'] : ESTADO_ARCH[a.estado] || ['', a.estado];
-        return '<li><div class="archFila"><button class="item" data-a="archivo" data-id="' + esc(a.id) + '"><span class="ico">' + icoArch(a.nombre) + '</span><span class="txt"><b>' + esc(a.nombre) + '</b><small>' +
-          [a.materia ? esc(a.materia) : 'Sin materia', a.tamano ? tamTxt(a.tamano) : '', a.origen === 'pc' ? '💻 de la compu' : '📱 ' + enDias(a.creada || Date.now())].filter(Boolean).join(' · ') +
-          '</small><span class="estado ' + es[0] + '">' + esc(es[1]) + '</span>' + (a.mensaje && a.estado !== 'listo' ? '<small>' + esc(a.mensaje) + '</small>' : '') + '</span></button>' +
-          (a.ruta ? '<button class="abrirBt toque" data-a="abrirArch" data-id="' + esc(a.id) + '">Abrir</button>' : '') + '</div></li>';
-      }).join('') + '</ul></div>' : vacioMini('dormida', fija('vArch', 'vArchivos')));
+      (l.length ? '<h3>Tus archivos</h3><div class="panel"><ul class="lista">' + l.map((a) => filaArchivo(a, true)).join('') + '</ul></div>' : vacioMini('dormida', fija('vArch', 'vArchivos')));
+  }
+  // Una fila de archivo con su estado ("⏳ Esperando a la laptop" → "📖 Liz lo está leyendo" → "✅ Listo: 15 tarjetas"); la usan Archivos y Mazos
+  function filaArchivo(a, conAbrir) {
+    const es = a.estado === 'listo' ? ['listo', '✅ Listo: ' + (a.tarjetas || 0) + ' tarjetas'] : ESTADO_ARCH[a.estado] || ['', a.estado];
+    return '<li><div class="archFila"><button class="item" data-a="archivo" data-id="' + esc(a.id) + '"><span class="ico">' + icoArch(a.nombre) + '</span><span class="txt"><b>' + esc(a.nombre) + '</b><small>' +
+      [a.materia ? esc(a.materia) : 'Sin materia', a.tamano ? tamTxt(a.tamano) : '', a.origen === 'pc' ? '💻 de la compu' : '📱 ' + enDias(a.creada || Date.now())].filter(Boolean).join(' · ') +
+      '</small><span class="estado ' + es[0] + '">' + esc(es[1]) + '</span>' + (a.mensaje && a.estado !== 'listo' ? '<small>' + esc(a.mensaje) + '</small>' : '') + '</span></button>' +
+      (conAbrir && a.ruta ? '<button class="abrirBt toque" data-a="abrirArch" data-id="' + esc(a.id) + '">Abrir</button>' : '') + '</div></li>';
+  }
+  // En Mazos: lo que subió desde el celular y todavía va en camino (o terminó hace menos de un día), para ver cómo avanza
+  function enCamino() {
+    const ahora = Date.now();
+    // (los que van en camino siempre; los ya terminados —listos, fotos sin texto o con error— solo un día)
+    const l = Org.vivos(E.archivos).filter((a) => a.origen !== 'pc' && (a.estado === 'esperando' || a.estado === 'leyendo' || ahora - (a.actualizado || a.creada || 0) < DIA))
+      .sort((a, b) => (b.creada || 0) - (a.creada || 0)).slice(0, 4);
+    return l.length ? '<h3>Tus apuntes en camino</h3><div class="panel"><ul class="lista">' + l.map((a) => filaArchivo(a, false)).join('') + '</ul></div>' : '';
   }
 
   // ---------- MAZOS ----------
@@ -977,7 +1009,7 @@
     const l = Org.archivados(E);
     v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' +
       (l.length ? escena('dormida', 'Aquí descansan: no salen en el repaso ni en los avisos. Puedes repasarlos a propósito o sacarlos (vuelven con su progreso).') +
-        listaArchivados(l) : vacio('dormida', 'No tienes nada archivado. Cuando termines una materia, archívala desde Mazos (⋯) y descansa aquí.'));
+        listaArchivados(l) : vacio('dormida', 'No tienes nada archivado. Cuando termines una materia, archívala desde Estudiar → Mazos (⋯) y descansa aquí.'));
   }
   function listaArchivados(l) {
     return '<div class="panel"><ul class="lista">' + l.map((x) => '<li><div class="item"><span class="ico">' + (x.tabla === 'materias' ? '🏷️' : '📦') + '</span><span class="txt"><b>' + esc(x.nombre) + '</b><small>' +
@@ -992,8 +1024,11 @@
     const huerfanos = Org.vivos(E.mazos).filter((m) => (!E.materias[m.materia_id] || E.materias[m.materia_id].borrado_en) && !Org.archivadoX(m));
     // (21-oct-2026: las rondas de favoritas y difíciles viven en Repasar; los archivados, en Más → Archivados)
     const hay = arbol.length || huerfanos.length;
-    v.innerHTML = (hay ? escena('microscopio', fija('pMaz', 'pMazos')) : '') +
-      '<button class="subir toque" data-a="pegarTexto" style="margin-bottom:12px"><span class="e">📋</span><span class="txt"><b>Pegar texto</b><span>Pega tus apuntes y te hago tarjetas solo con eso</span></span><span class="bt prin chico">＋</span></button>' +
+    v.innerHTML = segEstudiar('mazos') + (hay ? escena('microscopio', fija('pMaz', 'pMazos')) : '') +
+      // (21-oct-2026, Liz 1.3) Las DOS formas de crear tarjetas, juntas arriba: pegar un texto o subir un archivo (PDF, Word, PowerPoint o fotos)
+      '<div class="crear"><button class="subir mitad toque" data-a="pegarTexto"><span class="e">📋</span><span class="txt"><b>Pegar texto</b><span>Te hago tarjetas con lo que pegues</span></span></button>' +
+      '<button class="subir mitad toque" data-a="subirArchivo"><span class="e">📤</span><span class="txt"><b>Subir archivo</b><span>PDF, Word, PowerPoint o fotos</span></span></button></div>' +
+      enCamino() +
       '<input type="search" id="buscar" placeholder="🔎 Buscar en mis tarjetas" value="' + esc(buscando) + '" autocomplete="off">' +
       '<div id="resBusca"></div><div id="arbol">' +
       (arbol.length || huerfanos.length ? arbol.map((x, i) => '<div class="materiaCab" style="color:' + COLORES_MATERIA[i % COLORES_MATERIA.length] + '"><span class="bola"></span><b style="color:var(--t-texto)">' +
@@ -1107,17 +1142,20 @@
   const creadoraCel = () => (perfil.lizc && perfil.lizc.creadora) || 'su creadora';
   function pintarAcerca(v) {
     const lc = perfil.lizc || {};
-    const cr = creadoraCel();
+    const cr = V.autora;              // (21-oct-2026: el crédito de la voz, con el nombre completo de la autora)
     v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' +
       '<div class="acerca"><div class="marcoFoto respira" id="fotoSecreto"><div class="aura"></div>' + fotoLiz('contenta', 'grande') + '</div>' +
       '<div class="comic cola-arriba secreto" id="secretoGlobo" hidden></div>' +
-      '<div class="nombreLiz">LIZ</div><div class="verLiz">' + esc(V.texto) + ' · bolsillo ' + V.bolsillo + '</div>' +
+      '<div class="nombreLiz">LIZ</div><div class="verLiz">' + esc(V.texto) + '</div>' +
+      // (21-oct-2026) La autora, con su nombre completo; la dedicatoria (privada, llega de la PC) se queda igual
+      '<p class="autoraLiz">Creada por <b>' + esc(V.autora) + '</b></p>' +
       '<p class="dedica">' + esc(lc.dedicatoria || 'Creada con mucho cariño 💜') + '</p><p class="queEs">Tu compañera de estudio y microbióloga junior.</p></div>' +
-      '<h3>✨ Novedades de la ' + esc(V.liz) + '</h3><div class="panel"><ul class="nuevo">' + V.novedades.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' +
-      '<h3>🙏 Créditos</h3><div class="panel creditos">' + V.creditosCortos.map(([ic, q, l]) => '<div class="cred"><span class="ic">' + ic + '</span><span><b>' + esc(q) + '</b><small>' +
+      '<h3>✨ Lo que trae Liz ' + esc(V.liz) + '</h3><div class="panel"><ul class="nuevo">' + V.novedades.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' +
+      '<h3>🙏 Créditos y licencias</h3><div class="panel creditos">' + V.creditosCortos.map(([ic, q, l]) => '<div class="cred"><span class="ic">' + ic + '</span><span><b>' + esc(q) + '</b><small>' +
         esc(l.replace('{creadora}', cr)) + '</small></span></div>').join('') +
-      '<details><summary>Ver más</summary>' + V.creditos.map(([q, t]) => '<p><b>' + esc(q) + '.</b> ' + esc(t.replace('{creadora}', cr)) + '</p>').join('') + '</details></div>' +
-      '<p class="pie">Hecha a mano, con mucho cariño · ' + esc(V.fecha.slice(0, 4)) + '</p>';
+      '<details><summary>Ver la lista completa</summary>' + V.creditos.map(([q, t]) => (t ? '<p><b>' + esc(q) + '.</b> ' + esc(t.replace('{creadora}', cr)) + '</p>' : '<h4>' + esc(q) + '</h4>')).join('') + '</details></div>' +
+      '<p class="pie">Hecha a mano, con mucho cariño · ' + esc(V.fecha.slice(0, 4)) + '</p>' +
+      '<p class="derechos">' + esc(V.derechos) + '</p>';
     $('#fotoSecreto', v).onclick = tocarSecreto;
   }
   function tocarSecreto() {
@@ -1143,39 +1181,41 @@
   }
 
   // ---------- MÁS: un menú con secciones, con Liz arriba ----------
-  // (21-oct-2026) Una lista COMPACTA tipo "Ajustes" del iPhone: ícono chico, el nombre, el dato a la derecha (gris) y la flechita o el
-  // interruptor (que funciona ahí mismo). Cada cosa en UN solo lugar: aquí ya no están Charlar (pestaña Liz), Pegar texto (Mazos),
-  // Recordatorios (Agenda) ni "¿Cómo te sientes?" (Hoy).
+  // (21-oct-2026) Lista COMPACTA tipo "Ajustes" del iPhone (ícono chico, el nombre, el dato gris a la derecha, la flechita o el interruptor
+  // que funciona ahí mismo), en este orden: 1) Tu estudio · 2) Ajustes (con los Avisos) · 3) Tu Liz y tu cuenta (diario de ánimo, Acerca de
+  // Liz, el correo y la sincronización) · la versión, pequeñita · y al final, separado, "Cerrar sesión" (pide confirmar).
+  // Cada cosa en UN solo lugar: aquí no están Charlar (pestaña Liz), Pegar texto / Subir archivo (Estudiar → Mazos) ni Recordatorios (Agenda).
   function pintarMas(v) {
     const pap = Org.papelera(E).length, arch = Org.archivados(E).length;
     const esperando = Org.vivos(E.archivos).filter((a) => a.estado === 'esperando' || a.estado === 'leyendo').length;
     const instalada = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
     let avisosTxt = 'Apagados';
     try { if (localStorage.getItem('liz-aviso-id')) { const h = +(localStorage.getItem('liz-aviso-hora') || 8); avisosTxt = 'Tarjetas a las ' + (h <= 12 ? h : h - 12) + ':00 ' + (h < 12 ? 'a. m.' : 'p. m.'); } } catch (e) {}
-    const fila = (a, ic, color, t, dato, datos, extra) => '<li><button class="item" data-a="' + a + '"' + (datos || '') + '><span class="ico ' + (color || '') + '">' + ic + '</span>' +
-      '<span class="txt"><b>' + t + '</b></span>' + (dato ? '<span class="dato">' + dato + '</span>' : '') + (extra || '<span class="chev">›</span>') + '</button></li>';
+    const fila = (a, ic, color, t, dato, datos, extra, id) => '<li' + (id ? ' id="' + id + '"' : '') + '><button class="item" data-a="' + a + '"' + (datos || '') + '><span class="ico ' + (color || '') + '">' + ic + '</span>' +
+      '<span class="txt"><b>' + t + '</b></span>' + (dato ? '<span class="dato">' + dato + '</span>' : '') + (extra === undefined ? '<span class="chev">›</span>' : extra) + '</button></li>';
     const interruptor = (a, ic, color, t, on) => fila(a, ic, color, t, '', '', '<span class="interruptor' + (on ? ' on' : '') + '"></span>');
     const aV = (v2) => ' data-v="' + v2 + '"';
     const grupo = (t, filas) => '<h3>' + t + '</h3><div class="panel compacta"><ul class="lista">' + filas + '</ul></div>';
+    const hoyAn = Animo.deHoy(E);
     v.innerHTML = escena('saludo', fija('pMas', 'pMas')) +
       grupo('Tu estudio',
         fila('ir', '📈', 'verde', 'Progreso', '', aV('progreso')) +
         fila('ir', '📚', 'celeste', 'Archivos', esperando ? esperando + ' esperando' : '', aV('archivos')) +
-        fila('ir', '🗑️', '', 'Papelera', pap ? String(pap) : '', aV('papelera')) +
-        fila('ir', '📦', '', 'Archivados', arch ? String(arch) : '', aV('archivados'))) +
-      grupo('Tu Liz',
-        fila('avisos', '🔔', 'rosa', 'Avisos', avisosTxt) +
-        fila('ir', '💜', 'rosa', 'Acerca de Liz', 'Liz ' + esc(V.liz), aV('acerca'))) +
+        fila('ir', '📦', '', 'Archivados', arch ? String(arch) : '', aV('archivados')) +
+        fila('ir', '🗑️', '', 'Papelera', pap ? String(pap) : '', aV('papelera'))) +
       grupo('Ajustes',
+        fila('avisos', '🔔', 'rosa', 'Avisos', avisosTxt) +
         interruptor('alternarVibra', '📳', '', 'Vibración', pref.vibra) +
         interruptor('alternarSonido', '🔊', '', 'Sonido', pref.sonido) +
         interruptor('alternarQuieto', '🫧', '', 'Reducir movimiento', pref.quieto) +
-        fila('sincronizarYa', '🔄', 'celeste', 'Sincronizar ahora', E.ultimaSincro ? hace(E.ultimaSincro) : 'todavía no') +
         (instalada ? '' : fila('comoInstalar', '📲', '', 'Instalar en el iPhone'))) +
-      grupo('Tu cuenta',
+      grupo('Tu Liz y tu cuenta',
+        fila('verDiario', '🌈', 'oro', 'Diario de ánimo', hoyAn.length ? 'Hoy ' + hoyAn.map((k) => Animo.POR[k].e).join('') : '') +
+        fila('ir', '💜', 'rosa', 'Acerca de Liz', '', aV('acerca')) +
         '<li><div class="item"><span class="ico">✉️</span><span class="txt"><b>' + esc(DEMO ? 'Modo de prueba' : perfil.correo || 'Tu cuenta') + '</b></span></div></li>' +
-        (DEMO ? '' : sinSesion ? fila('volverEntrar', '🔑', 'oro', 'Volver a entrar') : fila('salir', '🚪', '', 'Cerrar sesión', '', '', ''))) +
-      '<p class="pie">LIZ · ' + esc(V.larga) + '</p>';
+        fila('sincronizarYa', '🔄', 'celeste', 'Sincronización', esc(estadoSync().t), '', undefined, 'filaSync')) +
+      '<p class="versionLiz">' + esc(V.larga) + ' · © ' + esc(V.fecha.slice(0, 4)) + ' ' + esc(V.autora) + '</p>' +
+      (sinSesion ? '<button class="bt salirBt" data-a="volverEntrar">🔑 Volver a entrar</button>' : '<button class="bt salirBt" data-a="salir">Cerrar sesión</button>');
   }
   function pintarPapelera(v) {
     const l = Org.papelera(E);
@@ -1542,6 +1582,8 @@
     if (vista !== 'charla') return;
     const a = $('#app').getBoundingClientRect(), b = $('#escribirLiz').getBoundingClientRect();
     if (b.height) $('#app').style.setProperty('--finCharla', Math.max(0, Math.round(a.bottom - b.top + 8)) + 'px');
+    // (21-oct-2026) El fondo sólido de abajo (body::after) sube hasta la barra de escribir: nada se ve por detrás de ella ni del menú
+    if (b.height) document.documentElement.style.setProperty('--zocaloCharla', Math.max(0, Math.round(innerHeight - b.top + 6)) + 'px');
   }
   // La parte de arriba se achica (Liz más pequeña, el globito en una línea) en pantallas chicas mientras él lee mensajes de antes, y
   // siempre con el teclado abierto; vuelve a su tamaño al llegar al último mensaje. Al cambiar de tamaño, si estaba en el último
@@ -1553,7 +1595,9 @@
     const falta = m.scrollHeight - m.clientHeight - m.scrollTop;
     const chica = innerHeight < 900;
     if (falta <= 4) alFinal = true; else if (falta > 60) alFinal = false;
-    document.body.classList.toggle('charlaChica', tecladoAbierto || (chica && !alFinal));
+    // (21-oct-2026) El encabezado de Liz 2D con su globito queda SIEMPRE de su tamaño (la franja de arriba ahora es delgada y sobra lugar)
+    void chica;
+    document.body.classList.remove('charlaChica');
   }
   document.addEventListener('scroll', (ev) => { if (ev.target && ev.target.id === 'mensajes') compactarCharla(); }, true);
   if (window.ResizeObserver) {
@@ -1866,7 +1910,8 @@
     subirArchivo: () => $('#elegirArchivo').click(),
     archivo: (d) => abrirArchivo(d.id),
     // Mazos
-    abrirMazo: (d) => { mazoAbierto = d.id; buscando = ''; pintar(); window.scrollTo({ top: 0 }); },
+    modoEstudio: (d) => { if (d.m !== vista) ir(d.m); },
+    abrirMazo: (d) => { mazoAbierto = d.id; buscando = ''; pintar(); arribaDeTodo(); },
     cerrarMazo: () => { mazoAbierto = null; pintar(); },
     editarTarjeta: (d) => editarTarjeta(d.id),
     nuevaTarjeta: (d) => editarTarjeta(null, d.mazo),
@@ -1936,7 +1981,13 @@
       '<li>Toca <b>Compartir</b> (el cuadrito con la flecha hacia arriba).</li><li>Elige <b>Agregar a pantalla de inicio</b> y toca <b>Agregar</b>.</li>' +
       '<li>Abre LIZ desde el ícono nuevo (la carita de Liz).</li></ol><p class="suave" style="font-size:15px">¿Ya la tenías con el ícono viejo? Mantén apretado el ícono → <b>Eliminar app</b> y vuélvela a agregar: así sale el ícono y el nombre nuevos (tus datos se bajan otra vez al entrar).</p><div class="botones"><button class="bt grande" data-cerrar>Entendido</button></div>'),
     volverEntrar: () => mostrarEntrar(),
+    // (21-oct-2026) Más → "Diario de ánimo": abre Progreso justo en "Cómo te has sentido"
+    verDiario: () => {
+      ir('progreso');
+      setTimeout(() => { const h = [...document.querySelectorAll('#vista h3')].find((x) => /sentido/i.test(x.textContent)); const a = $('#app'); if (h && a) a.scrollTo({ top: h.getBoundingClientRect().top - a.getBoundingClientRect().top + a.scrollTop - 90, behavior: 'smooth' }); }, 80);
+    },
     salir: async () => {
+      if (DEMO) return avisar('En el modo de prueba no hay sesión que cerrar.');
       const p = porSubir();
       if (!(await confirmar('¿Cerrar sesión?', (p ? 'OJO: hay ' + p + ' cambios que todavía no se subieron y se perderían. ' : '') + 'Se borra lo guardado en este celular (en la compu sigue).', 'Cerrar sesión', true))) return;
       await sb.auth.signOut().catch(() => {});
@@ -1976,7 +2027,7 @@
       app.style.top = Math.round(arriba) + 'px';
       app.style.bottom = 'auto';
       app.style.height = Math.round(fondo - arriba) + 'px';
-    } else { bar.style.top = ''; app.style.top = app.style.bottom = app.style.height = ''; }
+    } else { bar.style.top = ''; app.style.top = app.style.bottom = app.style.height = ''; enderezar(); }
     const cambio = abierto !== tecladoAbierto;
     tecladoAbierto = abierto;
     medirCharla();
@@ -1986,6 +2037,27 @@
   if (window.visualViewport) { visualViewport.addEventListener('resize', ajustarTeclado); visualViewport.addEventListener('scroll', ajustarTeclado); }
   textoLiz.addEventListener('focus', () => setTimeout(ajustarTeclado, 350));
   textoLiz.addEventListener('blur', () => setTimeout(ajustarTeclado, 350));
+  // (21-oct-2026, Liz 1.3) Que TODO vuelva a su lugar si iOS dejó la página corrida (pasaba a veces al cerrar el teclado: toda la app
+  // subida y un espacio negro debajo del menú). La página no se puede desplazar (CSS); aquí se quita cualquier desfase que quede.
+  // Mientras se escribe en un cuadro no se toca (iOS mueve la vista para mostrar el cuadro y eso está bien).
+  function escribiendo() { const a = document.activeElement; return !!a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) && a.type !== 'checkbox'; }
+  function enderezar() {
+    if (escribiendo()) return;
+    if (window.scrollX || window.scrollY) window.scrollTo(0, 0);
+    if (document.documentElement.scrollTop) document.documentElement.scrollTop = 0;
+    if (document.body.scrollTop) document.body.scrollTop = 0;
+  }
+  const enderezarYa = () => { enderezar(); setTimeout(enderezar, 120); setTimeout(() => { enderezar(); ajustarTeclado(); }, 450); };      // (iOS anima el teclado ~0,3 s)
+  document.addEventListener('focusout', enderezarYa);                                                       // (se cerró el teclado de cualquier cuadro)
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) enderezarYa(); });            // (volvió a la app desde otra)
+  addEventListener('pageshow', enderezarYa);
+  addEventListener('orientationchange', enderezarYa);                                                       // (giró el celular)
+  addEventListener('resize', () => { if (!escribiendo()) enderezar(); });
+  addEventListener('scroll', () => { if (!escribiendo()) enderezar(); }, { passive: true });                 // (algo movió la página)
+  // Subir al principio de la pantalla (cada pantalla se desplaza dentro de #app, no la página)
+  function arribaDeTodo() { const a = $('#app'); if (a) a.scrollTop = 0; document.body.classList.remove('desplazado'); }
+  // (21-oct-2026) El degradado de arriba solo aparece si la pantalla está desplazada (quieta, el fondo sigue de corrido hasta arriba)
+  $('#app').addEventListener('scroll', () => document.body.classList.toggle('desplazado', $('#app').scrollTop > 4), { passive: true });
   const crecer = () => { textoLiz.style.height = 'auto'; textoLiz.style.height = Math.min(140, textoLiz.scrollHeight) + 'px'; ajustarTeclado(); };      // (la lista termina arriba de la barra, aunque crezca)
   textoLiz.addEventListener('input', crecer);
   textoLiz.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); $('#formLiz').requestSubmit(); } });
@@ -2193,6 +2265,7 @@
     pegar: hojaPegar, hacerTarjetas: hacerTarjetasDeTexto,
     teclado: (px) => { tecladoSimulado = px || null; ajustarTeclado(); },      // (para las capturas: simula el teclado abierto)
     // (21-oct-2026) ánimo, frases de cariño y el secreto (pruebas y capturas)
+    enlace: (h) => irPorEnlace(h),      // (los avisos al tocarlos; para las pruebas)
     animoHoja: () => hojaAnimo(false), cerrarHoja: () => cerrarHoja(null), animoMarcar: (l) => guardarAnimo(l, 'caritas'),
     carino: (i) => { const f = frasesCel().sorpresa; if (!f.length) return false; carinoActual = { t: f[Math.min(i || 0, f.length - 1)].t, hasta: Date.now() + 90000, corazones: true }; ir('hoy'); setTimeout(() => corazones($('.heroe')), 50); return true; },
     secreto: () => { secretoToques = []; for (let i = 0; i < 5; i++) tocarSecreto(); },
