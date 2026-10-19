@@ -347,6 +347,7 @@
     setInterval(revisarCartaAniversario, 10 * MIN);
     setInterval(() => sincronizar('auto'), 5 * MIN);
     setInterval(() => { if (vista === 'hoy' || vista === 'agenda' || vista === 'recordatorios') pintarSuave(); }, 60000);
+    setInterval(revisarAvisosAbierta, 5000);                 // (19-oct-2026: con la app abierta, Liz avisa a la hora exacta; casi no gasta)
   }
 
   // ---------- Entrar: su correo y su contraseña, UNA vez (la cuenta se crea en Supabase; no se manda ningún correo) ----------
@@ -845,7 +846,8 @@
       };
     });
     $('#anListo', h).onclick = () => { const l = sel.slice(); cerrarHoja(true); guardarAnimo(l, 'caritas'); };
-    $('#anNo', h).onclick = () => { cerrarHoja(null); if (!Animo.hoy(E)) { Animo.saltar(E, DISP); guardarLocal(); pedirSincro(); } };
+    // (19-oct-2026) "Ahora no" también cuenta si lo que había era de la madrugada (si no, se lo volvería a preguntar cada vez que abre)
+    $('#anNo', h).onclick = () => { cerrarHoja(null); if (Animo.debePreguntar(E)) { Animo.saltar(E, DISP); guardarLocal(); pedirSincro(); } };
   }
   function guardarAnimo(lista, como) {
     if (!lista || !lista.length) return;
@@ -1595,6 +1597,8 @@
   document.body.classList.toggle('quieto', pref.quieto);
   function vibrar(tipo) {
     if (!pref.vibra) return;
+    // (19-oct-2026) Si él todavía no tocó la pantalla, el navegador no deja vibrar (y lo anota como error): ni se intenta
+    if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return;
     try {
       if (navigator.vibrate) { navigator.vibrate(tipo === 'bien' ? 18 : [25, 50, 25]); return; }
       // iPhone (iOS 18+): tocar un interruptor nativo hace vibrar suave
@@ -2095,15 +2099,67 @@
     const hoyAg = Ag.delDia(E, ahora).map((x) => (x.tipo === 'clase' ? 'clase de ' : '') + x.titulo + ' (' + N.horaCR(x.ms) + (x.fin ? '-' + N.horaCR(x.fin) : '') + (x.hecho ? ', hecho' : '') + ')');
     const prox = Ag.listaRecordatorios(E, ahora).filter((x) => !x.hecho && x.vez > ahora && x.vez < ahora + 7 * DIA).slice(0, 5).map((x) => x.r.texto + ' (' + N.fechaTxt(x.vez) + ' ' + N.horaCR(x.vez) + ')');
     const reps = Object.values(E.repasos), hoyR = reps.filter((r) => r.fecha >= N.inicioDiaCR(ahora));
+    // (19-oct-2026) SUS MAZOS y los NUEVOS (a "¿viste los mazos que agregué?" contestaba "no veo tus mazos": no lo sabía). Un mazo es nuevo si
+    // su primera tarjeta es de las últimas 48 h (importado, pegado, de un archivo o hecho a mano). Lo nuevo va en la 2ª línea, que siempre llega.
+    const enMazo = {};
+    for (const t of Org.vivos(E.tarjetas)) { const x = enMazo[t.mazo_id] || (enMazo[t.mazo_id] = { n: 0, desde: Infinity }); x.n++; x.desde = Math.min(x.desde, t.creada || Infinity); }
+    const mazos = Org.vivos(E.mazos).filter((m) => enMazo[m.id] && !Org.archivadoX(m)).map((m) => ({ nombre: m.nombre, n: enMazo[m.id].n, desde: enMazo[m.id].desde }));
+    const nuevos = mazos.filter((m) => ahora - m.desde < 2 * DIA).sort((a, b) => b.desde - a.desde);
+    const cuandoM = (ms) => (N.inicioDiaCR(ms) === N.inicioDiaCR(ahora) ? 'hoy' : 'ayer') + ' ' + N.horaCR(ms);
     return [
       perfil.nombre ? 'Se llama ' + perfil.nombre + '.' : '',
-      'Hoy le tocan ' + tocan.length + ' tarjetas' + (tocan.length ? ' (' + Object.entries(porMazo).map(([k, n]) => k + ': ' + n).join(', ') + ')' : '') + '. Tiene ' + Org.vivos(E.tarjetas).length + ' tarjetas en total.',
+      'Hoy le tocan ' + tocan.length + ' tarjetas' + (tocan.length ? ' (' + Object.entries(porMazo).map(([k, n]) => k + ': ' + n).join(', ') + ')' : '') + '. Tiene ' + Org.vivos(E.tarjetas).length + ' tarjetas en total.' +
+        (nuevos.length ? ' MAZOS NUEVOS (los agregó él, ya los ves): ' + nuevos.slice(0, 6).map((m) => '«' + m.nombre + '» (' + m.n + ' tarjetas, ' + cuandoM(m.desde) + ')').join(', ') + (nuevos.length > 6 ? ' y ' + (nuevos.length - 6) + ' más' : '') + '.' : ''),
+      mazos.length ? 'Sus mazos (' + mazos.length + '): ' + mazos.slice().sort((a, b) => b.n - a.n).slice(0, 12).map((m) => m.nombre + ' (' + m.n + ')').join(', ') + (mazos.length > 12 ? '…' : '') + '.' : 'Todavía no tiene mazos.',
       'Hoy repasó ' + hoyR.length + ' (' + hoyR.filter((r) => r.resultado === 'bien').length + ' bien). Racha: ' + N.racha(reps) + ' días.',
       exs.length ? 'Próximos exámenes: ' + exs.join('; ') + '.' : 'No tiene exámenes anotados.',
       hoyAg.length ? 'Su agenda de hoy: ' + hoyAg.join('; ') + '.' : 'Nada en su agenda de hoy.',
       prox.length ? 'Recordatorios de esta semana: ' + prox.join('; ') + '.' : '',
       'Materias: ' + (Org.vivos(E.materias).map((m) => m.nombre).join(', ') || 'ninguna') + '.',
     ].filter(Boolean).join('\n');
+  }
+  // ---------- (19-oct-2026) RECORDATORIOS pedidos en la charla: los anota la APP (agenda.js pedidoRecordatorio), no el cerebro ----------
+  // Antes: "Ocupo poner 1 recordatorio en 1 minuto" → "Listo, te puse el recordatorio" y no se anotaba nada (el cerebro ni sabía qué hora
+  // era). Ahora: si la frase dice cuándo, se anota al momento (también sin internet) y el cerebro solo lo confirma con sus palabras; si no
+  // dice cuándo, Liz lo pregunta y la respuesta ("a las 5", "en 10 minutos") lo completa. Y si el cerebro dice "listo, te lo anoté" sin que
+  // se haya anotado nada, eso se cambia por la pregunta: Liz nunca promete lo que no hizo.
+  const DICE_ANOTADO = /\b(te (lo |la )?(puse|pongo|anot[eé]|apunt[eé]|program[eé]|agend[eé]|guard[eé])|ya (te |lo |la )?(anot[eé]|puse|program[eé]|qued[oó])|qued[oó] (anotad|programad|guardad|list)|te (lo |la )?recordar[eé]|te aviso (a las|en |ma[nñ]ana|el |hoy|dentro)|listo[,.!]? (ya )?(te )?(lo |la )?(puse|anot|program|recuerd))/i;
+  const PIDE_ANOTAR = /recu[eé]rd|recordatorio|av[ií]s|alarma|an[oó]ta|ap[uú]nta|agend/i;
+  let pendienteRec = null;            // { texto, repite, ms }: pidió un recordatorio sin decir cuándo (10 minutos para completarlo)
+  function cuandoBonito(ms) {
+    const d = N.inicioDiaCR(ms), hoy0 = N.inicioDiaCR(Date.now());
+    return (d === hoy0 ? 'hoy' : d === hoy0 + DIA ? 'mañana' : 'el ' + N.fechaTxt(ms)) + ' a las ' + N.horaCR(ms);
+  }
+  const REPITE_TXT = { diario: 'todos los días', semanal: 'cada semana', mensual: 'cada mes' };
+  const chipRec = (f) => ({ html: '⏰ Anotado: ' + esc(f.texto) + ' · ' + esc(N.fechaTxt(f.cuando)) + ', ' + N.horaCR(f.cuando) + (f.repite ? ' · ' + REPITE_TXT[f.repite] : '') });
+  const confirmarRec = (f) => ['Listo, te aviso ' + cuandoBonito(f.cuando) + '.', 'Anotado: te lo recuerdo ' + cuandoBonito(f.cuando) + '.', 'Hecho. ' + cuandoBonito(f.cuando).replace(/^./, (x) => x.toUpperCase()) + ' te aviso.'][Math.floor(Math.random() * 3)];
+  const PREGUNTA_CUANDO = '¿Para cuándo te lo pongo? Dime el día y la hora (por ejemplo: «mañana a las 5» o «en 10 minutos»).';
+  // ¿Pide un recordatorio (o completa uno que quedó sin hora)? Si ya se sabe cuándo, se anota. Devuelve { fila } (anotado), { falta } o null.
+  function recordatorioDeCharla(texto, ahora) {
+    let ped = Ag.pedidoRecordatorio(texto, ahora);
+    if (!ped && pendienteRec && ahora - pendienteRec.ms < 10 * MIN && texto.length <= 70 && !/\?/.test(texto)) {
+      const w = Ag.cuandoDeFrase(texto, ahora);
+      if (w && w.cuando) ped = { texto: pendienteRec.texto, cuando: w.cuando, repite: w.repite || pendienteRec.repite, pasado: w.pasado };
+    }
+    if (!ped) return null;
+    if (ped.cuando && !ped.pasado) {
+      const x = Ag.crearRecordatorio(E, { texto: ped.texto || Ag.RECORDATORIO_SIN_NOMBRE, cuando: ped.cuando, repite: ped.repite || null }, DISP);
+      if (x.ok) { pendienteRec = null; cambio(); subirYa(); return { fila: x.fila }; }
+    }
+    pendienteRec = { texto: ped.texto || '', repite: ped.repite || null, ms: ahora };
+    return { falta: ped.pasado ? 'pasado' : 'cuando', texto: ped.texto || '' };
+  }
+  // Lo que se le dice al cerebro (va pegado a SU mensaje, solo para el cerebro: no se guarda ni se ve en la charla)
+  function notaRecordatorio(rec, ahora) {
+    if (!rec) return '';
+    if (rec.fila) {
+      const f = rec.fila, faltan = Math.round((f.cuando - ahora) / MIN);
+      return '(Nota de la app, él no la ve: YA quedó anotado en su agenda el recordatorio «' + f.texto + '» para ' + cuandoBonito(f.cuando) +
+        (faltan >= 1 && faltan < 120 ? ' (en ' + faltan + (faltan === 1 ? ' minuto' : ' minutos') + ')' : '') + (f.repite ? ', y se repite ' + REPITE_TXT[f.repite] : '') +
+        '. Confírmaselo en UNA frase corta, con esa hora exacta, y sigue normal. No llenes "recordatorio".)';
+    }
+    return '(Nota de la app, él no la ve: quiere un recordatorio' + (rec.texto ? ' («' + rec.texto + '»)' : '') + ' pero ' + (rec.falta === 'pasado' ? 'esa hora ya pasó' : 'no dijo para cuándo') +
+      ': pregúntale qué día y a qué hora. NO digas que ya lo anotaste y no llenes "recordatorio".)';
   }
   async function enviarCharla(texto) {
     texto = String(texto || '').trim();
@@ -2124,31 +2180,53 @@
     // (20-oct-2026) "Archiva las tarjetas de Micología", "desarchiva…", "ya me sé esta" y el "sí" a la pregunta después de un examen:
     // lo hace la app (sin internet también), con las mismas reglas que la compu
     if (archivarDesdeCharla(texto)) return;
-    if (!DEMO && !navigator.onLine) { agregarMsg({ quien: 'liz', texto: F.frase('cSinInternet'), animo: 'tierna' }); return; }
+    // (19-oct-2026) ¿Pide un recordatorio? Si dice cuándo, la app lo anota YA (también sin internet); si no, Liz pregunta (recordatorioDeCharla)
+    const ahora0 = Date.now(), rec = recordatorioDeCharla(texto, ahora0);
+    const respuestaLocal = () => (rec && rec.fila ? { texto: confirmarRec(rec.fila), extra: chipRec(rec.fila), animo: 'feliz' } : rec ? { texto: PREGUNTA_CUANDO, animo: 'pensativa' } : null);
+    if (!DEMO && !navigator.onLine) { agregarMsg(Object.assign({ quien: 'liz' }, respuestaLocal() || { texto: F.frase('cSinInternet'), animo: 'tierna' })); return; }
     pensando(true);
+    // (19-oct-2026) Lo que la app ya hizo (o lo que falta) va pegado a SU mensaje, solo para el cerebro: así lo confirma con sus palabras
+    const paraCerebro = charla.slice(-12).map((m) => ({ quien: m.quien, texto: m.texto }));
+    const nota = notaRecordatorio(rec, ahora0);
+    if (nota && paraCerebro.length) paraCerebro[paraCerebro.length - 1].texto += '\n\n' + nota;
+    const lizDijo = charla.filter((m) => m.quien === 'liz').slice(-10);
     // (21-oct-2026) Su ÁNIMO de ahora (el que él ve en Hoy: dormida, contenta...) va al cerebro: así no dice "¡estoy activa!" si se ve dormida
     // (21-oct-2026) y cómo se siente ÉL hoy (su diario de ánimo): Liz se adapta; si pregunta "¿cómo me he sentido?", el resumen
-    const r = await cerebro('charla', { mensajes: charla.slice(-12).map((m) => ({ quien: m.quien, texto: m.texto })), contexto: contextoTexto(), animo: animoHoy(),
+    const r = await cerebro('charla', { mensajes: paraCerebro, contexto: contextoTexto(), animo: animoHoy(),
       animoEl: Animo.deHoy(E), animoDijo: dijo, femenino: fem(), diarioAnimo: Animo.PIDE_RESUMEN.test(texto) ? Animo.resumenTexto(E, Date.now(), { fem: fem() }) : '',
       // (prueba 17) cómo se siente él, armado con LA MISMA función que la compu (animo.js → partePrompt): liz-cerebro lo usa tal cual
-      animoTexto: Animo.partePrompt(E, Date.now(), { dueno: perfil.nombre || '', fem: fem(), consulta: texto, dijo }) });
+      // (19-oct-2026) + lo último que dijo Liz: si ya le propuso respirar, no lo repite
+      animoTexto: Animo.partePrompt(E, Date.now(), { dueno: perfil.nombre || '', fem: fem(), consulta: texto, dijo, recientes: lizDijo }) });
     pensando(false);
-    if (r.sinInternet) return agregarMsg({ quien: 'liz', texto: F.frase('cSinInternet'), animo: 'tierna' });
-    if (r.error && !r.dice) return agregarMsg({ quien: 'liz', texto: F.frase('cError') + ' (' + r.error + ')', animo: 'tierna' });
-    let extra = null, animo = 'contenta';
-    // Lo que pidió anotar: va a la agenda (se sincroniza con la compu)
-    if (r.recordatorio) {
+    if (r.sinInternet || (r.error && !r.dice)) {
+      const loc = respuestaLocal();
+      if (loc) return agregarMsg(Object.assign({ quien: 'liz' }, loc));
+      return agregarMsg(r.sinInternet ? { quien: 'liz', texto: F.frase('cSinInternet'), animo: 'tierna' } : { quien: 'liz', texto: F.frase('cError') + ' (' + r.error + ')', animo: 'tierna' });
+    }
+    let extra = null, animo = 'contenta', anotado = false;
+    // Lo que pidió anotar: va a la agenda (se sincroniza con la compu). (19-oct-2026) Si la app ya lo anotó, el del cerebro no se usa (no se repite)
+    if (rec && rec.fila) { extra = chipRec(rec.fila); animo = 'feliz'; anotado = true; }
+    else if (r.recordatorio && !rec) {
       const cuando = N.msDeCR(r.recordatorio.fecha, r.recordatorio.hora);
       const x = isFinite(cuando) ? Ag.crearRecordatorio(E, { texto: r.recordatorio.texto, cuando, repite: r.recordatorio.repite || null }, DISP) : { error: 'fecha rara' };
-      if (x.ok) { extra = { html: '⏰ Anotado: ' + esc(r.recordatorio.texto) + ' · ' + esc(N.fechaTxt(cuando)) + ', ' + N.horaCR(cuando) }; animo = 'feliz'; cambio(); subirYa(); }
+      if (x.ok) { extra = chipRec(x.fila); animo = 'feliz'; anotado = true; pendienteRec = null; cambio(); subirYa(); }
     }
     if (r.examen) {
       const cuando = N.msDeCR(r.examen.fecha, r.examen.hora);
       const x = isFinite(cuando) ? Ag.crearExamen(E, { que: r.examen.que, materia: r.examen.materia, cuando }, DISP) : { error: 'fecha rara' };
-      if (x.ok) { extra = { html: '📝 Anotado: ' + esc(N.nombreExamen(x.fila).replace(/^./, (c) => c.toUpperCase())) + ' · ' + esc(N.fechaTxt(cuando)) + ', ' + N.horaCR(cuando) + '<br>Te aviso 3 días antes, el día antes y 2 horas antes.' }; animo = 'feliz'; cambio(); subirYa(); }
+      if (x.ok) { extra = { html: '📝 Anotado: ' + esc(N.nombreExamen(x.fila).replace(/^./, (c) => c.toUpperCase())) + ' · ' + esc(N.fechaTxt(cuando)) + ', ' + N.horaCR(cuando) + '<br>Te aviso 3 días antes, el día antes y 2 horas antes.' }; animo = 'feliz'; anotado = true; cambio(); subirYa(); }
     }
+    let dice = r.dice || '…';
+    // (19-oct-2026) RED DE SEGURIDAD: dice "listo, te lo anoté" y no se anotó nada → pregunta (nunca promete lo que no hizo)
+    const hablaDeAnotar = rec || PIDE_ANOTAR.test(texto) || (pendienteRec && Date.now() - pendienteRec.ms < 10 * MIN);
+    if (!anotado && hablaDeAnotar && DICE_ANOTADO.test(dice)) {
+      dice = 'Uy, todavía no lo anoté: no me quedó claro para cuándo. ' + PREGUNTA_CUANDO;
+      if (!pendienteRec) pendienteRec = { texto: '', repite: null, ms: Date.now() };
+    }
+    // (19-oct-2026) Si ya le propuso respirar hace poco y él no habla de eso, esa frase no se repite (animo.js)
+    dice = Animo.sinRespirarOtraVez(dice, lizDijo, texto, Date.now());
     if (r.pegar) extra = { html: '<button class="bt chico prin" data-a="pegarTexto">📋 Pegar el texto</button>' };
-    agregarMsg({ quien: 'liz', texto: r.dice || '…', extra, animo: r.limite ? 'dormida' : animo });
+    agregarMsg({ quien: 'liz', texto: dice, extra, animo: r.limite ? 'dormida' : animo });
     if (r.pegar) setTimeout(() => hojaPegar(), 900);
   }
 
@@ -2340,7 +2418,7 @@
     repasarHoy: () => empezar(Org.paraRepasar(E, { soloHoy: true }), 'Las de hoy'),
     // (21-oct-2026) un día pesado: solo unas poquitas (las primeras: las que más tocan)
     repasarSuave: () => empezar(Org.paraRepasar(E, { soloHoy: true }).slice(0, Animo.tarjetasSugeridas(Animo.deHoy(E), 999)), 'Con calma'),
-    animoHoy: () => hojaAnimo(!!Animo.hoy(E)),
+    animoHoy: () => hojaAnimo(!Animo.debePreguntar(E)),
     repasarFav: () => empezar(Org.paraRepasar(E, { favoritas: true }), '⭐ Favoritas'),
     repasarDif: () => empezar(Org.paraRepasar(E, { dificiles: true }), '🔥 Difíciles'),
     repasarTodas: () => empezar(Org.paraRepasar(E, {}).slice(0, 20), 'Repaso libre'),
@@ -2961,6 +3039,31 @@
     $('#ptFabrica', h).onclick = () => { try { localStorage.removeItem(POMO_T); } catch (e) {} cerrarHoja(true); avisar('Volvimos a 25 · 5 · 15.'); pintarSuave(); };
   }
 
+  // ---------- (19-oct-2026) AVISOS CON LA APP ABIERTA, a la hora exacta ----------
+  // El servidor manda el aviso al celular con 2 minutos de margen (para que, si la compu está prendida, avise ella primero: avisos.sql).
+  // Si él tiene la app abierta cuando toca un recordatorio, un evento o un aviso de examen, Liz avisa AHÍ, en la charla, a la hora exacta,
+  // y lo anota como avisado (como la compu: Agenda.paraAvisar), así ni el servidor ni la compu lo repiten. Solo lo que tocó hace menos de
+  // 2 minutos: lo de antes ya lo avisó el servidor (o la compu). Las clases y los bloques del pomodoro no van por aquí (Agenda.sonidos).
+  function revisarAvisosAbierta() {
+    if (document.hidden || !$('#entrar').hidden || !E || !E.avisos) return 0;
+    const ahora = Date.now();
+    let n = 0;
+    for (const s of Ag.sonidos(E, ahora - 2 * MIN, ahora + 1)) {
+      if (Ag.yaSono(E, s.clave, s.ms)) continue;
+      Sincro.agregar(E, 'avisos', { clave: s.clave, ocurrencia: s.ms, dispositivo: DISP, presente: true, fecha: ahora });
+      n++;
+      const t = s.tabla === 'examenes' ? '📝 ' + s.texto.replace(/^./, (x) => x.toUpperCase()) : s.tabla === 'eventos' ? '📅 Ya empieza: ' + s.texto : '⏰ ¡Es la hora! ' + s.texto;
+      agregarMsg({ quien: 'liz', texto: t, animo: s.tabla === 'examenes' ? 'tierna' : 'sorprendida' });
+      avisar(t);
+    }
+    if (n) {
+      vibrar('aviso'); sonar('fin');
+      if (vista !== 'charla') { avisoCharla = true; pintarMenu(); }
+      guardarLocal(); subirYa();
+    }
+    return n;
+  }
+
   // ---------- Avisito y conexión ----------
   let tAviso = 0;
   function avisar(t) {
@@ -3032,6 +3135,11 @@
     const ultimo = lim((b.mensajes || []).slice(-1)[0].texto);
     const tocan = tocanHoy().length, ex = Ag.proximosExamenes(E, Date.now())[0];
     if (/toca hoy/.test(ultimo)) return { dice: 'Hoy te tocan ' + tocan + ' tarjetas, casi todas de Tinciones. Y ojo: ' + (ex ? N.nombreExamen(ex) + ' es ' + enDias(ex.cuando) : 'no tienes exámenes cerca') + '. ¿Empezamos con unas 5 ahorita?' };
+    // (19-oct-2026) lo que la app ya anotó (o lo que falta) llega como "Nota de la app" pegada a su mensaje
+    if (/ya quedo anotado/.test(ultimo)) return { dice: '¡Listo! Ya quedó en tu agenda. ⏰' };
+    if (/no dijo para cuando|esa hora ya paso/.test(ultimo)) return { dice: '¿Para cuándo te lo pongo?' };
+    // (19-oct-2026) imita la falla de antes (el cerebro dice que lo anotó y no llena nada): la app NO debe dejar pasar esa promesa
+    if (/apunta lo del pan/.test(ultimo)) return { dice: 'Listo, te lo anoté para mañana.' };
     if (/recuerda/.test(ultimo)) return { dice: 'Listo, te lo anoto para mañana a las 3 de la tarde. 📝', recordatorio: { texto: 'Sacar las placas de agar', fecha: N.diaCR(Date.now() + DIA), hora: '15:00', repite: null } };
     if (/dormida|cansada|como estas/.test(ultimo)) return { dice: b.animo === 'dormida' ? 'Medio dormida, la verdad… 😴 ¡pero para ti me despierto! ¿Repasamos unas poquitas o ya a dormir?' : '¡Bien despierta y contenta de verte! ¿Qué hacemos?' };
     if (/animo/.test(ultimo)) return { dice: 'Ya repasaste un montón y se nota. Respira, duerme bien y confía en lo que sabes: yo estoy contigo. 💜' };
@@ -3104,6 +3212,8 @@
     // (19-oct-2026) para las pruebas y las fotos de la carta (SOLO en ?demo: un poema de prueba que trae la herramienta, nunca el de verdad)
     cartaDemo: (c, para, de) => { if (!DEMO || !c) return false; perfil.lizc = Object.assign({}, perfil.lizc || {}, { carta: c, dueno: para || '', creadora: de || '' }); if (vista === 'acerca') pintar(); return true; },
     revisarCarta: () => revisarCartaAniversario(),
+    // (19-oct-2026) para probar-charla-movil.js: lo que sabe el cerebro, la pregunta del ánimo y los avisos con la app abierta
+    contexto: () => contextoTexto(), revisarAnimo: () => { preguntadoAnimo = false; esperasAnimo = 0; revisarAnimoDia(); }, revisarAvisos: () => revisarAvisosAbierta(),
     pomo: () => pomoEstado(),
     pomoPoner: (s) => { pomoGuardar(s); pomoRevisar(); },      // (19-oct-2026: para las pruebas: "adelantar el reloj" del pomodoro; el estado vive en memoria)
     pantalla: (curar) => { medirHueco(curar); return { pantalla: altoPantalla(), vista: innerHeight, rayita: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--abajo')) || 0, hueco }; },   // (para las pruebas: ¿iOS midió la vista más corta?)

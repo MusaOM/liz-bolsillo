@@ -10,7 +10,7 @@
   else raiz.LizVersion = fabrica();
 })(typeof self !== 'undefined' ? self : this, function () {
   const liz = '1.0';
-  const bolsillo = 22;
+  const bolsillo = 23;
   return {
     liz,
     bolsillo,
@@ -31,11 +31,12 @@
     // compu solo lo de la compu (loNuevoPC); nada de uno en el otro, tampoco en "Acerca de Liz". Para la próxima actualización de cada uno:
     // cambiar su "id" (así se vuelve a mostrar) y sus "cosas".
     loNuevoCelular: {
-      id: 'celular-22',
+      id: 'celular-23',
       cosas: [
-        'Importa tarjetas ya hechas: en Estudiar → Mazos → “Importar tarjetas”, elige un archivo .json o pega su texto, y las guardo tal cual, sin cambiarles ni una palabra.',
-        'Te muestro antes un resumen (cuántos mazos y tarjetas traes), y si alguna tiene un problema te digo cuál.',
-        'Si ya tenías alguna de esas tarjetas, no la repito.',
+        'Pídeme recordatorios en la charla (“recuérdame sacar las placas a las 5”, “ponme uno en 10 minutos”) y quedan en tu Agenda al momento.',
+        'Si tienes la app abierta, te aviso a la hora exacta.',
+        'Ya no te repito lo de respirar en cada mensaje, y si me contaste cómo te sentías de madrugada, en la mañana te vuelvo a preguntar.',
+        'Sé cuáles mazos agregaste.',
       ],
     },
     loNuevoPC: {

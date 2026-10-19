@@ -27,17 +27,31 @@
   const idDia = (dia) => 'dia-' + dia;
   const delDia = (E, dia) => { const f = E.animo && E.animo[idDia(dia)]; return f && !f.borrado_en ? f : null; };
   const hoy = (E, ahora) => delDia(E, N.diaCR(ahora || Date.now()));
-  // Las emociones de HOY (vacío si no respondió o se lo saltó)
-  const deHoy = (E, ahora) => { const f = hoy(E, ahora); return f && Array.isArray(f.emociones) ? f.emociones.filter((k) => POR[k]) : []; };
-  // ¿Toca preguntar? Solo si hoy todavía no respondió NI se lo saltó (en ningún aparato)
-  const debePreguntar = (E, ahora) => !hoy(E, ahora);
+  // (19-oct-2026) Lo que marcó EN LA MADRUGADA (antes de las 6 a. m.) es de la noche: desde las 6, y si ya pasaron 3 horas, ya no cuenta
+  // como "cómo está hoy" (Liz le seguía diciendo "como estás estresado" a las 4 de la tarde por algo que marcó a las 5:46 a. m.) y se le
+  // vuelve a preguntar una vez (lo nuevo reemplaza lo de la madrugada en la fila del día, como siempre).
+  const MADRUGADA = 6;
+  // Cuándo marcó lo que siente (datos.marcadoEn; las filas de antes: cuándo se guardó). Anotar la respuesta de Liz o "Ahora no" no lo cambian.
+  const marcadoEn = (f) => Number(f && ((f.datos && f.datos.marcadoEn) || f.actualizado || f.creada)) || 0;
+  const deMadrugada = (f, ahora) => {
+    const t = marcadoEn(f);
+    return !!t && N.enCR(t).h < MADRUGADA && N.diaCR(t) === N.diaCR(ahora) && N.enCR(ahora).h >= MADRUGADA && ahora - t >= 3 * N.H;
+  };
+  // Las emociones de HOY (vacío si no respondió, se lo saltó, o lo marcó en la madrugada y ya es de día)
+  const deHoy = (E, ahora) => { ahora = ahora || Date.now(); const f = hoy(E, ahora); return f && Array.isArray(f.emociones) && !deMadrugada(f, ahora) ? f.emociones.filter((k) => POR[k]) : []; };
+  // ¿Toca preguntar? Solo si hoy todavía no respondió NI se lo saltó (en ningún aparato), o si lo que hay es de la madrugada (y no dijo "Ahora no" después)
+  const debePreguntar = (E, ahora) => {
+    ahora = ahora || Date.now();
+    const f = hoy(E, ahora);
+    return !f || (deMadrugada(f, ahora) && !(Number(f.datos && f.datos.saltadoEn) > marcadoEn(f)));
+  };
   function guardar(E, emociones, dispositivo, como, ahora) {
     ahora = ahora || Date.now();
     const lista = [];
     for (const k of emociones || []) if (POR[k] && !lista.includes(k)) lista.push(k);
     const dia = N.diaCR(ahora), previo = delDia(E, dia);
     return Sincro.cambiar(E, 'animo', { id: idDia(dia), dia, emociones: lista.slice(0, 3), creada: (previo && previo.creada) || ahora,
-      datos: Object.assign({}, previo && previo.datos, { como: como || 'caritas', saltado: false }), borrado_en: null }, dispositivo, ahora);
+      datos: Object.assign({}, previo && previo.datos, { como: como || 'caritas', saltado: false, marcadoEn: ahora, saltadoEn: null }), borrado_en: null }, dispositivo, ahora);
   }
   // (Liz 1.0 · prueba 15) Lo que Liz le CONTESTÓ al marcar (p. ej. "Te doy tu espacio…") queda en su diario, en la fila de ese día
   // (datos.respuesta), junto a lo que él marcó. Se sincroniza como lo demás (misma fila, campo datos).
@@ -56,8 +70,10 @@
   }
   function saltar(E, dispositivo, ahora) {
     ahora = ahora || Date.now();
-    const dia = N.diaCR(ahora);
-    if (delDia(E, dia)) return delDia(E, dia);
+    const dia = N.diaCR(ahora), f = delDia(E, dia);
+    // (19-oct-2026) Si lo que hay es de la madrugada, "Ahora no" se anota (sin borrar lo que marcó): así no se le vuelve a preguntar hoy
+    if (f && deMadrugada(f, ahora)) return Sincro.cambiar(E, 'animo', { id: f.id, datos: Object.assign({}, f.datos, { saltadoEn: ahora }) }, dispositivo, ahora);
+    if (f) return f;
     return Sincro.cambiar(E, 'animo', { id: idDia(dia), dia, emociones: [], creada: ahora, datos: { saltado: true } }, dispositivo, ahora);
   }
 
@@ -106,8 +122,9 @@
     feliz: 'Está FELIZ: celébralo con él y sigue normal, con tu chispa de siempre.',
     tranquilo: 'Está TRANQUILO: sigue normal, cálida y con calma.',
     cansado: 'Está CANSADO: sugiérele descansar o dormir bien; si quiere estudiar, solo lo importante y poquito. No lo llenes de tareas.',
-    estresado: 'Está ESTRESADO: sé más calmada y breve; propón una pausa o respirar juntos (4 segundos inhalar, 4 sostener, 6 exhalar); no lo llenes de tarjetas: ofrece repasar solo unas pocas (5) y paso a paso.',
-    ansioso: 'Está ANSIOSO: tono suave y tranquilizador; propón respirar juntos o una pausa corta; ofrece repasar solo unas pocas tarjetas; nada de presión con fechas ni números.',
+    // (19-oct-2026) "respirar juntos" UNA vez, no en cada mensaje (le decía "respira: inhala 4, sostén 4…" hasta al pedir un recordatorio)
+    estresado: 'Está ESTRESADO: sé más calmada y breve; si viene al caso, propónle UNA vez una pausa o respirar juntos (4 segundos inhalar, 4 sostener, 6 exhalar), no en cada mensaje; no lo llenes de tarjetas: ofrece repasar solo unas pocas (5) y paso a paso.',
+    ansioso: 'Está ANSIOSO: tono suave y tranquilizador; si viene al caso, propónle UNA vez respirar juntos o una pausa corta (no en cada mensaje); ofrece repasar solo unas pocas tarjetas; nada de presión con fechas ni números.',
     triste: 'Está TRISTE: sé más tierna; escúchalo, pregúntale si quiere hablar de eso, no lo apures con el estudio y NADA de chistes.',
     enojado: 'Está ENOJADO: dale espacio; respuestas breves y tranquilas, sin bromas y sin sermones; si quiere desahogarse, escucha.',
   };
@@ -116,19 +133,41 @@
     const l = (emociones || []).filter((k) => POR[k]);
     if (!l.length) return '';
     const quien = opc.dueno || 'Él';
+    // (19-oct-2026) CUÁNDO lo marcó: lo de hace horas puede haber cambiado (no darlo por hecho ni recordárselo a cada rato)
+    const ahora = opc.ahora || Date.now(), horas = opc.marcado ? Math.floor((ahora - opc.marcado) / N.H) : 0;
+    const cuando = opc.marcado ? ' (lo marcó a las ' + N.horaCR(opc.marcado) + (horas >= 4 ? ', hace ' + horas + ' horas: puede que ya se sienta distinto, así que no lo des por hecho' : '') + ')' : '';
     return 'CÓMO SE SIENTE HOY ' + quien.toUpperCase() + ' (lo marcó en su diario de ánimo; es PRIVADO: no lo menciones si hay alguien más): ' +
-      l.map((k) => nombre(k, opc.fem)).join(', ') + '. ' + l.map((k) => COMO_ACTUAR[k]).join(' ') +
-      ' Que se note en tu forma de ser, con naturalidad; no le repitas a cada rato que sabes cómo se siente. No eres psicóloga: no diagnostiques.' +
+      l.map((k) => nombre(k, opc.fem)).join(', ') + cuando + '. ' + l.map((k) => COMO_ACTUAR[k]).join(' ') +
+      ' Que se note en tu forma de ser, con naturalidad; no le repitas a cada rato que sabes cómo se siente. Responde PRIMERO a lo que te pide (un recordatorio, una explicación, sus tarjetas…), sin desviarte a su ánimo. No eres psicóloga: no diagnostiques.' +
       ' Si alguna vez dice que quiere hacerse daño o que no quiere vivir, tómalo en serio: dile con cariño que no está solo, que hable YA con alguien de confianza y que, si está en peligro, llame al 911.';
+  }
+  // (19-oct-2026) ¿Liz ya le propuso RESPIRAR hace poco? (sus mensajes: [{ texto|t, fecha|ms }]) y, si es así, esa frase no se repite
+  const RESPIRA = /respir|inhal|exhal/i;
+  function yaPropusoRespirar(mensajes, ahora, horas) {
+    ahora = ahora || Date.now();
+    return (mensajes || []).some((m) => m && ahora - (Number(m.fecha || m.ms) || 0) < (horas || 3) * N.H && RESPIRA.test(String(m.texto || m.t || '')));
+  }
+  function sinRespirarOtraVez(texto, mensajes, consulta, ahora) {
+    texto = String(texto || '');
+    if (!RESPIRA.test(texto) || /respir|ansie|estres|nervio|calm|panico|agobi|ahog/.test(quitarTildes(String(consulta || '').toLowerCase())) || !yaPropusoRespirar(mensajes, ahora, 3)) return texto;
+    const quedan = (texto.match(/[^.!?…]+[.!?…]*\s*/g) || [texto]).filter((f) => !RESPIRA.test(f)).join('').trim();
+    return quedan.replace(/[^a-záéíóúñ]/gi, '').length >= 8 ? quedan : texto;
   }
   // (Liz 1.0 · prueba 17) LA PARTE DEL PROMPT sobre cómo se siente él: LA MISMA en la compu (src/main/animo-pc.js → prompt) y en el
   // celular (la arma la app con esta función y la manda a liz-cerebro como "animoTexto"): una sola fuente, sin copias.
+  // (19-oct-2026) opc.recientes = lo último que dijo Liz ([{ texto|t, fecha|ms }]): si ya le propuso respirar, se le dice que no lo repita.
   function partePrompt(E, ahora, opc) {
     opc = opc || {};
-    const partes = [];
-    const ins = instrucciones(deHoy(E, ahora), { dueno: opc.dueno, fem: opc.fem });
+    ahora = ahora || Date.now();
+    const partes = [], f = hoy(E, ahora);
+    const ins = instrucciones(deHoy(E, ahora), { dueno: opc.dueno, fem: opc.fem, marcado: marcadoEn(f), ahora });
     if (ins) partes.push(ins);
+    else if (f && deMadrugada(f, ahora) && Array.isArray(f.emociones) && f.emociones.length) {
+      partes.push('EN LA MADRUGADA (a las ' + N.horaCR(marcadoEn(f)) + ') marcó en su diario de ánimo: ' + f.emociones.filter((k) => POR[k]).map((k) => nombre(k, opc.fem)).join(', ') +
+        '. Ya es otro momento del día: no lo trates como si siguiera igual; si viene al caso, pregúntale cómo está ahora.');
+    }
     if (opc.dijo && opc.dijo.length) partes.push('Acaba de contarte cómo se siente (' + opc.dijo.map((k) => nombre(k, opc.fem)).join(', ') + '; ya quedó en su diario de ánimo): respóndele a eso primero, con cariño.');
+    if (yaPropusoRespirar(opc.recientes, ahora, 3)) partes.push('YA LE PROPUSISTE RESPIRAR hace poco: NO lo vuelvas a proponer ni lo menciones (salvo que él lo pida o te diga que está muy agobiado).');
     if (PIDE_RESUMEN.test(String(opc.consulta || ''))) partes.push('SU DIARIO DE ÁNIMO (te pregunta por él): ' + resumenTexto(E, ahora, { fem: opc.fem }));
     return partes.join('\n');
   }
@@ -296,5 +335,5 @@
 
   return { EMOCIONES, POR, PESADAS, nombre, idDia, delDia, hoy, deHoy, debePreguntar, guardar, saltar, delTexto, PIDE_RESUMEN, COMO_ACTUAR,
     instrucciones, partePrompt, reaccion, principal, lineaHoy, anotarRespuesta, respuestaAlMarcar, animoLiz, pesado, tarjetasSugeridas, dias, cuentas, resumen, resumenTexto, necesitaCuidado, textoCuidado, CUIDADO_DIAS,
-    leerFrases, ultimoAviso, esperaCarino, carinoAhora, anotarCarino, anotarCuidado, secreto };
+    leerFrases, ultimoAviso, esperaCarino, carinoAhora, anotarCarino, anotarCuidado, secreto, deMadrugada, yaPropusoRespirar, sinRespirarOtraVez };
 });
