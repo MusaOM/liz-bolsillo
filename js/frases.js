@@ -47,6 +47,17 @@
     vBuscar: ['No encontré nada con eso. ¿Probamos otra palabra?'],
     vPapelera: ['La papelera está vacía. Todo en su lugar.'],
     vMazo: ['Este mazo está vacío. ¿Le agregamos una tarjeta?'],
+    // (20-oct-2026) La charla con Liz y lo nuevo
+    cMadrugada: ['¿Todavía despierto, {nombre}? Cuéntame, aquí estoy.', 'Hola, búho. ¿Qué te tiene despierto, {nombre}?'],
+    cManana: ['¡Buenos días, {nombre}! ¿En qué te ayudo hoy?', 'Buenos días, {nombre}. ¿Qué estudiamos hoy?'],
+    cTarde: ['¡Buenas tardes, {nombre}! ¿De qué hablamos?', 'Hola, {nombre}. Aquí estoy, ¿qué necesitas?'],
+    cNoche: ['Buenas noches, {nombre}. ¿Cómo te fue hoy?', 'Hola, {nombre}. ¿Repasamos algo o solo charlamos?'],
+    cSinInternet: ['Para charlar necesito internet 📶. Mientras, puedes repasar tus tarjetas: eso sí funciona sin conexión.'],
+    cError: ['Uy, se me trabó el cerebro un momento. ¿Me lo repites en un ratito?', 'Perdón, no pude pensar ahorita. ¿Lo intentamos otra vez?'],
+    escribe: ['Escríbeme tu respuesta con tus palabras. Yo la reviso.', 'Cuéntame lo que sabes de esta, como te salga.'],
+    revisando: ['A ver, déjame revisar…', 'Mmm, leyendo tu respuesta…', 'Revisando con lupa…'],
+    pegando: ['Estoy leyendo tu texto con el microscopio…', 'Saco lo importante de tu texto… ya casi.', 'Preparando tus tarjetas, como placas recién sembradas…'],
+    hechas: ['¡Te hice <b>{n}</b> tarjetas de “{nombreMazo}”! ¿Las repasamos?', '¡Listo! <b>{n}</b> tarjetas nuevas de “{nombreMazo}”. ¿Empezamos?'],
   };
   const azar = (l) => l[Math.floor(Math.random() * l.length)];
   function frase(tipo, datos) {
@@ -61,6 +72,10 @@
     const t = h < 5 ? 'madrugada' : h < 12 ? 'manana' : h < 19 ? 'tarde' : h < 23 ? 'noche' : 'madrugada';
     return frase(t, { nombre: nombre || '' });
   }
-  raiz.Frases = { F, frase, saludo };
+  // El saludo de la charla, según la hora
+  function saludoCharla(nombre, h) {
+    return frase(h < 5 ? 'cMadrugada' : h < 12 ? 'cManana' : h < 19 ? 'cTarde' : h < 23 ? 'cNoche' : 'cMadrugada', { nombre: nombre || '' });
+  }
+  raiz.Frases = { F, frase, saludo, saludoCharla };
   if (typeof module === 'object' && module.exports) module.exports = raiz.Frases;
 })(typeof self !== 'undefined' ? self : this);

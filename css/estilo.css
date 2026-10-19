@@ -1,8 +1,10 @@
 /* estilo.css — la Liz de bolsillo, diseño 3 (19-oct-2026): LIZ ES LA PROTAGONISTA, como en la intro y el juego de estudio de la PC.
    Colores: los del tema oscuro de la Liz de la compu (src/renderer/colores.css, body.oscuro, mismos nombres --t-*), con más
    brillo (glow), degradados y bordes que brillan en lo importante. Letra: Nunito (redonda y amigable; fuentes/, licencia OFL).
-   Liz aparece con sus poses 2D (saludo, feliz, animo, dormida, microscopio), que son PRIVADAS: la app las baja del almacenamiento
-   privado y las guarda en el celular; mientras no las tiene, se ve la placa de Petri. */
+   (20-oct-2026, ajustes) Liz se ve con la FOTO de su avatar 3D según su ánimo (círculo con aura en Hoy, carita junto al título y
+   en cada pantalla) y con sus poses 2D en momentos puntuales (reacciones del repaso, el microscopio al hacer tarjetas, dormida en
+   lo vacío, saludo en la charla). Fotos y poses son PRIVADAS: la app las baja del almacenamiento privado y las guarda en el
+   celular; mientras no las tiene, se ve la placa de Petri. */
 @font-face { font-family: 'Nunito'; font-weight: 400; font-display: swap; src: url(../fuentes/nunito-400.woff2) format('woff2'); }
 @font-face { font-family: 'Nunito'; font-weight: 600; font-display: swap; src: url(../fuentes/nunito-600.woff2) format('woff2'); }
 @font-face { font-family: 'Nunito'; font-weight: 800; font-display: swap; src: url(../fuentes/nunito-800.woff2) format('woff2'); }
@@ -99,16 +101,15 @@ svg.ic { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-wid
 .comic.cola-izq::after { left: -10px; top: 40%; transform: rotate(135deg); }
 @keyframes globo { from { opacity: 0; transform: scale(.85) translateY(8px); } to { opacity: 1; transform: none; } }
 
-/* ---------- Pantalla de carga: Liz con el microscopio ---------- */
-#carga { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px;
-  text-align: center; background: radial-gradient(ellipse at 50% 38%, #2d2340, #15101c 60%, #0a080d); transition: opacity .7s var(--suave); }
+/* ---------- Pantalla de carga: MINIMALISTA (como el diseño 2): "Liz / DE BOLSILLO" brillando, la barra y las frases,
+   con el fondo de microbiología detrás (el fondo es medio transparente para que se vean las bacterias) ---------- */
+#carga { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 24px;
+  text-align: center; background: radial-gradient(ellipse at 50% 42%, rgba(45, 35, 64, .55), rgba(21, 16, 28, .72) 60%, rgba(10, 8, 13, .9)); transition: opacity .7s var(--suave); }
 #carga.fuera { opacity: 0; pointer-events: none; }
-#carga .escenaCarga { position: relative; width: min(330px, 84vw); height: 250px; display: grid; place-items: end center; }
-#carga .escenaCarga .aura { inset: -10% 0 0; }
-#carga .escenaCarga .liz2d { max-width: 100%; max-height: 250px; position: relative; }
-#carga .escenaCarga .liz2d.sin { width: 160px; height: 160px; margin-bottom: 40px; }
-#carga .nombre { font-size: 58px; font-weight: 900; line-height: 1; color: #fff; text-shadow: 0 0 18px var(--t-acento), 0 0 46px var(--t-acento-fuerte); animation: brillo 2.6s ease-in-out infinite; }
-#carga .sub { color: var(--t-texto-suave); font-size: 14px; letter-spacing: .3em; text-transform: uppercase; font-weight: 800; margin-top: -6px; }
+/* Mientras carga, la app no se ve detrás (solo el fondo con las bacterias); aparece cuando la carga se desvanece */
+body.cargando #app, body.cargando #menu, body.cargando #entrar, body.cargando #aviso, body.cargando #escribirLiz { visibility: hidden; }
+#carga .nombre { font-size: 72px; font-weight: 900; line-height: 1; letter-spacing: .02em; color: #fff; text-shadow: 0 0 18px var(--t-acento), 0 0 46px var(--t-acento-fuerte); animation: brillo 2.6s ease-in-out infinite; }
+#carga .sub { color: var(--t-texto-suave); font-size: 15px; letter-spacing: .32em; text-transform: uppercase; font-weight: 800; margin-top: -10px; }
 #carga .barra { width: min(250px, 66vw); height: 8px; border-radius: 9px; background: rgba(169, 139, 255, .15); overflow: hidden; margin-top: 6px; }
 #carga .barra i { display: block; height: 100%; width: 0; border-radius: 9px; background: linear-gradient(90deg, var(--magenta), var(--t-acento)); box-shadow: 0 0 14px var(--t-acento); transition: width .5s var(--suave); }
 #carga .frase { min-height: 1.5em; color: var(--t-texto); font-size: 17px; font-weight: 700; transition: opacity .35s; }
@@ -146,7 +147,10 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 
 /* ---------- La app ---------- */
 #app { max-width: 640px; margin: 0 auto; padding: calc(8px + var(--arriba)) calc(16px + var(--der)) calc(116px + var(--abajo)) calc(16px + var(--izq)); }
-#cabeza { display: flex; align-items: center; gap: 10px; padding: 6px 2px 4px; min-height: 52px; }
+#cabeza { display: flex; align-items: center; gap: 12px; padding: 6px 2px 4px; min-height: 52px; }
+/* La carita de Liz junto al título (su foto con el ánimo de hoy) */
+#carita { width: 46px; height: 46px; flex: none; }
+#carita .lizFoto { width: 46px; }
 #cabeza .titulo { flex: 1; min-width: 0; font-size: 30px; font-weight: 900; line-height: 1.1; letter-spacing: -.015em;
   background: linear-gradient(180deg, #fff 30%, #cdb8ff); -webkit-background-clip: text; background-clip: text; color: transparent; filter: drop-shadow(0 0 14px rgba(169, 139, 255, .45)); }
 #estadoSync { display: inline-flex; align-items: center; gap: 6px; max-width: 52%; padding: 6px 12px; border-radius: 999px; background: rgba(34, 27, 44, .75); border: 1px solid var(--vidrio-borde);
@@ -156,23 +160,43 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 #estadoSync.mal::before { background: var(--t-mal); box-shadow: none; }
 .volverBt { display: inline-flex; align-items: center; gap: 4px; color: var(--t-acento); font-weight: 900; font-size: 17px; padding: 6px 2px; }
 
-/* La escena de cada pantalla: Liz (chica) + su globito */
-.escena { position: relative; display: flex; align-items: flex-end; gap: 6px; margin: 2px 0 14px; min-height: 128px; }
-.escena .marcoLiz { position: relative; width: 108px; flex: none; display: grid; place-items: end center; }
-.escena .marcoLiz .aura { width: 150px; height: 150px; left: -20px; bottom: -14px; }
-.escena .marcoLiz .liz2d { position: relative; max-width: 108px; max-height: 132px; }
-.escena .marcoLiz .liz2d.sin { width: 84px; height: 84px; margin-bottom: 14px; }
-.escena .comic { flex: 1; margin: 0 0 28px 8px; font-size: 16px; }
+/* (20-oct-2026) La FOTO de Liz (su avatar 3D, la sube la PC al almacenamiento privado) en un círculo que brilla. Cambia con su
+   ánimo: contenta, feliz, sorprendida, pensativa, tierna, dormida. Sin fotos todavía: la foto de siempre o la placa de Petri. */
+.lizFoto { position: relative; display: block; border-radius: 50%; overflow: hidden; aspect-ratio: 1;
+  background: radial-gradient(circle at 50% 30%, #4a3b66, #241c30 62%, #17121e); border: 2px solid var(--t-acento);
+  box-shadow: 0 0 0 4px var(--t-acento-suave), 0 0 22px rgba(169, 139, 255, .45); }
+.lizFoto img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 30%; user-select: none; -webkit-user-drag: none; animation: fundido .5s; }
+.lizFoto.sin img { inset: 14%; width: 72%; height: 72%; object-fit: contain; }
+.lizFoto.perfil::after { content: ''; position: absolute; inset: 0; background: var(--liz) center 12%/cover no-repeat; }
+.lizFoto.grande { border-width: 3px; box-shadow: 0 0 0 7px rgba(169, 139, 255, .16), 0 0 0 9px rgba(247, 37, 133, .18), 0 0 60px rgba(169, 139, 255, .55), 0 18px 40px rgba(0, 0, 0, .5); }
+.lizFoto.salta { animation: saltaLiz .7s var(--rebote); } .lizFoto.ladea { animation: ladeaLiz .8s var(--suave); }
 
-/* HOY: Liz GRANDE ocupando buena parte de arriba */
-.heroe { position: relative; height: 368px; margin: -6px -16px 6px; overflow: hidden; }
-.heroe .aura { width: 380px; height: 380px; right: -60px; top: 0; }
-.heroe .placa { width: 300px; height: 300px; right: -40px; top: 44px; }
-.heroe .placa.chica { width: 120px; height: 120px; left: -30px; top: 210px; right: auto; border-color: rgba(76, 201, 240, .22); }
-.heroe .liz2d { position: absolute; right: -6px; bottom: 0; max-height: 360px; max-width: 66%; }
-.heroe .liz2d.sin { width: 200px; height: 200px; right: 30px; bottom: 70px; }
-.heroe .comic { position: absolute; left: 10px; top: 26px; max-width: 50%; font-size: 15.5px; z-index: 2; }
-.heroe .degrade { position: absolute; left: 0; right: 0; bottom: 0; height: 70px; background: linear-gradient(transparent, #120e18); pointer-events: none; }
+/* La escena de cada pantalla: la carita de Liz (con su ánimo) + su globito */
+.escena { position: relative; display: flex; align-items: center; gap: 12px; margin: 4px 0 14px; min-height: 96px; }
+.escena .marcoLiz { position: relative; width: 84px; height: 84px; flex: none; }
+.escena .marcoLiz .aura { width: 150px; height: 150px; left: -33px; top: -33px; }
+.escena .marcoLiz .lizFoto { width: 84px; }
+.escena .comic { flex: 1; margin: 0 0 0 8px; font-size: 16px; }
+
+/* HOY: la foto de Liz GRANDE en un círculo con aura (como el diseño 2) y su globito de cómic debajo */
+.heroe { position: relative; display: flex; flex-direction: column; align-items: center; margin: 0 -16px 4px; padding: 14px 16px 0; overflow: hidden; }
+.heroe .marcoFoto { position: relative; width: 212px; height: 212px; margin-top: 4px; }
+.heroe .marcoFoto .aura { width: 340px; height: 340px; left: -64px; top: -64px; }
+.heroe .placa { width: 270px; height: 270px; left: 50%; top: -14px; margin-left: -135px; }
+.heroe .placa.chica { width: 92px; height: 92px; left: 14px; top: 150px; margin-left: 0; border-color: rgba(76, 201, 240, .24); }
+.heroe .lizFoto { width: 212px; }
+.heroe .comic { margin: 22px 0 6px; max-width: 94%; text-align: center; font-size: 16.5px; }
+.comic.cola-arriba::after { left: 50%; top: -10px; margin-left: -11px; transform: rotate(-135deg); }
+.heroe .animo { position: absolute; right: 18px; top: 16px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 900; color: var(--t-texto-suave);
+  background: rgba(34, 27, 44, .78); border: 1px solid var(--vidrio-borde); }
+/* La pantalla final del repaso (Liz 2D grande, feliz o dando ánimo) */
+.heroeFin { position: relative; height: 330px; margin: -6px -16px 6px; overflow: hidden; }
+.heroeFin .aura { width: 380px; height: 380px; right: -60px; top: 0; }
+.heroeFin .placa { width: 300px; height: 300px; right: -40px; top: 44px; }
+.heroeFin .liz2d { position: absolute; right: -6px; bottom: 0; max-height: 320px; max-width: 66%; }
+.heroeFin .liz2d.sin { width: 200px; height: 200px; right: 30px; bottom: 70px; }
+.heroeFin .comic { position: absolute; left: 10px; top: 26px; max-width: 50%; font-size: 15.5px; z-index: 2; }
+.heroeFin .degrade { position: absolute; left: 0; right: 0; bottom: 0; height: 70px; background: linear-gradient(transparent, #120e18); pointer-events: none; }
 /* Vacío chiquito (dentro de una pantalla que ya tiene a Liz arriba): su carita y su frase */
 .vacio.mini { flex-direction: row; align-items: center; gap: 10px; padding: 8px 4px; text-align: left; }
 .vacio.mini .cara-liz { width: 64px; height: 64px; flex: none; border-radius: 50%; overflow: hidden; border: 2px solid var(--t-acento); box-shadow: 0 0 16px rgba(169, 139, 255, .45); background: radial-gradient(circle, #3b3150, #1d1826); }
@@ -387,8 +411,72 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .pronto { font-size: 11px; font-weight: 900; color: var(--rosa); letter-spacing: .1em; border: 1px solid rgba(247, 37, 133, .45); padding: 2px 8px; border-radius: 999px; }
 .pie { text-align: center; font-size: 13px; color: var(--t-texto-suave); margin-top: 22px; }
 
+/* ---------- Responder ESCRIBIENDO (lo califica Liz, como en el juego de la PC) ---------- */
+.dosBotones { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.escribe { display: grid; gap: 10px; }
+.escribe textarea { min-height: 96px; font-size: 17px; }
+.escribe .fila { gap: 10px; } .escribe .fila .bt { flex: 1; }
+.trasEscribir { display: grid; gap: 10px; }
+.trasEscribir .pregunta { display: flex; gap: 8px; }
+.trasEscribir .pregunta input { min-height: 48px; font-size: 16px; }
+.trasEscribir .pregunta .bt { flex: none; }
+.nivel { display: inline-block; margin-bottom: 4px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.nivel.bien { background: rgba(76, 214, 154, .2); color: #1e8a5c; } .nivel.medio { background: rgba(255, 200, 87, .3); color: #8a5b00; } .nivel.mal { background: rgba(255, 138, 128, .28); color: #a3392f; }
+.pensando { display: inline-flex; gap: 5px; padding: 4px 2px; }
+.pensando i { width: 9px; height: 9px; border-radius: 50%; background: currentColor; opacity: .5; animation: puntito 1.1s ease-in-out infinite; }
+.pensando i:nth-child(2) { animation-delay: .15s; } .pensando i:nth-child(3) { animation-delay: .3s; }
+@keyframes puntito { 30% { transform: translateY(-6px); opacity: 1; } }
+
+/* ---------- Charla con Liz ---------- */
+.charla { display: flex; flex-direction: column; gap: 12px; padding-bottom: calc(150px + var(--abajo)); }
+.bienvenida { display: flex; align-items: flex-end; gap: 4px; margin: 0 0 4px; min-height: 150px; }
+.bienvenida .marcoLiz { position: relative; width: 120px; flex: none; display: grid; place-items: end center; }
+.bienvenida .marcoLiz .aura { width: 170px; height: 170px; left: -25px; bottom: -10px; }
+.bienvenida .liz2d { position: relative; max-width: 120px; max-height: 160px; }
+.bienvenida .liz2d.sin { width: 90px; height: 90px; margin-bottom: 20px; }
+.bienvenida .comic { flex: 1; margin: 0 0 36px 8px; font-size: 16px; }
+.msg { display: flex; align-items: flex-end; gap: 8px; animation: aparece .35s var(--suave) both; }
+.msg .lizFoto { width: 34px; flex: none; border-width: 1.5px; box-shadow: 0 0 12px rgba(169, 139, 255, .4); }
+.msg .burbuja { max-width: 80%; padding: 10px 15px; border-radius: 22px; font-weight: 700; font-size: 16.5px; line-height: 1.42; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg.liz .burbuja { background: linear-gradient(170deg, #fbf6ff, #ece2fb); color: #2a1f3a; border-bottom-left-radius: 6px; box-shadow: 0 0 0 2px rgba(169, 139, 255, .45), 0 8px 20px rgba(0, 0, 0, .35); }
+.msg.el { justify-content: flex-end; }
+.msg.el .burbuja { background: linear-gradient(135deg, #a58aff, #7c5cf0 60%, #b44fcf); color: #fff; border-bottom-right-radius: 6px; box-shadow: 0 8px 20px rgba(124, 92, 240, .35); }
+.msg .extra { display: block; margin-top: 8px; padding: 7px 11px; border-radius: 14px; background: rgba(124, 92, 240, .12); color: #4b2fa8; font-size: 14px; font-weight: 800; }
+.msg .extra .bt { margin-top: 6px; min-height: 38px; }
+.msg .hora { display: block; margin-top: 3px; font-size: 11px; opacity: .55; font-weight: 800; }
+.rapidos { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; scrollbar-width: none; }
+.rapidos::-webkit-scrollbar { display: none; }
+.rapidos .chip { flex: none; white-space: nowrap; }
+#escribirLiz { position: fixed; left: calc(12px + var(--izq)); right: calc(12px + var(--der)); bottom: calc(92px + var(--abajo)); z-index: 29; max-width: 620px; margin: 0 auto; }
+#escribirLiz form { display: flex; align-items: flex-end; gap: 8px; padding: 6px; border-radius: 26px; background: rgba(26, 20, 34, .9); border: 1px solid rgba(169, 139, 255, .35);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
+#escribirLiz textarea { min-height: 46px; max-height: 140px; padding: 11px 14px; border-radius: 20px; font-size: 16.5px; resize: none; border: 0; background: rgba(51, 43, 62, .9); }
+#escribirLiz button { width: 46px; height: 46px; flex: none; border-radius: 50%; display: grid; place-items: center; font-size: 20px; color: #fff;
+  background: linear-gradient(135deg, #b39bff, #7c5cf0 55%, #c94bd0); box-shadow: 0 4px 14px rgba(124, 92, 240, .5); }
+#escribirLiz button[disabled] { opacity: .5; }
+
+/* ---------- Pegar texto y "te hice N tarjetas" (Liz con el microscopio) ---------- */
+.conMicro { display: flex; align-items: flex-end; gap: 6px; margin: -4px 0 6px; }
+.conMicro .marcoLiz { position: relative; width: 120px; flex: none; display: grid; place-items: end center; }
+.conMicro .marcoLiz .aura { width: 170px; height: 170px; left: -25px; bottom: -14px; }
+.conMicro .liz2d { position: relative; max-width: 120px; max-height: 150px; }
+.conMicro .liz2d.sin { width: 90px; height: 90px; margin-bottom: 16px; }
+.conMicro .comic { flex: 1; margin: 0 0 30px 8px; font-size: 15.5px; }
+#hoja textarea.grande { min-height: 220px; font-size: 16px; }
+.cuentaLetras { text-align: right; font-size: 13px; color: var(--t-texto-suave); margin: 4px 6px 0; }
+
+/* ---------- Archivos: el botón "Abrir" de cada uno ---------- */
+.archFila { display: flex; align-items: center; gap: 6px; }
+.archFila .item { flex: 1; min-width: 0; }
+.abrirBt { flex: none; margin-right: 8px; min-height: 40px; padding: 7px 14px; border-radius: 999px; font-weight: 900; font-size: 15px; color: #fff;
+  background: linear-gradient(135deg, #a58aff, #7c5cf0); box-shadow: 0 4px 14px rgba(124, 92, 240, .45); }
+.abrirBt:active { transform: scale(.94); }
+.cargando { display: flex; align-items: center; gap: 12px; padding: 16px 6px; font-weight: 800; }
+.cargando::before { content: ''; width: 26px; height: 26px; border-radius: 50%; border: 3px solid rgba(169, 139, 255, .25); border-top-color: var(--t-acento); animation: gira .8s linear infinite; }
+@keyframes gira { to { transform: rotate(360deg); } }
+
 /* ---------- Menú de abajo ---------- */
-#menu { position: fixed; left: calc(12px + var(--izq)); right: calc(12px + var(--der)); bottom: calc(10px + var(--abajo)); z-index: 30; display: grid; grid-template-columns: repeat(5, 1fr);
+#menu { position: fixed; left: calc(12px + var(--izq)); right: calc(12px + var(--der)); bottom: calc(10px + var(--abajo)); z-index: 30; display: grid; grid-template-columns: repeat(6, 1fr);
   max-width: 620px; margin: 0 auto; padding: 6px; border-radius: 30px; background: rgba(26, 20, 34, .82);
   backdrop-filter: blur(20px) saturate(1.4); -webkit-backdrop-filter: blur(20px) saturate(1.4); border: 1px solid rgba(169, 139, 255, .3); box-shadow: 0 12px 36px rgba(0, 0, 0, .6), 0 0 24px rgba(142, 107, 255, .15); }
 #menu button { position: relative; display: flex; flex-direction: column; align-items: center; gap: 3px; min-height: 58px; padding: 6px 0; font-size: 11.5px; font-weight: 900; color: var(--t-texto-suave); border-radius: 24px; transition: color .25s, background .35s var(--suave), transform .18s var(--rebote); }
@@ -396,6 +484,10 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 #menu button svg { width: 25px; height: 25px; transition: transform .35s var(--rebote); }
 #menu button.activo { color: #fff; background: linear-gradient(160deg, rgba(169, 139, 255, .38), rgba(209, 79, 196, .2)); box-shadow: inset 0 0 0 1px rgba(169, 139, 255, .45); }
 #menu button.activo svg { transform: translateY(-2px) scale(1.12); stroke: #d8c8ff; filter: drop-shadow(0 0 7px rgba(169, 139, 255, .9)); }
+#menu button { font-size: 11px; }
+/* La pestaña de Liz: su carita (con su ánimo) en vez de un dibujo */
+#menu .caraMenu { width: 27px; height: 27px; border-width: 1.5px; box-shadow: 0 0 10px rgba(169, 139, 255, .5); }
+#menu button.activo .caraMenu { transform: translateY(-2px) scale(1.12); box-shadow: 0 0 0 2px rgba(255, 255, 255, .5), 0 0 14px rgba(169, 139, 255, .9); }
 #menu .punto { position: absolute; top: 3px; right: calc(50% - 24px); min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--magenta); color: #fff; font-size: 12px; line-height: 20px; font-weight: 900; box-shadow: 0 0 12px rgba(247, 37, 133, .7); }
 
 /* ---------- Hoja que sube desde abajo ---------- */
@@ -418,8 +510,7 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
   display: flex; align-items: center; gap: 10px; max-width: 90vw; padding: 8px 16px 8px 8px; border-radius: 22px; background: rgba(40, 32, 52, .96); border: 1.5px solid rgba(169, 139, 255, .6);
   font-weight: 800; box-shadow: 0 10px 30px rgba(0, 0, 0, .55), 0 0 24px rgba(142, 107, 255, .35); transition: opacity .3s var(--suave), transform .35s var(--rebote); }
 #aviso.ver { opacity: 1; transform: translate(-50%, 0) scale(1); }
-#aviso .liz2d { width: 42px; height: 42px; object-fit: cover; object-position: 50% 8%; border-radius: 50%; background: radial-gradient(circle, #3b3150, #1d1826); border: 2px solid var(--t-acento); filter: none; }
-#aviso .liz2d.sin { width: 42px; height: 42px; box-shadow: none; }
+#aviso .lizFoto { width: 42px; flex: none; box-shadow: none; }
 
 /* Para la vibración en iPhone (un interruptor invisible) */
 #haptico { position: fixed; left: -100px; top: -100px; width: 1px; height: 1px; opacity: 0; pointer-events: none; }

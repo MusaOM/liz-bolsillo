@@ -8,18 +8,28 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Liz">
+<meta name="apple-mobile-web-app-title" content="LIZ">
 <meta name="robots" content="noindex">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="iconos/icono-180.png">
-<link rel="icon" href="iconos/icono.svg" type="image/svg+xml">
+<link rel="icon" href="iconos/icono-192.png" type="image/png">
+<!-- La pantalla que muestra el iPhone mientras abre la app (herramientas/hacer-iconos-movil.js) -->
+<link rel="apple-touch-startup-image" media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="iconos/inicio-1290x2796.png">
+<link rel="apple-touch-startup-image" media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="iconos/inicio-1179x2556.png">
+<link rel="apple-touch-startup-image" media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="iconos/inicio-1170x2532.png">
+<link rel="apple-touch-startup-image" media="(device-width: 428px) and (device-height: 926px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="iconos/inicio-1284x2778.png">
+<link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="iconos/inicio-1125x2436.png">
+<link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="iconos/inicio-1242x2688.png">
+<link rel="apple-touch-startup-image" media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="iconos/inicio-828x1792.png">
+<link rel="apple-touch-startup-image" media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2) and (orientation: portrait)" href="iconos/inicio-750x1334.png">
+<link rel="apple-touch-startup-image" media="(device-width: 402px) and (device-height: 874px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="iconos/inicio-1206x2622.png">
+<link rel="apple-touch-startup-image" media="(device-width: 440px) and (device-height: 956px) and (-webkit-device-pixel-ratio: 3) and (orientation: portrait)" href="iconos/inicio-1320x2868.png">
 <link rel="stylesheet" href="css/estilo.css">
-<title>Liz</title>
+<title>LIZ</title>
 </head>
 <body>
-<!-- Pantalla de carga (como la de la PC: frases de laboratorio) -->
+<!-- Pantalla de carga minimalista (como el diseño 2): "Liz / de bolsillo" brillando, la barra y frases de laboratorio, con las bacterias detrás -->
 <div id="carga" role="status" aria-live="polite">
-  <div class="escenaCarga" data-liz="microscopio"><div class="aura"></div></div>
   <div class="nombre">Liz</div>
   <div class="sub">de bolsillo</div>
   <div class="barra"><i></i></div>
@@ -41,15 +51,19 @@
 
 <main id="app" hidden>
   <header id="cabeza">
+    <div id="carita" aria-hidden="true"></div>
     <div class="titulo" id="tituloVista">Hoy</div>
     <span id="estadoSync"></span>
   </header>
   <section id="vista" class="vista"></section>
 </main>
+<!-- Charla con Liz: el cuadro para escribirle (solo se ve en la pestaña Liz) -->
+<div id="escribirLiz" hidden><form id="formLiz"><textarea id="textoLiz" rows="1" placeholder="Escríbele a Liz…" enterkeyhint="send" maxlength="14000"></textarea><button aria-label="Enviar">➤</button></form></div>
 
 <nav id="menu" hidden aria-label="Menú">
   <button data-v="hoy" class="activo"><svg class="ic" viewBox="0 0 24 24"><path d="M4 11.5 12 4l8 7.5"/><path d="M6 10v9.5a.5.5 0 0 0 .5.5H10v-5.5h4V20h3.5a.5.5 0 0 0 .5-.5V10"/></svg>Hoy</button>
   <button data-v="repasar"><svg class="ic" viewBox="0 0 24 24"><rect x="3" y="6.5" width="13" height="14" rx="2.5" transform="rotate(-8 9.5 13.5)"/><path d="M10 4.2l7.6.9a2.5 2.5 0 0 1 2.2 2.8l-1.2 10"/></svg>Repasar</button>
+  <button data-v="charla"><span class="lizFoto caraMenu" id="caraMenu"></span>Liz</button>
   <button data-v="agenda"><svg class="ic" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15.5" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/><circle cx="8.5" cy="14.5" r=".6"/><circle cx="12" cy="14.5" r=".6"/><circle cx="15.5" cy="14.5" r=".6"/></svg>Agenda</button>
   <button data-v="mazos"><svg class="ic" viewBox="0 0 24 24"><path d="m12 3.5 8.5 4.5L12 12.5 3.5 8z"/><path d="m3.5 12 8.5 4.5 8.5-4.5"/><path d="m3.5 16 8.5 4.5 8.5-4.5"/></svg>Mazos</button>
   <button data-v="mas"><svg class="ic" viewBox="0 0 24 24"><rect x="4" y="4" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="2"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="2"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="2"/></svg>Más</button>

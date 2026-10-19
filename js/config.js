@@ -3,5 +3,5 @@
 self.LIZ_CONFIG = {
   "supabaseUrl": "https://fwdcioedyafxvakjpdfa.supabase.co",
   "supabaseKey": "sb_publishable_tRCeajus0FS4gbZeZp9yDw_jBrFGKYH",
-  "vapidPublica": ""
+  "vapidPublica": "BBGgWD-_gXvsbAqXyyt2ZmMZbzHqqQpt7YPnZlWmm4RbNk6c9dddCypHM27506XFj1eobH9C7hzom25tvt6JIGo"
 };

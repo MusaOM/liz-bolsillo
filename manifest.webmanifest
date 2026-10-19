@@ -1,18 +1,17 @@
 {
-  "name": "Liz de bolsillo",
-  "short_name": "Liz",
-  "description": "Tarjetas de estudio con repaso espaciado, sincronizadas con la Liz de la compu.",
+  "name": "LIZ",
+  "short_name": "LIZ",
+  "description": "Liz de bolsillo: tus tarjetas con repaso espaciado, tu agenda y una charla con Liz, sincronizadas con la Liz de la compu.",
   "lang": "es",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#1a1520",
-  "theme_color": "#1a1520",
+  "background_color": "#15101c",
+  "theme_color": "#1b1622",
   "icons": [
-    { "src": "iconos/icono-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "iconos/icono-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "iconos/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
-    { "src": "iconos/icono.svg", "sizes": "any", "type": "image/svg+xml" }
+    { "src": "iconos/icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "iconos/icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "iconos/icono-mascara-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

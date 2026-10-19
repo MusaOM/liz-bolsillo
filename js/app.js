@@ -4,8 +4,10 @@
 // de organizar y de la agenda son LAS MISMAS que en la Liz de la compu (nucleo.js, organizar.js, agenda.js). Lo que dice Liz sale
 // de frases.js (lista fija, sin inteligencia artificial). Las horas, en hora de Costa Rica.
 // ?demo en la dirección: modo de prueba con datos de ejemplo y un servidor de mentira (no toca nada de verdad, no guarda nada).
-// (Más adelante, preparado pero NO hecho: calificar con IA y charlar con Liz, por una Edge Function que guarde la clave de Groq
-// del lado del servidor: ver supabase/functions/liz-cerebro/LEEME.md.)
+// (20-oct-2026) + CHARLA con Liz (pestaña Liz), responder tarjetas ESCRIBIENDO (las califica Liz), PEGAR TEXTO para hacer
+// tarjetas y "Abrir" archivos. Lo que necesita inteligencia lo pide a la función de Supabase "liz-cerebro" (supabase/functions/
+// liz-cerebro): la clave de Groq vive SOLO allá, nunca en esta página. Sin internet: se repasa con los botones de siempre.
+// La foto de Liz (su avatar 3D, privada) cambia con su ánimo: animoHoy().
 (function () {
   'use strict';
   const $ = (s, r) => (r || document).querySelector(s);
@@ -22,12 +24,15 @@
   let sb = null, cli = null;
   let perfil = { nombre: '' };
   let liz2d = {};                           // las poses de Liz (privadas, guardadas en el celular): 'saludo-g' → imagen
+  let animos = {};                          // las fotos de su cara con cada ánimo (privadas): 'contenta' → imagen
+  let animoForzado = null;                  // (para las fotos de prueba)
+  let charla = [];                          // la charla con Liz en este celular: [{ id, quien: 'el'|'liz', texto, fecha, extra }]
   let vista = 'hoy';
   let sesion = null;                        // la ronda de repaso en curso
   let mazoAbierto = null, buscando = '';
   const ag = { modo: 'mes', ref: Date.now(), dia: N.inicioDiaCR(Date.now()) };
   let sincronizando = false, otraVez = false, ultimoError = '', sinSesion = false;
-  const TITULOS = { hoy: 'Hoy', repasar: 'Repasar', agenda: 'Agenda', mazos: 'Mis mazos', mas: 'Más', recordatorios: 'Recordatorios', archivos: 'Archivos',
+  const TITULOS = { hoy: 'Hoy', repasar: 'Repasar', charla: 'Liz', agenda: 'Agenda', mazos: 'Mis mazos', mas: 'Más', recordatorios: 'Recordatorios', archivos: 'Archivos',
     progreso: 'Mi progreso', papelera: 'Papelera' };
   const DE_MAS = ['recordatorios', 'archivos', 'progreso', 'papelera'];
 
@@ -44,8 +49,9 @@
   const cargaAvance = (p) => { $('#carga .barra i').style.width = p + '%'; };
   function cargaFin() {
     const falta = Math.max(0, 1500 - (Date.now() - carga.t0));
-    setTimeout(() => { cargaAvance(100); clearInterval(carga.tFrase); setTimeout(() => $('#carga').classList.add('fuera'), 250); setTimeout(() => { $('#carga').hidden = true; }, 900); }, falta);
+    setTimeout(() => { cargaAvance(100); clearInterval(carga.tFrase); setTimeout(() => { $('#carga').classList.add('fuera'); document.body.classList.remove('cargando'); }, 250); setTimeout(() => { $('#carga').hidden = true; }, 900); }, falta);
   }
+  document.body.classList.add('cargando');
   cargaFrase();
   carga.tFrase = setInterval(cargaFrase, 1700);
   cargaAvance(15);
@@ -123,6 +129,21 @@
         pintarSuave();
       }
     }
+    // (20-oct-2026) Las fotos de su cara con cada ánimo (las saca y sube la PC; PRIVADAS): se bajan solo si cambiaron
+    const an = data.datos && data.datos.animos;
+    if (an && an.v && an.v !== perfil.animosV && an.archivos && typeof an.archivos === 'object') {
+      const imgs = {};
+      for (const [animo, n] of Object.entries(an.archivos)) {
+        const r = await sb.storage.from('liz-privado').download(an.carpeta + n);
+        if (r.data) imgs[animo] = await aDataURL(r.data);
+      }
+      if (Object.keys(imgs).length) {
+        animos = imgs;
+        await Almacen.guardar(K + 'animos', imgs);
+        perfil.animosV = an.v;
+        pintarSuave();
+      }
+    }
     Almacen.guardar(K + 'perfil', perfil);
   }
   const aDataURL = (blob) => new Promise((ok, mal) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = mal; f.readAsDataURL(blob); });
@@ -139,6 +160,8 @@
       const img = await Almacen.leer(K + 'liz-img');
       if (img) ponerFoto(img);
       liz2d = (await Almacen.leer(K + 'liz2d')) || {};
+      animos = (await Almacen.leer(K + 'animos')) || {};
+      charla = (await Almacen.leer(K + 'charla')) || [];
       pintarFijas();
     } catch (e) { console.warn('Almacén', e); }
     cargaAvance(55);
@@ -160,6 +183,8 @@
       E = Sincro.vacio();
       perfil = { nombre: '' };
       liz2d = {};
+      animos = {};
+      charla = [];
       await Almacen.borrarTodo().catch(() => {});
       document.documentElement.style.removeProperty('--liz');
       document.body.classList.add('sin-foto');
@@ -173,7 +198,7 @@
     $('#entrar').hidden = true;
     $('#app').hidden = false;
     $('#menu').hidden = false;
-    pintar();
+    if (!irPorEnlace(location.hash)) pintar();
     setInterval(() => sincronizar('auto'), 5 * MIN);
     setInterval(() => { if (vista === 'hoy' || vista === 'agenda' || vista === 'recordatorios') pintarSuave(); }, 60000);
   }
@@ -209,30 +234,45 @@
   });
   // ---------- Navegar y pintar ----------
   function ir(v) {
+    if (!PINTA[v]) v = 'hoy';
     vista = v;
     if (v !== 'mazos') mazoAbierto = null;
     const tab = DE_MAS.includes(v) ? 'mas' : v;
     for (const b of document.querySelectorAll('#menu button')) b.classList.toggle('activo', b.dataset.v === tab);
+    if (v !== 'charla') window.scrollTo({ top: 0 });
     pintar();
-    window.scrollTo({ top: 0 });
   }
-  const PINTA = { hoy: pintarHoy, repasar: pintarRepasar, agenda: pintarAgenda, mazos: pintarMazos, mas: pintarMas, recordatorios: pintarRecordatorios,
+  const PINTA = { hoy: pintarHoy, repasar: pintarRepasar, charla: pintarCharla, agenda: pintarAgenda, mazos: pintarMazos, mas: pintarMas, recordatorios: pintarRecordatorios,
     archivos: pintarArchivos, progreso: pintarProgreso, papelera: pintarPapelera };
   function pintar() {
     const v = $('#vista');
     v.classList.remove('vista'); void v.offsetWidth; v.classList.add('vista');      // (la animación de entrada, suave)
     PINTA[vista](v);
     $('#tituloVista').textContent = vista === 'mazos' && mazoAbierto && E.mazos[mazoAbierto] ? 'Mazo' : TITULOS[vista];
+    $('#escribirLiz').hidden = vista !== 'charla';
+    pintarCarita();
     pintarEstado();
     pintarMenu();
+    if (vista === 'charla') abajoCharla();
   }
   // Repintar sin la animación de entrada (cuando solo cambió la hora o llegó algo)
   function pintarSuave() {
-    if (document.querySelector('#hoja:not([hidden])') || respondiendo) return;
+    if (document.querySelector('#hoja:not([hidden])') || respondiendo || (vista === 'repasar' && sesion && sesion.escrito)) return;
+    if (vista === 'charla') { pintarCarita(); pintarMenu(); return; }    // (la charla no se repinta sola: se perdería lo que escribe)
     const v = $('#vista');
     v.classList.remove('vista');
     PINTA[vista](v);
+    pintarCarita();
     pintarMenu();
+  }
+  // Un enlace a una pantalla (lo usan los avisos al tocarlos): #hoy, #repasar, #charla, #agenda, #recordatorios, #archivos, #mazo=<id>
+  function irPorEnlace(h) {
+    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso)$|^mazo=([\w-]+)$/);
+    if (!m) return false;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    if (m[2]) { if (!E.mazos[m[2]]) { ir('mazos'); return true; } vista = 'mazos'; ir('mazos'); mazoAbierto = m[2]; pintar(); return true; }
+    ir(m[1]);
+    return true;
   }
   function pintarMenu() {
     const n = Org.paraRepasar(E, { soloHoy: true }).length;
@@ -292,19 +332,62 @@
     return src ? '<img class="liz2d ' + (clase || '') + '" src="' + src + '" alt="Liz">'
       : '<div class="liz2d sin ' + (clase || '') + '"><img src="iconos/icono.svg" alt=""></div>';
   }
-  // Arriba de cada pantalla: Liz (chica) y su globito
-  const escena = (pose, frase) => '<div class="escena"><div class="marcoLiz"><div class="aura"></div>' + lizImg(pose, 'c', 'respira') + '</div>' +
-    '<div class="comic cola-izq">' + frase + '</div></div>';
-  // Estado vacío: siempre Liz con una frase suya
-  const vacio = (pose, frase, boton) => '<div class="vacio"><div class="comic cola-abajo">' + frase + '</div><div class="marcoLiz"><div class="aura"></div>' +
-    lizImg(pose, 'c', 'respira') + '</div>' + (boton || '') + '</div>';
-  // Vacío chiquito: dentro de una pantalla que ya tiene a Liz arriba (su carita y su frase)
-  const vacioMini = (pose, frase) => '<div class="vacio mini"><div class="cara-liz">' + lizImg(pose, 'c') + '</div><div class="comic cola-izq">' + frase + '</div></div>';
-  function pintarFijas() {
-    for (const [sel, pose] of [['#carga .escenaCarga', 'microscopio'], ['#entrar .escenaEntrar', 'saludo']]) {
-      const el = $(sel);
-      if (el) el.innerHTML = '<div class="aura"></div>' + lizImg(pose, 'g', 'respira');
+  // ---------- (20-oct-2026) Liz: la FOTO de su cara (avatar 3D, privada) con su ánimo de ahora ----------
+  // contenta (lo normal), feliz (racha o muchos aciertos), pensativa (muchas tarjetas), tierna (falló mucho), dormida (de noche o
+  // si no hay nada), sorprendida (examen cerca). Sin fotos de ánimo todavía: la foto de siempre (--liz) o la placa de Petri.
+  function animoHoy() {
+    if (animoForzado) return animoForzado;
+    const ahora = Date.now(), h = N.enCR(ahora).h;
+    const reps = Object.values(E.repasos);
+    const hoyR = reps.filter((r) => r.fecha >= N.inicioDiaCR(ahora));
+    const malHoy = hoyR.filter((r) => r.resultado !== 'bien').length;
+    const tocan = Org.paraRepasar(E, { soloHoy: true }).length;
+    const ex = Ag.proximosExamenes(E, ahora)[0];
+    const agendaHoy = Ag.delDia(E, ahora).filter((x) => !x.hecho && x.ms > ahora).length;
+    if (h >= 22 || h < 5) return 'dormida';
+    if (ex && ex.cuando - ahora <= 3 * DIA) return 'sorprendida';
+    if (hoyR.length >= 5 && malHoy / hoyR.length >= 0.5) return 'tierna';
+    if (N.racha(reps) >= 3 || hoyR.length - malHoy >= 10) return 'feliz';
+    if (tocan >= 10) return 'pensativa';
+    if (!tocan && !agendaHoy) return 'dormida';
+    return 'contenta';
+  }
+  const TEXTO_ANIMO = { contenta: '😊 contenta', feliz: '✨ feliz', pensativa: '🔬 pensativa', tierna: '💜 tierna', dormida: '😴 dormida', sorprendida: '😮 sorprendida' };
+  function fotoLiz(animo, clase) {
+    const src = animos[animo || animoHoy()] || animos.contenta;
+    if (src) return '<span class="lizFoto ' + (clase || '') + '"><img src="' + src + '" alt="Liz"></span>';
+    if (!document.body.classList.contains('sin-foto')) return '<span class="lizFoto perfil ' + (clase || '') + '"></span>';
+    return '<span class="lizFoto sin ' + (clase || '') + '"><img src="iconos/icono.svg" alt=""></span>';
+  }
+  // La carita junto al título y en la pestaña "Liz"
+  function pintarCarita() {
+    const a = animoHoy();
+    const clave = a + !!animos[a] + !!animos.contenta + document.body.classList.contains('sin-foto');
+    const c = $('#carita');
+    if (c && c.dataset.animo !== clave) { c.innerHTML = fotoLiz(a); c.dataset.animo = clave; }
+    const m = $('#caraMenu');
+    if (m && m.dataset.animo !== clave) {
+      const src = animos[a] || animos.contenta;
+      m.innerHTML = src ? '<img src="' + src + '" alt="">' : '';
+      m.classList.toggle('perfil', !src && !document.body.classList.contains('sin-foto'));
+      m.classList.toggle('sin', !src && document.body.classList.contains('sin-foto'));
+      if (!src && document.body.classList.contains('sin-foto')) m.innerHTML = '<img src="iconos/icono.svg" alt="">';
+      m.dataset.animo = clave;
     }
+  }
+  // Arriba de cada pantalla: la carita de Liz (con su ánimo) y su globito
+  const escena = (pose, frase) => '<div class="escena"><div class="marcoLiz"><div class="aura"></div>' + fotoLiz(null, 'respira') + '</div>' +
+    '<div class="comic cola-izq">' + frase + '</div></div>';
+  // Estado vacío: Liz DORMIDA (pose 2D) con una frase suya
+  const vacio = (pose, frase, boton) => '<div class="vacio"><div class="comic cola-abajo">' + frase + '</div><div class="marcoLiz"><div class="aura"></div>' +
+    lizImg('dormida', 'c', 'respira') + '</div>' + (boton || '') + '</div>';
+  // Vacío chiquito: dentro de una pantalla que ya tiene a Liz arriba (su carita dormida y su frase)
+  const vacioMini = (pose, frase) => '<div class="vacio mini"><div class="cara-liz">' + lizImg('dormida', 'c') + '</div><div class="comic cola-izq">' + frase + '</div></div>';
+  // Liz con el microscopio (pose 2D) y su globito: cuando hace tarjetas o lee un texto pegado
+  const conMicro = (frase) => '<div class="conMicro"><div class="marcoLiz"><div class="aura"></div>' + lizImg('microscopio', 'c', 'respira') + '</div><div class="comic cola-izq">' + frase + '</div></div>';
+  function pintarFijas() {
+    const el = $('#entrar .escenaEntrar');
+    if (el) el.innerHTML = '<div class="aura"></div>' + lizImg('saludo', 'g', 'respira');
   }
   const ICONO = { evento: '📅', recordatorio: '⏰', examen: '📝', parcial: '📝', entrega: '📦', quiz: '📝' };
   const COLOR = { evento: 'celeste', recordatorio: 'oro', examen: 'rosa', parcial: 'rosa', entrega: 'rosa', quiz: 'rosa' };
@@ -323,7 +406,7 @@
       '<button class="txt" style="text-align:left" data-a="editarAgenda" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '"><b>' + esc(titulo) + '</b><small>' + (sub.join(' · ') || '&nbsp;') + '</small></button></div></li>';
   }
 
-  // ---------- HOY: Liz grande, su globito, y debajo lo del día ----------
+  // ---------- HOY: la foto de Liz grande (con su ánimo), su globito debajo, y lo del día ----------
   function pintarHoy(v) {
     const ahora = Date.now();
     const tocan = Org.paraRepasar(E, { soloHoy: true });
@@ -333,16 +416,17 @@
     const hoyN = reps.filter((r) => r.fecha >= N.inicioDiaCR(ahora)).length;
     const msg = !total ? fija('hoy', 'sinTarjetas') : tocan.length > 1 ? fija('hoy', 'hayHoy', { n: '<b>' + tocan.length + '</b>' })
       : tocan.length === 1 ? fija('hoy', 'hayUna') : fija('hoy', 'nadaHoy');
-    // Su pose según el momento: mucho que repasar → microscopio; nada → dormida; con racha → feliz; si no, saluda
-    const pose = tocan.length >= 10 ? 'microscopio' : total && !tocan.length ? 'dormida' : racha >= 3 ? 'feliz' : 'saludo';
+    // Su foto según su ánimo (animoHoy): feliz con racha, pensativa con muchas tarjetas, sorprendida con un examen cerca...
+    const animo = animoHoy();
     const hoyAg = Ag.delDia(E, ahora);
     const exs = Ag.proximosExamenes(E, ahora).filter((x) => x.cuando < ahora + 30 * DIA);
     const ex = exs[0];
     const dEx = ex ? Math.round((N.inicioDiaCR(ex.cuando) - N.inicioDiaCR(ahora)) / DIA) : 0;
     const favs = Org.paraRepasar(E, { favoritas: true }).length, difs = Org.paraRepasar(E, { dificiles: true }).length;
     v.innerHTML =
-      '<div class="heroe"><div class="aura"></div><div class="placa"></div><div class="placa chica"></div>' + lizImg(pose, 'g', 'respira') +
-      '<div class="comic cola-der">' + esc(saludoFijo()) + '<br>' + msg + (racha >= 2 ? '<small>🔥 ' + esc(fija('racha', 'racha', { n: racha })) + '</small>' : '') + '</div><div class="degrade"></div></div>' +
+      '<div class="heroe"><div class="placa"></div><div class="placa chica"></div><span class="animo">' + TEXTO_ANIMO[animo] + '</span>' +
+      '<div class="marcoFoto respira"><div class="aura"></div>' + fotoLiz(animo, 'grande') + '</div>' +
+      '<div class="comic cola-arriba">' + esc(saludoFijo()) + '<br>' + msg + (racha >= 2 ? '<small>🔥 ' + esc(fija('racha', 'racha', { n: racha })) + '</small>' : '') + '</div></div>' +
       (tocan.length ? '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + tocan.length + '</span><span class="t"><b>Repasar ahora</b>' +
         (tocan.length === 1 ? 'tarjeta te toca hoy' : 'tarjetas te tocan hoy') + '</span><span class="flecha">▶</span></button>' : '') +
       (ex ? '<button class="examenG" data-a="editarAgenda" data-tabla="examenes" data-id="' + esc(ex.id) + '"><span class="cuenta">' +
@@ -362,7 +446,8 @@
     const ids = lista.map((x) => (x.t ? x.t.id : x)).filter((id) => E.tarjetas[id] && !E.tarjetas[id].borrado_en);
     if (!ids.length) { avisar('No hay tarjetas ahí todavía.'); return; }
     sesion = { titulo, cola: ids.slice(0, 40).map((id) => ({ id, repetida: false })), i: 0, volteada: false, bien: 0, primeras: Math.min(ids.length, 40),
-      dice: '¡Vamos! Toca la tarjeta cuando quieras ver la respuesta.', reaccion: '', pose: 'microscopio', fin: false, entra: true };
+      dice: puedeCerebro() ? '¡Vamos! Escríbeme tu respuesta o toca la tarjeta para verla.' : '¡Vamos! Toca la tarjeta cuando quieras ver la respuesta.',
+      reaccion: '', pose: 'animo', fin: false, entra: true, escrito: null };
     ir('repasar');
   }
   let respondiendo = false;
@@ -390,7 +475,7 @@
       '</span><button class="bt chico" data-a="salirSesion">Terminar</button></div>' +
       '<div class="barraProg"><i style="width:' + pct + '%"></i></div>' +
       '<div class="lizRep"><div class="marcoLiz"><div class="aura"></div><span id="lizRep">' + lizImg(sesion.pose, 'c', sesion.reaccion || 'respira') + '</span></div>' +
-      '<div class="comic cola-izq" id="lizDice">' + esc(sesion.dice) + '</div></div>' +
+      '<div class="comic cola-izq" id="lizDice">' + (sesion.diceHtml || esc(sesion.dice)) + '</div></div>' +
       '<div class="tarjetaG' + (sesion.volteada ? ' volteada' : '') + (sesion.entra ? ' entra' : '') + '" data-a="voltear"><div class="giro">' +
       '<div class="cara frente"><div class="m">' + esc(nombreMazo(t.mazo_id)) + (c.repetida ? ' · otra vez' : '') + '</div><div class="p">' + esc(t.pregunta) + '</div>' +
       (fig ? '<img src="' + esc(fig.src) + '" alt="" loading="lazy" onerror="this.remove()">' : '') +
@@ -403,9 +488,120 @@
     sesion.entra = false;
     sesion.reaccion = '';
   }
-  const botonesSesion = () => (sesion.volteada
-    ? '<div class="respuestas"><button class="r-mal" data-a="resp" data-r="mal"><span>😕</span>No la sabía</button><button class="r-medio" data-a="resp" data-r="medio"><span>🤏</span>A medias</button><button class="r-bien" data-a="resp" data-r="bien"><span>😄</span>La sabía</button></div>'
-    : '<button class="bt prin grande" data-a="voltear">Ver respuesta</button>');
+  const botonesSesion = () => (sesion.escrito ? botonesEscrito()
+    : sesion.volteada
+      ? '<div class="respuestas"><button class="r-mal" data-a="resp" data-r="mal"><span>😕</span>No la sabía</button><button class="r-medio" data-a="resp" data-r="medio"><span>🤏</span>A medias</button><button class="r-bien" data-a="resp" data-r="bien"><span>😄</span>La sabía</button></div>'
+      : puedeCerebro() ? '<div class="dosBotones"><button class="bt prin grande" data-a="escribirResp">✍️ Escribir mi respuesta</button><button class="bt grande" data-a="voltear">Ver respuesta</button></div>'
+        : '<button class="bt prin grande" data-a="voltear">Ver respuesta</button>');
+
+  // ---------- (20-oct-2026) Responder ESCRIBIENDO: Liz lo califica con las MISMAS reglas del juego de la PC ----------
+  // bien / medio (qué tiene bien y qué le faltó) / mal, por SIGNIFICADO, con la respuesta guardada y el fragmento de donde salió.
+  // Si él PREGUNTA algo ("¿qué es...?", "no entiendo"), Liz lo explica sin calificar. Solo la PRIMERA respuesta cuenta para el
+  // repaso espaciado (como siempre). Después: "¿Por qué?" o cualquier pregunta sobre esa tarjeta sigue el hilo. Sin internet: botones.
+  const puedeCerebro = () => DEMO || (!!sb && navigator.onLine && !!E.usuario);
+  function botonesEscrito() {
+    const e = sesion.escrito;
+    if (e.fase === 'escribiendo' || e.fase === 'revisando') {
+      return '<form class="escribe" id="fEscribe"><textarea id="tEscribe" placeholder="Escribe tu respuesta aquí…" maxlength="800"' + (e.fase === 'revisando' ? ' disabled' : '') + '>' + esc(e.borrador || '') + '</textarea>' +
+        '<div class="fila"><button class="bt prin"' + (e.fase === 'revisando' ? ' disabled' : '') + '>' + (e.fase === 'revisando' ? 'Revisando…' : '✓ Revisar') + '</button>' +
+        '<button type="button" class="bt" data-a="cancelarEscribir">Cancelar</button></div></form>';
+    }
+    return '<div class="trasEscribir"><button class="bt prin grande" data-a="siguienteTarjeta">Siguiente ▶</button>' +
+      '<form class="pregunta" id="fPregunta"><input type="text" id="tPregunta" placeholder="¿Algo que no entendiste? Pregúntame" maxlength="400" autocomplete="off">' +
+      '<button class="bt chico prin"' + (e.explicando ? ' disabled' : '') + '>➤</button></form>' +
+      '<div class="chips" style="margin:0"><button class="chip" data-a="porQue">🤔 ¿Por qué?</button><button class="chip" data-a="otraForma">🔁 Explícamelo de otra forma</button></div></div>';
+  }
+  function decirEnSesion(html, pose, reaccion) {
+    const d = $('#lizDice');
+    if (d) d.innerHTML = html;
+    sesion.diceHtml = html;
+    if (pose) { sesion.pose = pose; const l = $('#lizRep'); if (l) l.innerHTML = lizImg(pose, 'c', reaccion || 'respira'); }
+  }
+  const PENSANDO = '<span class="pensando"><i></i><i></i><i></i></span>';
+  async function revisarEscrito(texto) {
+    const e = sesion.escrito, c = sesion.cola[sesion.i], t = E.tarjetas[c.id];
+    if (!t || e.fase === 'revisando') return;
+    e.fase = 'revisando';
+    e.borrador = texto;
+    $('#abajoSesion').innerHTML = botonesSesion();
+    decirEnSesion(esc(F.frase('revisando')) + ' ' + PENSANDO);
+    const r = await cerebro('calificar', { tarjeta: { pregunta: t.pregunta, respuesta: t.respuesta, contexto: t.contexto || '', fuente: t.fuente || '' }, respuesta: texto, hilo: e.hilo });
+    if (!sesion || sesion.escrito !== e) return;
+    e.hilo.push({ q: 'el', t: texto });
+    if (!r || r.error || r.limite || r.sinInternet || !r.nivel) {
+      // Sin cerebro: se voltea y él elige con los botones de siempre
+      sesion.escrito = null;
+      sesion.volteada = true;
+      $('.tarjetaG').classList.add('volteada');
+      $('#abajoSesion').innerHTML = botonesSesion();
+      decirEnSesion(esc(r && r.dice ? r.dice : r && r.sinInternet ? 'Sin internet no puedo revisarla. Mira la respuesta y dime cómo te fue.' : 'No pude revisarla ahora. Mira la respuesta y dime cómo te fue.'));
+      return;
+    }
+    e.hilo.push({ q: 'liz', t: r.dice });
+    if (r.nivel === 'pregunta') {
+      e.fase = 'escribiendo';
+      e.borrador = '';
+      $('#abajoSesion').innerHTML = botonesSesion();
+      decirEnSesion(esc(r.dice), 'animo', 'ladea');
+      setTimeout(() => { const ta = $('#tEscribe'); if (ta) ta.focus(); }, 200);
+      return;
+    }
+    // Calificada: cuenta para el repaso espaciado (solo la primera vez), se voltea y Liz reacciona
+    e.fase = 'hecho';
+    e.nivel = r.nivel;
+    const res = r.nivel;
+    if (!c.repetida) {
+      Sincro.repasar(E, c.id, res, DISP);
+      if (res === 'bien') sesion.bien++;
+      guardarLocal();
+      pedirSincro();
+      if (res !== 'bien') sesion.cola.push({ id: c.id, repetida: true });
+    }
+    sesion.volteada = true;
+    const tj = $('.tarjetaG');
+    tj.classList.remove('entra');
+    tj.classList.add('volteada');
+    const NIVEL = { bien: '¡La sabías!', medio: 'A medias', mal: 'Todavía no' };
+    decirEnSesion('<span class="nivel ' + res + '">' + NIVEL[res] + '</span><br>' + esc(r.dice), res === 'bien' ? 'feliz' : 'animo', res === 'bien' ? 'salta' : 'ladea');
+    vibrar(res);
+    sonar(res);
+    if (res === 'bien') { tj.classList.add('brilla'); confeti(); }
+    $('#abajoSesion').innerHTML = botonesSesion();
+  }
+  async function preguntarTarjeta(texto) {
+    const e = sesion && sesion.escrito, c = sesion.cola[sesion.i], t = E.tarjetas[c.id];
+    if (!e || !t || e.explicando || !texto.trim()) return;
+    e.explicando = true;
+    $('#abajoSesion').innerHTML = botonesSesion();
+    decirEnSesion(PENSANDO);
+    const r = await cerebro('explicar', { tarjeta: { pregunta: t.pregunta, respuesta: t.respuesta, contexto: t.contexto || '', fuente: t.fuente || '' }, texto, hilo: e.hilo, yaRespondio: true });
+    if (!sesion || sesion.escrito !== e) return;
+    e.explicando = false;
+    const dice = r && r.dice ? r.dice : 'No pude pensar ahora. La respuesta es: ' + t.respuesta;
+    e.hilo.push({ q: 'el', t: texto }, { q: 'liz', t: dice });
+    decirEnSesion(esc(dice), 'animo');
+    $('#abajoSesion').innerHTML = botonesSesion();
+  }
+  // Pasar a la siguiente tarjeta (después de escribir), con la misma animación de siempre
+  function siguienteTarjeta() {
+    if (respondiendo) return;
+    respondiendo = true;
+    const res = sesion.escrito && sesion.escrito.nivel;
+    const tj = $('.tarjetaG');
+    if (tj) tj.classList.add('vuela');
+    setTimeout(() => {
+      respondiendo = false;
+      sesion.i++;
+      sesion.volteada = false;
+      sesion.entra = true;
+      sesion.reaccion = '';
+      sesion.escrito = null;
+      sesion.diceHtml = null;
+      sesion.dice = res === 'bien' ? '¡Sigamos! ¿Esta también la sabes?' : 'Vamos con la siguiente. Escribe o toca la tarjeta.';
+      if (sesion.i >= sesion.cola.length) sesion.fin = true;
+      pintarSuave();
+    }, 450);
+  }
   function responder(res) {
     if (respondiendo) return;
     respondiendo = true;
@@ -419,6 +615,7 @@
       if (res !== 'bien') sesion.cola.push({ id: c.id, repetida: true });
     }
     sesion.dice = F.frase(res);
+    sesion.diceHtml = null;
     // Liz reacciona con su pose: feliz al acertar, dando ánimo al fallar
     sesion.pose = res === 'bien' ? 'feliz' : 'animo';
     sesion.reaccion = res === 'bien' ? 'salta' : 'ladea';
@@ -449,7 +646,7 @@
     }
     const quedan = Org.paraRepasar(E, { soloHoy: true }).length;
     const bueno = sesion.bien / sesion.primeras >= 0.6;
-    v.innerHTML = '<div class="heroe" style="height:330px"><div class="aura"></div><div class="placa"></div>' + lizImg(bueno ? 'feliz' : 'animo', 'g', 'salta') +
+    v.innerHTML = '<div class="heroeFin"><div class="aura"></div><div class="placa"></div>' + lizImg(bueno ? 'feliz' : 'animo', 'g', 'salta') +
       '<div class="comic cola-der">' + esc(sesion.txtFin) + '</div><div class="degrade"></div></div>' +
       '<div class="grandes"><div><b>' + sesion.bien + '</b><small>a la primera</small></div><div><b>' + (sesion.primeras - sesion.bien) + '</b><small>para repasar</small></div>' +
       '<div><b>' + N.racha(Object.values(E.repasos)) + '</b><small>🔥 racha</small></div></div>' +
@@ -540,10 +737,11 @@
       '<div class="espacio" style="margin:6px 6px 0"><i style="width:' + pct + '%"></i></div>' +
       (l.length ? '<h3>Tus archivos</h3><div class="panel"><ul class="lista">' + l.map((a) => {
         const es = a.estado === 'listo' ? ['listo', '✅ Listo: ' + (a.tarjetas || 0) + ' tarjetas'] : ESTADO_ARCH[a.estado] || ['', a.estado];
-        return '<li><button class="item" data-a="archivo" data-id="' + esc(a.id) + '"><span class="ico">' + icoArch(a.nombre) + '</span><span class="txt"><b>' + esc(a.nombre) + '</b><small>' +
+        return '<li><div class="archFila"><button class="item" data-a="archivo" data-id="' + esc(a.id) + '"><span class="ico">' + icoArch(a.nombre) + '</span><span class="txt"><b>' + esc(a.nombre) + '</b><small>' +
           [a.materia ? esc(a.materia) : 'Sin materia', a.tamano ? tamTxt(a.tamano) : '', a.origen === 'pc' ? '💻 de la compu' : '📱 ' + enDias(a.creada || Date.now())].filter(Boolean).join(' · ') +
-          '</small><span class="estado ' + es[0] + '">' + esc(es[1]) + '</span>' + (a.mensaje && a.estado !== 'listo' ? '<small>' + esc(a.mensaje) + '</small>' : '') + '</span></button></li>';
-      }).join('') + '</ul></div>' : vacioMini('animo', fija('vArch', 'vArchivos')));
+          '</small><span class="estado ' + es[0] + '">' + esc(es[1]) + '</span>' + (a.mensaje && a.estado !== 'listo' ? '<small>' + esc(a.mensaje) + '</small>' : '') + '</span></button>' +
+          (a.ruta ? '<button class="abrirBt toque" data-a="abrirArch" data-id="' + esc(a.id) + '">Abrir</button>' : '') + '</div></li>';
+      }).join('') + '</ul></div>' : vacioMini('dormida', fija('vArch', 'vArchivos')));
   }
 
   // ---------- MAZOS ----------
@@ -569,6 +767,7 @@
     const favs = Org.paraRepasar(E, { favoritas: true }).length, difs = Org.paraRepasar(E, { dificiles: true }).length;
     const hay = arbol.length || huerfanos.length;
     v.innerHTML = (hay ? escena('microscopio', fija('pMaz', 'pMazos')) : '') +
+      '<button class="subir toque" data-a="pegarTexto" style="margin-bottom:12px"><span class="e">📋</span><span class="txt"><b>Pegar texto</b><span>Pega tus apuntes y te hago tarjetas solo con eso</span></span><span class="bt prin chico">＋</span></button>' +
       '<input type="search" id="buscar" placeholder="🔎 Buscar en mis tarjetas" value="' + esc(buscando) + '" autocomplete="off">' +
       '<div id="resBusca"></div><div id="arbol">' +
       '<div class="chips"><button class="chip" data-a="repasarFav">⭐ Favoritas (' + favs + ')</button><button class="chip" data-a="repasarDif">🔥 Difíciles (' + difs + ')</button></div>' +
@@ -576,7 +775,7 @@
         esc(x.materia.nombre) + '</b><button class="bt chico" data-a="menuMateria" data-id="' + esc(x.materia.id) + '" aria-label="Opciones de la materia">⋯</button></div>' +
         '<div class="panel"><ul class="lista">' + (x.mazos.length ? x.mazos.map((m) => filaMazo(m.mazo)).join('') : '<li class="suave" style="padding:12px 16px">Sin mazos</li>') + '</ul></div>').join('') +
         (huerfanos.length ? '<div class="materiaCab"><span class="bola"></span><b>Sin materia</b></div><div class="panel"><ul class="lista">' + huerfanos.map(filaMazo).join('') + '</ul></div>' : '')
-        : vacio('saludo', fija('vMaz', 'vMazos'))) +
+        : vacio('dormida', fija('vMaz', 'vMazos'))) +
       '<div class="acciones" style="grid-template-columns:1fr 1fr 1fr"><button class="bt chico" data-a="nuevaMateria">＋ Materia</button><button class="bt chico" data-a="nuevoMazo">＋ Mazo</button><button class="bt chico" data-a="nuevaTarjeta">＋ Tarjeta</button></div></div>';
     const inp = $('#buscar');
     inp.addEventListener('input', () => { buscando = inp.value; pintarBusqueda(); });
@@ -662,12 +861,13 @@
       fila('avisos', '🔔', 'rosa', 'Avisos', 'Recordatorios, exámenes y tarjetas del día') +
       interruptor('alternarVibra', '📳', '', 'Vibración', 'Al acertar o fallar una tarjeta', pref.vibra) +
       interruptor('alternarSonido', '🔊', '', 'Sonidos', 'Un sonidito al acertar (apagado al principio)', pref.sonido) +
-      '<li><div class="item" style="opacity:.8"><span class="ico rosa">💬</span><span class="txt"><b>Charlar con Liz</b><small>Calificar con IA y hablar con ella</small></span><span class="pronto">PRONTO</span></div></li></ul></div>' +
+      fila('ir', '💬', 'rosa', 'Charlar con Liz', 'Pregúntale, pídele recordatorios o tarjetas', '', ' data-v="charla"') +
+      fila('pegarTexto', '📋', 'celeste', 'Pegar texto', 'Te hago tarjetas con lo que pegues') + '</ul></div>' +
       '<h3>Tu cuenta</h3><div class="panel"><ul class="lista">' +
       fila('sincronizarYa', '🔄', 'celeste', 'Sincronizar ahora', E.ultimaSincro ? 'Última vez: ' + hace(E.ultimaSincro) : 'Todavía no') +
       (instalada ? '' : fila('comoInstalar', '📲', '', 'Instalar en el iPhone', 'Para tenerla en la pantalla de inicio')) +
       (DEMO ? '' : sinSesion ? fila('volverEntrar', '🔑', 'oro', 'Volver a entrar', 'Con tu correo y contraseña') : fila('salir', '🚪', '', 'Cerrar sesión', 'En este celular')) + '</ul></div>' +
-      '<p class="pie">Liz de bolsillo · versión 4</p>';
+      '<p class="pie">LIZ · Liz de bolsillo · versión 5</p>';
   }
   function pintarPapelera(v) {
     const l = Org.papelera(E);
@@ -906,18 +1106,224 @@
     if (!a) return;
     const ops = [];
     if (a.mazo_id && E.mazos[a.mazo_id] && !E.mazos[a.mazo_id].borrado_en) ops.push({ v: 'repasar', t: '▶ Repasar sus ' + (a.tarjetas || '') + ' tarjetas' }, { v: 'mazo', t: '🗂️ Ver su mazo' });
-    if (a.ruta && !DEMO) ops.push({ v: 'ver', t: '⬇ Abrir el archivo' });
+    if (a.ruta) ops.push({ v: 'ver', t: '📂 Abrir o guardar el archivo' });
     ops.push({ v: 'borrar', t: '🗑️ Borrar (a la papelera)', clase: 'peligro' });
     const r = await elegir(a.nombre, ops, a.materia ? 'Materia: ' + a.materia : '');
     if (r === 'repasar') empezar(Org.paraRepasar(E, { mazo: a.mazo_id }), nombreMazo(a.mazo_id));
     if (r === 'mazo') { vista = 'mazos'; ir('mazos'); mazoAbierto = a.mazo_id; pintar(); }
-    if (r === 'ver') {
-      if (!navigator.onLine) return avisar('Necesito internet para abrirlo.');
-      const { data, error } = await sb.storage.from('liz-privado').createSignedUrl(a.ruta, 600);
-      if (error) return avisar('No lo pude abrir: ' + error.message);
-      window.open(data.signedUrl, '_blank');
-    }
+    if (r === 'ver') setTimeout(() => abrirArchivoYa(id), 350);
     if (r === 'borrar') { Ag.borrar(E, 'archivos', id, DISP); avisar('A la papelera (lo recuperas en 30 días).'); cambio(); }
+  }
+  // (20-oct-2026) "Abrir": funciona en Safari y en la app instalada (también con lo que subió la PC). En el iPhone, abrir una
+  // ventana DESPUÉS de esperar la descarga no está permitido (lo bloquea), así que va en dos toques: (1) "Abrir" baja el archivo
+  // mientras dice "Preparando…"; (2) "Abrir o guardar" abre la hoja de compartir del iPhone (Abrir en…, Guardar en Archivos) y
+  // "Ver en Safari" es un enlace normal (firmado, sirve 10 minutos).
+  const TIPOS = { pdf: 'application/pdf', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', doc: 'application/msword',
+    pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation', ppt: 'application/vnd.ms-powerpoint', txt: 'text/plain', md: 'text/markdown',
+    jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', heic: 'image/heic', heif: 'image/heif', webp: 'image/webp', gif: 'image/gif' };
+  async function abrirArchivoYa(id) {
+    const a = E.archivos[id];
+    if (!a) return;
+    if (!a.ruta) return avisar(a.origen === 'pc' ? 'Ese archivo se quedó en la compu (era muy grande o todavía no termina de subir).' : 'Ese archivo todavía no está en la nube.');
+    if (!DEMO && !navigator.onLine) return avisar('Necesito internet para abrirlo.');
+    const h = abrirHoja('<h2>' + icoArch(a.nombre) + ' ' + esc(a.nombre) + '</h2><div class="cargando">Preparando el archivo…</div><div class="botones"><button class="bt grande" data-cerrar>Cancelar</button></div>');
+    let archivo = null, enlace = '';
+    try {
+      if (DEMO) {
+        archivo = new File(['Archivo de ejemplo del modo de prueba.'], a.nombre.replace(/\.[^.]+$/, '') + '.txt', { type: 'text/plain' });
+      } else {
+        const [bajado, firmado] = await Promise.all([sb.storage.from('liz-privado').download(a.ruta), sb.storage.from('liz-privado').createSignedUrl(a.ruta, 600)]);
+        if (bajado.error || !bajado.data) throw new Error(bajado.error ? bajado.error.message : 'no llegó');
+        const ext = (a.nombre.match(/\.([a-z0-9]+)$/i) || [])[1] || a.tipo || '';
+        archivo = new File([bajado.data], a.nombre, { type: TIPOS[String(ext).toLowerCase()] || bajado.data.type || 'application/octet-stream' });
+        enlace = firmado.data ? firmado.data.signedUrl : '';
+      }
+    } catch (e) {
+      if (!$('#hoja').hidden && $('#hoja') === h) $('.cargando', h).outerHTML = '<p class="error">No lo pude bajar: ' + esc(e.message || e) + '</p>';
+      return;
+    }
+    if ($('#hoja').hidden) return;
+    const comparte = navigator.canShare && navigator.canShare({ files: [archivo] });
+    h.innerHTML = '<h2>' + icoArch(a.nombre) + ' ' + esc(a.nombre) + '</h2><p class="suave">' + (a.tamano ? tamTxt(a.tamano) + ' · ' : '') + 'Listo para abrir.</p><div class="botones">' +
+      '<button class="bt prin grande" id="abrirYa">' + (comparte ? '📲 Abrir o guardar' : '⬇ Descargar') + '</button>' +
+      (enlace ? '<a class="bt grande" href="' + esc(enlace) + '" target="_blank" rel="noopener">👀 Ver en Safari</a>' : '') +
+      '<button class="bt grande" data-cerrar>Cerrar</button></div>' +
+      (comparte ? '<p class="suave" style="font-size:14px">En la hoja que aparece: <b>Guardar en Archivos</b> para tenerlo en el iPhone, o elige la app con que abrirlo.</p>' : '');
+    $('#abrirYa', h).onclick = async () => {
+      if (comparte) {
+        try { await navigator.share({ files: [archivo], title: a.nombre }); } catch (e) { if (e && e.name !== 'AbortError') avisar('No se pudo abrir: ' + e.message); }
+        return;
+      }
+      const u = URL.createObjectURL(archivo), el = document.createElement('a');
+      el.href = u; el.download = archivo.name; document.body.appendChild(el); el.click(); el.remove();
+      setTimeout(() => URL.revokeObjectURL(u), 60000);
+    };
+  }
+
+  // ---------- (20-oct-2026) El cerebro de Liz: la función "liz-cerebro" de Supabase (la clave de Groq vive allá, nunca aquí) ----------
+  async function cerebro(tipo, cuerpo) {
+    if (DEMO) return cerebroDemo(tipo, cuerpo || {});
+    if (!navigator.onLine) return { sinInternet: true };
+    if (!sb) return { error: 'la app no está configurada' };
+    try {
+      const r = await Promise.race([
+        sb.functions.invoke('liz-cerebro', { body: Object.assign({ tipo }, cuerpo || {}) }),
+        new Promise((ok) => setTimeout(() => ok({ error: { message: 'tardó demasiado' } }), 45000)),
+      ]);
+      if (r.error) {
+        let m = r.error.message || String(r.error);
+        const st = r.error.context && r.error.context.status;
+        if (st === 404) m = 'todavía no está publicada la función liz-cerebro (ver planes/movil.md)';
+        else if (st === 401) { sinSesion = true; m = 'tu sesión venció: vuelve a entrar'; }
+        return { error: m };
+      }
+      return r.data || { error: 'no respondió' };
+    } catch (e) { return { error: e.message || String(e) }; }
+  }
+
+  // ---------- CHARLA con Liz (pestaña "Liz") ----------
+  // Se guarda en el celular y se sube a la tabla "charla" (así la Liz de la compu sabe de qué hablaron). Liz puede crear
+  // recordatorios y exámenes desde aquí (van a la agenda, que se sincroniza como siempre). Sin internet: lo dice con cariño.
+  const RAPIDOS = [['hoy', '📅 ¿Qué me toca hoy?'], ['explica', '🔬 Explícame algo'], ['animo', '💪 Ánimo para el examen'], ['pegar', '📋 Hazme tarjetas de esto']];
+  let pensandoCharla = false;
+  const horaMsg = (ms) => N.horaCR(ms);
+  function burbuja(m) {
+    const extra = m.extra ? '<span class="extra">' + m.extra.html + '</span>' : '';
+    return m.quien === 'liz'
+      ? '<div class="msg liz">' + fotoLiz(m.animo || 'contenta') + '<div class="burbuja">' + esc(m.texto) + extra + '<span class="hora">' + horaMsg(m.fecha) + '</span></div></div>'
+      : '<div class="msg el"><div class="burbuja">' + esc(m.texto) + '<span class="hora">' + horaMsg(m.fecha) + '</span></div></div>';
+  }
+  function pintarCharla(v) {
+    const h = N.enCR(Date.now()).h;
+    if (!fijas.charla || fijas.charla.k !== h + perfil.nombre) fijas.charla = { k: h + perfil.nombre, txt: F.saludoCharla(perfil.nombre, h) };
+    v.innerHTML = '<div class="charla"><div class="bienvenida"><div class="marcoLiz"><div class="aura"></div>' + lizImg('saludo', 'c', 'respira') + '</div>' +
+      '<div class="comic cola-izq">' + esc(fijas.charla.txt) + '</div></div>' +
+      '<div class="rapidos">' + RAPIDOS.map(([k, t]) => '<button class="chip toque" data-a="rapido" data-k="' + k + '">' + t + '</button>').join('') + '</div>' +
+      '<div id="mensajes">' + charla.slice(-60).map(burbuja).join('') + (pensandoCharla ? '<div class="msg liz" id="pensandoMsg">' + fotoLiz('pensativa') + '<div class="burbuja">' + PENSANDO + '</div></div>' : '') + '</div></div>';
+  }
+  function abajoCharla() { setTimeout(() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' }), 60); }
+  function agregarMsg(m) {
+    m = Object.assign({ id: N.uuid(), fecha: Date.now() }, m);
+    charla = charla.concat(m).slice(-120);
+    if (!DEMO) Almacen.guardar(K + 'charla', charla).catch(() => {});
+    const caja = $('#mensajes');
+    if (vista === 'charla' && caja) { const p = $('#pensandoMsg'); if (p) p.remove(); caja.insertAdjacentHTML('beforeend', burbuja(m)); abajoCharla(); }
+    // A la nube (para que la PC lo sepa); si falla (sin internet o sin la tabla), no pasa nada
+    if (!DEMO && sb && navigator.onLine && E.usuario) sb.from('charla').insert({ id: m.id, quien: m.quien, texto: String(m.texto).slice(0, 4000), fecha: m.fecha, dispositivo: DISP }).then(() => {}, () => {});
+    return m;
+  }
+  function pensando(si) {
+    pensandoCharla = si;
+    const caja = $('#mensajes');
+    if (!caja) return;
+    const p = $('#pensandoMsg');
+    if (si && !p) { caja.insertAdjacentHTML('beforeend', '<div class="msg liz" id="pensandoMsg">' + fotoLiz('pensativa') + '<div class="burbuja">' + PENSANDO + '</div></div>'); abajoCharla(); }
+    if (!si && p) p.remove();
+  }
+  // Lo que la app sabe de su estudio ahora (va al cerebro como contexto)
+  function contextoTexto() {
+    const ahora = Date.now();
+    const tocan = Org.paraRepasar(E, { soloHoy: true });
+    const porMazo = {};
+    for (const x of tocan) { const n = nombreMazo((x.t || E.tarjetas[x]).mazo_id); porMazo[n] = (porMazo[n] || 0) + 1; }
+    const exs = Ag.proximosExamenes(E, ahora).slice(0, 4).map((x) => N.nombreExamen(x) + ' el ' + N.fechaTxt(x.cuando) + ' a las ' + N.horaCR(x.cuando));
+    const hoyAg = Ag.delDia(E, ahora).map((x) => x.titulo + ' (' + N.horaCR(x.ms) + (x.hecho ? ', hecho' : '') + ')');
+    const prox = Ag.listaRecordatorios(E, ahora).filter((x) => !x.hecho && x.vez > ahora && x.vez < ahora + 7 * DIA).slice(0, 5).map((x) => x.r.texto + ' (' + N.fechaTxt(x.vez) + ' ' + N.horaCR(x.vez) + ')');
+    const reps = Object.values(E.repasos), hoyR = reps.filter((r) => r.fecha >= N.inicioDiaCR(ahora));
+    return [
+      perfil.nombre ? 'Se llama ' + perfil.nombre + '.' : '',
+      'Hoy le tocan ' + tocan.length + ' tarjetas' + (tocan.length ? ' (' + Object.entries(porMazo).map(([k, n]) => k + ': ' + n).join(', ') + ')' : '') + '. Tiene ' + Org.vivos(E.tarjetas).length + ' tarjetas en total.',
+      'Hoy repasó ' + hoyR.length + ' (' + hoyR.filter((r) => r.resultado === 'bien').length + ' bien). Racha: ' + N.racha(reps) + ' días.',
+      exs.length ? 'Próximos exámenes: ' + exs.join('; ') + '.' : 'No tiene exámenes anotados.',
+      hoyAg.length ? 'Su agenda de hoy: ' + hoyAg.join('; ') + '.' : 'Nada en su agenda de hoy.',
+      prox.length ? 'Recordatorios de esta semana: ' + prox.join('; ') + '.' : '',
+      'Materias: ' + (Org.vivos(E.materias).map((m) => m.nombre).join(', ') || 'ninguna') + '.',
+    ].filter(Boolean).join('\n');
+  }
+  async function enviarCharla(texto) {
+    texto = String(texto || '').trim();
+    if (!texto || pensandoCharla) return;
+    // Un texto LARGO pidiendo tarjetas: se hacen solo con ese texto (como "Pegar texto")
+    if (texto.length >= 400 && /tarjetas?/i.test(texto.slice(0, 160))) {
+      agregarMsg({ quien: 'el', texto: texto.slice(0, 160) + '… (' + texto.length + ' letras)' });
+      const corte = texto.slice(0, 160).search(/[:\n]|\.\s/);
+      return hacerTarjetasDeTexto({ texto: texto.slice(corte > 0 ? corte + 1 : 0), nombre: '', materia: '' }, true);
+    }
+    agregarMsg({ quien: 'el', texto });
+    if (!DEMO && !navigator.onLine) { agregarMsg({ quien: 'liz', texto: F.frase('cSinInternet'), animo: 'tierna' }); return; }
+    pensando(true);
+    const r = await cerebro('charla', { mensajes: charla.slice(-12).map((m) => ({ quien: m.quien, texto: m.texto })), contexto: contextoTexto() });
+    pensando(false);
+    if (r.sinInternet) return agregarMsg({ quien: 'liz', texto: F.frase('cSinInternet'), animo: 'tierna' });
+    if (r.error && !r.dice) return agregarMsg({ quien: 'liz', texto: F.frase('cError') + ' (' + r.error + ')', animo: 'tierna' });
+    let extra = null, animo = 'contenta';
+    // Lo que pidió anotar: va a la agenda (se sincroniza con la compu)
+    if (r.recordatorio) {
+      const cuando = N.msDeCR(r.recordatorio.fecha, r.recordatorio.hora);
+      const x = isFinite(cuando) ? Ag.crearRecordatorio(E, { texto: r.recordatorio.texto, cuando, repite: r.recordatorio.repite || null }, DISP) : { error: 'fecha rara' };
+      if (x.ok) { extra = { html: '⏰ Anotado: ' + esc(r.recordatorio.texto) + ' · ' + esc(N.fechaTxt(cuando)) + ', ' + N.horaCR(cuando) }; animo = 'feliz'; cambio(); }
+    }
+    if (r.examen) {
+      const cuando = N.msDeCR(r.examen.fecha, r.examen.hora);
+      const x = isFinite(cuando) ? Ag.crearExamen(E, { que: r.examen.que, materia: r.examen.materia, cuando }, DISP) : { error: 'fecha rara' };
+      if (x.ok) { extra = { html: '📝 Anotado: ' + esc(N.nombreExamen(x.fila).replace(/^./, (c) => c.toUpperCase())) + ' · ' + esc(N.fechaTxt(cuando)) + ', ' + N.horaCR(cuando) + '<br>Te aviso 3 días antes, el día antes y 2 horas antes.' }; animo = 'feliz'; cambio(); }
+    }
+    if (r.pegar) extra = { html: '<button class="bt chico prin" data-a="pegarTexto">📋 Pegar el texto</button>' };
+    agregarMsg({ quien: 'liz', texto: r.dice || '…', extra, animo: r.limite ? 'dormida' : animo });
+    if (r.pegar) setTimeout(() => hojaPegar(), 900);
+  }
+
+  // ---------- PEGAR TEXTO → tarjetas (con Liz y su microscopio) ----------
+  function hojaPegar(inicial) {
+    const h = abrirHoja(conMicro('Pega aquí tus apuntes o un texto y te hago tarjetas <b>solo con eso</b>.') +
+      '<form id="fPegar"><label for="pgTexto">El texto</label><textarea id="pgTexto" class="grande" maxlength="14000" placeholder="Pega el texto aquí (mantén apretado → Pegar)">' + esc(inicial || '') + '</textarea>' +
+      '<div class="cuentaLetras" id="pgCuenta"></div>' +
+      '<label for="pgNombre">Nombre del mazo</label><input type="text" id="pgNombre" maxlength="80" placeholder="Ej.: Endosporas">' +
+      '<label for="pgMateria">Materia</label><input type="text" id="pgMateria" list="pgMaterias" maxlength="60" placeholder="Ej.: Bacteriología">' +
+      '<datalist id="pgMaterias">' + materiasConocidas().map((m) => '<option value="' + esc(m) + '">').join('') + '</datalist>' +
+      '<p class="error" id="pgErr"></p><div class="botones"><button class="bt prin grande">🧫 Hacer tarjetas</button><button type="button" class="bt grande" data-cerrar>Cancelar</button></div></form>');
+    const ta = $('#pgTexto', h), cu = $('#pgCuenta', h);
+    const contar = () => { cu.textContent = ta.value.length ? ta.value.length + ' letras' + (ta.value.length > 12000 ? ' (uso las primeras 12.000)' : '') : ''; };
+    ta.addEventListener('input', contar);
+    contar();
+    $('#fPegar', h).addEventListener('submit', (ev) => {
+      ev.preventDefault();
+      const texto = ta.value.trim();
+      if (texto.length < 80) { $('#pgErr', h).textContent = 'Pega un poco más de texto (por lo menos un párrafo).'; return; }
+      if (!DEMO && !navigator.onLine) { $('#pgErr', h).textContent = 'Necesito internet para leerlo.'; return; }
+      hacerTarjetasDeTexto({ texto, nombre: $('#pgNombre', h).value.trim(), materia: $('#pgMateria', h).value.trim() });
+    });
+  }
+  async function hacerTarjetasDeTexto(d, desdeCharla) {
+    const nombre = d.nombre || 'Texto pegado ' + N.fechaTxt(Date.now()).replace(/^\w+ /, '');
+    const h = abrirHoja(conMicro(esc(F.frase('pegando')) + ' ' + PENSANDO) + '<div class="cargando">Haciendo tus tarjetas… (unos segundos)</div>');
+    const r = await cerebro('tarjetas', { texto: d.texto.slice(0, 12000), nombre, materia: d.materia, cantidad: 12 });
+    const lista = r && Array.isArray(r.tarjetas) ? r.tarjetas : [];
+    if (!lista.length) {
+      const m = r.sinInternet ? 'Necesito internet para leer tu texto.' : r.limite ? r.dice : r.error === 'corto' ? 'Ese texto es muy cortito: pega un poco más.' : 'No me salieron tarjetas de ese texto' + (r.error ? ' (' + r.error + ')' : '') + '. ¿Lo intentamos otra vez?';
+      h.innerHTML = conMicro(esc(m)) + '<div class="botones"><button class="bt grande" data-cerrar>Cerrar</button></div>';
+      if (desdeCharla) agregarMsg({ quien: 'liz', texto: m, animo: 'tierna' });
+      return;
+    }
+    const ma = Org.crearMateria(E, d.materia || 'General', DISP);
+    const mz = Org.crearMazo(E, nombre, ma.id, null, DISP);
+    let n = 0;
+    for (const x of lista) {
+      const t = Org.crearTarjeta(E, { mazo_id: mz.id, pregunta: x.pregunta, respuesta: x.respuesta, fuente: 'Texto pegado: ' + nombre, contexto: x.contexto }, DISP);
+      if (t.ok) n++;
+    }
+    cambio();
+    if (!n) {
+      h.innerHTML = conMicro('Esas tarjetas ya las tenías todas. ¿Pegamos otro texto?') + '<div class="botones"><button class="bt grande" data-cerrar>Cerrar</button></div>';
+      return;
+    }
+    vibrar('bien');
+    confeti(30);
+    h.innerHTML = conMicro(F.frase('hechas', { n, nombreMazo: esc(nombre) })) +
+      '<div class="botones"><button class="bt prin grande" id="pgRepasar">▶ Repasarlas ahora</button><button class="bt grande" data-cerrar>Después</button></div>';
+    $('#pgRepasar', h).onclick = () => { cerrarHoja(true); empezar(Org.paraRepasar(E, { mazo: mz.id }), nombre); };
+    if (desdeCharla || vista === 'charla') agregarMsg({ quien: 'liz', texto: 'Te hice ' + n + ' tarjetas de “' + nombre + '”. ¿Las repasamos?', animo: 'feliz',
+      extra: { html: '<button class="bt chico prin" data-a="repasarMazo" data-id="' + esc(mz.id) + '">▶ Repasarlas</button>' } });
   }
 
   // ---------- Botones (data-a) ----------
@@ -931,6 +1337,7 @@
     repasarCuestan: () => empezar(lasQueCuestan(), 'Las que más te cuestan'),
     voltear: () => {
       if (!sesion || sesion.fin || respondiendo) return;
+      if (sesion.escrito && sesion.escrito.fase !== 'hecho') { if (sesion.escrito.fase === 'revisando') return; sesion.escrito = null; }
       sesion.volteada = !sesion.volteada;
       const tj = $('.tarjetaG');
       tj.classList.remove('entra');
@@ -938,6 +1345,26 @@
       $('#abajoSesion').innerHTML = botonesSesion();
     },
     resp: (d) => responder(d.r),
+    // Responder escribiendo
+    escribirResp: () => {
+      if (!sesion || respondiendo) return;
+      sesion.escrito = { fase: 'escribiendo', borrador: '', hilo: [] };
+      $('#abajoSesion').innerHTML = botonesSesion();
+      decirEnSesion(esc(F.frase('escribe')));
+      setTimeout(() => { const t = $('#tEscribe'); if (t) t.focus(); }, 150);
+    },
+    cancelarEscribir: () => { if (!sesion) return; sesion.escrito = null; $('#abajoSesion').innerHTML = botonesSesion(); },
+    siguienteTarjeta: () => siguienteTarjeta(),
+    porQue: () => preguntarTarjeta('¿Por qué?'),
+    otraForma: () => preguntarTarjeta('Explícamelo de otra forma, con un ejemplo.'),
+    // Charla y pegar texto
+    rapido: (d) => {
+      if (d.k === 'pegar') return hojaPegar();
+      if (d.k === 'explica') { const t = $('#textoLiz'); t.value = 'Explícame '; t.focus(); t.setSelectionRange(t.value.length, t.value.length); return; }
+      enviarCharla(d.k === 'hoy' ? '¿Qué me toca hoy?' : 'Dame ánimo para mi próximo examen, porfa.');
+    },
+    pegarTexto: () => hojaPegar(),
+    abrirArch: (d) => abrirArchivoYa(d.id),
     salirSesion: () => { sesion = null; ir('hoy'); },
     marcarFav: (d, b) => { const t = E.tarjetas[sesion.cola[sesion.i].id]; Org.marcar(E, t.id, 'favorita', !t.favorita, DISP); b.classList.toggle('on', !!E.tarjetas[t.id].favorita); guardarLocal(); pedirSincro(); },
     marcarDif: (d, b) => { const t = E.tarjetas[sesion.cola[sesion.i].id]; Org.marcar(E, t.id, 'dificil', !t.dificil, DISP); b.classList.toggle('on', !!E.tarjetas[t.id].dificil); guardarLocal(); pedirSincro(); },
@@ -1031,7 +1458,7 @@
     alternarSonido: (d, b) => { pref.sonido = !pref.sonido; try { localStorage.setItem('liz-sonido', pref.sonido ? '1' : '0'); } catch (e) {} b.querySelector('.interruptor').classList.toggle('on', pref.sonido); if (pref.sonido) sonar('bien'); },
     comoInstalar: () => abrirHoja('<h2>Instalar en el iPhone</h2><ol style="padding-left:22px;line-height:1.8"><li>Abre esta página en <b>Safari</b>.</li>' +
       '<li>Toca <b>Compartir</b> (el cuadrito con la flecha hacia arriba).</li><li>Elige <b>Agregar a pantalla de inicio</b> y toca <b>Agregar</b>.</li>' +
-      '<li>Abre Liz desde el ícono nuevo (la placa de Petri).</li></ol><div class="botones"><button class="bt grande" data-cerrar>Entendido</button></div>'),
+      '<li>Abre LIZ desde el ícono nuevo (la carita de Liz).</li></ol><p class="suave" style="font-size:15px">¿Ya la tenías con el ícono viejo? Mantén apretado el ícono → <b>Eliminar app</b> y vuélvela a agregar: así sale el ícono y el nombre nuevos (tus datos se bajan otra vez al entrar).</p><div class="botones"><button class="bt grande" data-cerrar>Entendido</button></div>'),
     volverEntrar: () => mostrarEntrar(),
     salir: async () => {
       const p = porSubir();
@@ -1047,6 +1474,25 @@
     A[b.dataset.a](b.dataset, b);
   });
   for (const b of document.querySelectorAll('#menu button')) b.addEventListener('click', () => ir(b.dataset.v));   // (la ronda en curso se conserva)
+  // Los formularios de la ronda (escribir la respuesta, preguntar sobre la tarjeta)
+  document.addEventListener('submit', (ev) => {
+    if (ev.target.id === 'fEscribe') { ev.preventDefault(); const t = $('#tEscribe').value.trim(); if (t) revisarEscrito(t); }
+    if (ev.target.id === 'fPregunta') { ev.preventDefault(); const i = $('#tPregunta'); const t = i.value.trim(); i.value = ''; if (t) preguntarTarjeta(t); }
+  });
+  document.addEventListener('input', (ev) => { if (ev.target.id === 'tEscribe' && sesion && sesion.escrito) sesion.escrito.borrador = ev.target.value; });
+  // El cuadro de la charla: crece con el texto; Enter manda (Mayús+Enter: otra línea)
+  const textoLiz = $('#textoLiz');
+  const crecer = () => { textoLiz.style.height = 'auto'; textoLiz.style.height = Math.min(140, textoLiz.scrollHeight) + 'px'; };
+  textoLiz.addEventListener('input', crecer);
+  textoLiz.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey && !ev.isComposing) { ev.preventDefault(); $('#formLiz').requestSubmit(); } });
+  $('#formLiz').addEventListener('submit', (ev) => {
+    ev.preventDefault();
+    const t = textoLiz.value;
+    if (!t.trim() || pensandoCharla) return;
+    textoLiz.value = '';
+    crecer();
+    enviarCharla(t);
+  });
 
   // ---------- Avisos (notificaciones; en el iPhone, solo con la app en la pantalla de inicio) ----------
   function b64aBytes(b64) {
@@ -1060,19 +1506,34 @@
     try { activo = puede && Notification.permission === 'granted' && !!(await (await navigator.serviceWorker.ready).pushManager.getSubscription()); } catch (e) {}
     const hora = +(localStorage.getItem('liz-aviso-hora') || 8);
     const horas = Array.from({ length: 17 }, (_, i) => i + 6).map((h) => '<option value="' + h + '"' + (h === hora ? ' selected' : '') + '>' + (h <= 12 ? h : h - 12) + ':00 ' + (h < 12 ? 'a. m.' : 'p. m.') + '</option>').join('');
-    const h = abrirHoja('<h2>🔔 Avisos</h2><p>Te aviso tus recordatorios y eventos a su hora, tus exámenes (3 días antes, el día antes y 2 horas antes) y, una vez al día, “Tienes N tarjetas para hoy 🧫”. ' +
-      'Si ya te avisé en la compu y estabas ahí, el celular no lo repite.</p>' +
-      (!puede || !instalada ? '<p class="suave">En el iPhone, primero instala Liz en la pantalla de inicio (Más → Instalar) y ábrela desde ahí.</p>' : '') +
+    const h = abrirHoja('<h2>🔔 Avisos</h2><p>Te aviso <b>aunque la app esté cerrada</b>: tus recordatorios y eventos a su hora, tus exámenes (3 días antes, el día antes y 2 horas antes), ' +
+      'cuando la laptop termina tus tarjetas y, una vez al día, “Tienes N tarjetas para hoy 🧫”. Si ya te avisé en la compu y estabas ahí, el celular no lo repite.</p>' +
+      (!puede || !instalada ? '<p class="suave">En el iPhone, primero instala LIZ en la pantalla de inicio (Más → Instalar) y ábrela desde ahí.</p>' : '') +
       '<label for="aHora">¿A qué hora te aviso las tarjetas?</label><select id="aHora">' + horas + '</select><p class="error" id="aErr"></p><div class="botones">' +
-      '<button class="bt prin grande" id="aOn">' + (activo ? 'Guardar la hora' : 'Activar los avisos') + '</button>' + (activo ? '<button class="bt grande" id="aOff">Apagar los avisos</button>' : '') +
-      '<button class="bt grande" data-cerrar>Cerrar</button></div>');
+      '<button class="bt prin grande" id="aOn">' + (activo ? 'Guardar la hora' : 'Activar los avisos') + '</button>' +
+      (activo ? '<button class="bt grande" id="aProbar">🔔 Probar aviso (llega en 10 s)</button><button class="bt grande" id="aOff">Apagar los avisos</button>' : '') +
+      '<button class="bt grande" data-cerrar>Cerrar</button></div>' +
+      '<details style="margin-top:14px"><summary class="suave" style="font-weight:800">¿No te llegan?</summary><ol class="suave" style="padding-left:22px;line-height:1.6;font-size:15px">' +
+      '<li>LIZ tiene que estar en la <b>pantalla de inicio</b> y abrirse desde ese ícono (en Safari los avisos no funcionan).</li>' +
+      '<li>iPhone: <b>Ajustes → Notificaciones → LIZ</b> → “Permitir notificaciones” encendido (y “Pantalla bloqueada”, “Centro de notificaciones” y “Globos”).</li>' +
+      '<li>Si tienes un <b>Modo de concentración</b> (No molestar, Dormir), agrega LIZ a las apps permitidas.</li>' +
+      '<li>Si reinstalaste la app, toca aquí <b>Activar los avisos</b> otra vez.</li></ol></details>');
+    if (activo) $('#aProbar', h).onclick = async (ev) => {
+      const b = ev.target;
+      b.disabled = true;
+      b.textContent = 'Pidiendo el aviso…';
+      const r = await cerebro('probarAviso', {});
+      b.disabled = false;
+      if (r && r.ok) { b.textContent = '✓ Llega en 10 s: cierra la app para ver'; avisar('Listo: en 10 segundos te llega. Puedes cerrar la app.'); }
+      else { b.textContent = '🔔 Probar aviso (llega en 10 s)'; $('#aErr', h).textContent = 'No pude: ' + ((r && (r.error || r.dice)) || 'sin respuesta'); }
+    };
     $('#aOn', h).onclick = async () => {
       const err = $('#aErr', h);
       try {
         if (DEMO) throw new Error('En el modo de prueba no hay avisos.');
         if (!puede) throw new Error('Este navegador no permite avisos. En el iPhone: instala Liz en la pantalla de inicio y ábrela desde ahí.');
         if (!CFG.vapidPublica) throw new Error('Falta la llave pública de los avisos (ver planes/movil.md).');
-        if ((await Notification.requestPermission()) !== 'granted') throw new Error('No me diste permiso. Puedes darlo en Ajustes → Notificaciones → Liz.');
+        if ((await Notification.requestPermission()) !== 'granted') throw new Error('No me diste permiso. Puedes darlo en Ajustes → Notificaciones → LIZ.');
         const reg = await navigator.serviceWorker.ready;
         const s = (await reg.pushManager.getSubscription()) || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64aBytes(CFG.vapidPublica) }));
         const hh = +$('#aHora', h).value;
@@ -1082,7 +1543,8 @@
         if (r.error) throw new Error(r.error.message);
         localStorage.setItem('liz-aviso-hora', hh);
         cerrarHoja(true);
-        avisar('Listo: avisos activados.');
+        avisar('Listo: avisos activados. Pruébalo con “Probar aviso”.');
+        setTimeout(hojaAvisos, 1200);
       } catch (e) { err.textContent = e.message || String(e); }
     };
     if (activo) $('#aOff', h).onclick = async () => {
@@ -1101,11 +1563,14 @@
   let tAviso = 0;
   function avisar(t) {
     const a = $('#aviso');
-    a.innerHTML = lizImg('saludo', 'c') + '<span>' + esc(t) + '</span>';
+    a.innerHTML = fotoLiz() + '<span>' + esc(t) + '</span>';
     a.classList.add('ver');
     clearTimeout(tAviso);
     tAviso = setTimeout(() => a.classList.remove('ver'), 3000);
   }
+  // Al tocar un aviso con la app abierta: el service worker manda a qué pantalla ir
+  if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (ev) => { if (ev.data && ev.data.tipo === 'abrir' && E.usuario) irPorEnlace(ev.data.url); });
+  window.addEventListener('hashchange', () => { if (E.usuario && !$('#app').hidden) irPorEnlace(location.hash); });
   window.addEventListener('online', () => sincronizar('abrir'));
   window.addEventListener('offline', pintarEstado);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && E.usuario) { pintarSuave(); sincronizar('abrir'); } });
@@ -1119,6 +1584,38 @@
       else Sincro.cambiar(E, 'archivos', { id, estado: 'listo', tarjetas: 15 }, 'pc');
       pintarSuave();
     }, 6000);
+  }
+  // El cerebro "de mentira" del modo de prueba (sin internet ni Groq): respuestas fijas, para ver cómo se ve
+  async function cerebroDemo(tipo, b) {
+    await new Promise((ok) => setTimeout(ok, 700));
+    const lim = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+    if (tipo === 'calificar') {
+      const dijo = lim(b.respuesta), bien = lim(b.tarjeta.respuesta).split(/\W+/).filter((w) => w.length > 4);
+      if (/no entiendo|que es|que significa|\?/.test(dijo)) return { nivel: 'pregunta', dice: 'Te pregunta por un paso de la técnica. Piensa en qué hace cada reactivo. ¿Qué crees?' };
+      const n = bien.filter((w) => dijo.includes(w.slice(0, 6))).length;
+      if (n >= Math.min(3, bien.length)) return { nivel: 'bien', dice: '¡Exacto! Lo dijiste completito. 🎉' };
+      if (n >= 1) return { nivel: 'medio', dice: '¡Vas bien! Esa parte es correcta, pero te faltó completarla. La respuesta entera es: ' + b.tarjeta.respuesta };
+      return { nivel: 'mal', dice: 'Todavía no. La respuesta es: ' + b.tarjeta.respuesta };
+    }
+    if (tipo === 'explicar') return { dice: 'Piénsalo así: ' + b.tarjeta.respuesta + ' Es el paso que separa a las Gram positivas de las Gram negativas.' };
+    if (tipo === 'tarjetas') {
+      return { tarjetas: [
+        ['¿Qué son las endosporas?', 'Estructuras latentes muy resistentes que forman algunas bacterias Gram positivas.'],
+        ['¿Qué géneros forman endosporas?', 'Bacillus y Clostridium.'], ['¿Cuándo se forman las endosporas?', 'Cuando faltan nutrientes.'],
+        ['¿A qué resisten las endosporas?', 'Al calor, la desecación, la radiación y muchos desinfectantes.'],
+        ['¿Qué les da su resistencia?', 'Poca agua, una corteza gruesa y ácido dipicolínico con calcio.'],
+        ['¿Cómo se eliminan las endosporas?', 'Con autoclave a 121 °C por al menos 15 minutos.'],
+        ['¿Qué pasa cuando vuelven las buenas condiciones?', 'La endospora germina y vuelve a ser una célula vegetativa.'],
+        ['¿Qué colorante tiñe las endosporas en Schaeffer-Fulton?', 'El verde de malaquita, con calor.'],
+      ].map(([pregunta, respuesta]) => ({ pregunta, respuesta, contexto: b.texto.slice(0, 200) })) };
+    }
+    if (tipo === 'probarAviso') return { error: 'en el modo de prueba no hay avisos' };
+    const ultimo = lim((b.mensajes || []).slice(-1)[0].texto);
+    const tocan = Org.paraRepasar(E, { soloHoy: true }).length, ex = Ag.proximosExamenes(E, Date.now())[0];
+    if (/toca hoy/.test(ultimo)) return { dice: 'Hoy te tocan ' + tocan + ' tarjetas, casi todas de Tinciones. Y ojo: ' + (ex ? N.nombreExamen(ex) + ' es ' + enDias(ex.cuando) : 'no tienes exámenes cerca') + '. ¿Empezamos con unas 5 ahorita?' };
+    if (/recuerda/.test(ultimo)) return { dice: 'Listo, te lo anoto para mañana a las 3 de la tarde. 📝', recordatorio: { texto: 'Sacar las placas de agar', fecha: N.diaCR(Date.now() + DIA), hora: '15:00', repite: null } };
+    if (/animo/.test(ultimo)) return { dice: 'Ya repasaste un montón y se nota. Respira, duerme bien y confía en lo que sabes: yo estoy contigo. 💜' };
+    return { dice: '¡Claro! Pregúntame lo que quieras de micro; si no lo sé, lo buscamos juntos en tus apuntes.' };
   }
   async function arrancarDemo() {
     const srv = Sincro.servidorDePrueba();
@@ -1170,5 +1667,7 @@
   }
 
   arrancar();
-  self.LizApp = { estado: () => E, sincronizar, avisar, ir, foto: ponerFoto, liz2d: (m) => { liz2d = m || {}; pintarFijas(); pintarSuave(); }, empezar: () => A.repasarHoy(), voltear: () => A.voltear(), accion: (n) => A[n]({}), formAgenda };   // (para las pruebas y las fotos)
+  self.LizApp = { estado: () => E, sincronizar, avisar, ir, foto: ponerFoto, liz2d: (m) => { liz2d = m || {}; pintarFijas(); pintarSuave(); }, empezar: () => A.repasarHoy(), voltear: () => A.voltear(), accion: (n) => A[n]({}), formAgenda,   // (para las pruebas y las fotos)
+    animos: (m) => { animos = m || {}; pintar(); }, animo: (a) => { animoForzado = a || null; pintar(); }, enviar: enviarCharla, escribir: (t) => { A.escribirResp(); setTimeout(() => revisarEscrito(t), 100); },
+    pegar: hojaPegar, hacerTarjetas: hacerTarjetasDeTexto };
 })();
