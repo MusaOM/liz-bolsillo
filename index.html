@@ -25,19 +25,15 @@
   <div class="frase"></div>
 </div>
 
-<!-- Entrar (una sola vez): su correo → un código que le llega al correo -->
+<!-- Entrar (una sola vez): su correo y su contraseña (la cuenta se crea en Supabase; no se manda ningún correo) -->
 <section id="entrar" hidden>
   <div class="logo" aria-hidden="true"></div>
   <h1>Liz de bolsillo</h1>
-  <p class="suave" id="entrarTexto">Tus tarjetas, tu calendario y tus apuntes, también en el celular. Escribe el mismo correo que usas en la Liz de tu compu.</p>
-  <form id="formCorreo">
-    <input id="correo" type="email" autocomplete="email" inputmode="email" placeholder="tu correo" required>
-    <button class="bt prin grande">Enviarme un código</button>
-  </form>
-  <form id="formCodigo" hidden>
-    <input id="codigo" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="10" placeholder="código" required>
+  <p class="suave" id="entrarTexto">Tus tarjetas, tu calendario y tus apuntes, también en el celular. Entra con tu correo y tu contraseña (solo esta vez).</p>
+  <form id="formEntrar">
+    <input id="correo" type="email" autocomplete="username" inputmode="email" placeholder="tu correo" required>
+    <input id="clave" type="password" autocomplete="current-password" placeholder="tu contraseña" required>
     <button class="bt prin grande">Entrar</button>
-    <button type="button" class="enlace" id="otroCorreo">Usar otro correo</button>
   </form>
   <p class="error" id="entrarError"></p>
 </section>

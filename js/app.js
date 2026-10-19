@@ -26,7 +26,6 @@
   let mazoAbierto = null, buscando = '';
   const ag = { modo: 'mes', ref: Date.now(), dia: N.inicioDiaCR(Date.now()) };
   let sincronizando = false, otraVez = false, ultimoError = '', sinSesion = false;
-  let correoUsado = '';
   const TITULOS = { hoy: 'Hoy', repasar: 'Repasar', agenda: 'Agenda', mazos: 'Mis mazos', mas: 'Más', recordatorios: 'Recordatorios', archivos: 'Archivos',
     progreso: 'Mi progreso', papelera: 'Papelera' };
   const DE_MAS = ['recordatorios', 'archivos', 'progreso', 'papelera'];
@@ -159,48 +158,35 @@
     setInterval(() => { if (vista === 'hoy' || vista === 'agenda' || vista === 'recordatorios') pintarSuave(); }, 60000);
   }
 
-  // ---------- Entrar con su correo ----------
+  // ---------- Entrar: su correo y su contraseña, UNA vez (la cuenta se crea en Supabase; no se manda ningún correo) ----------
+  // (19-oct-2026: antes era un código por correo, pero el correo gratis de Supabase ya no deja cambiar la plantilla y manda ~2 por hora)
   function mostrarEntrar(error) {
     $('#entrar').hidden = false;
     $('#app').hidden = true;
     $('#menu').hidden = true;
     $('#entrarError').textContent = error || '';
-    if (!sb) $('#formCorreo').hidden = true;
+    if (!sb) $('#formEntrar').hidden = true;
   }
   function errorBonito(e) {
     const m = String(e && e.message || e || '');
-    if (/signups? not allowed|user not found|not.*registered/i.test(m)) return 'Ese correo no está registrado. Usa el mismo de la Liz de tu compu.';
-    if (/rate limit|too many|security purposes/i.test(m)) return 'Pediste muchos códigos seguidos. Espera un minuto y prueba otra vez.';
-    if (/expired|invalid/i.test(m)) return 'Ese código no sirve o ya venció. Pide otro.';
+    if (/invalid login|invalid credentials|invalid.*password|user not found/i.test(m)) return 'El correo o la contraseña no coinciden. Revisa y prueba otra vez.';
+    if (/email not confirmed/i.test(m)) return 'Esa cuenta todavía no está confirmada (en Supabase, marcar "Auto Confirm User").';
+    if (/rate limit|too many/i.test(m)) return 'Muchos intentos seguidos. Espera un minuto y prueba otra vez.';
     if (/fetch|network|failed/i.test(m)) return 'No hay internet. Conéctate y prueba otra vez.';
     return 'Algo falló: ' + m;
   }
-  $('#formCorreo').addEventListener('submit', async (ev) => {
-    ev.preventDefault();
-    const b = ev.target.querySelector('button');
-    correoUsado = $('#correo').value.trim().toLowerCase();
-    b.disabled = true; b.textContent = 'Enviando…';
-    $('#entrarError').textContent = '';
-    const { error } = await sb.auth.signInWithOtp({ email: correoUsado, options: { shouldCreateUser: false } });
-    b.disabled = false; b.textContent = 'Enviarme un código';
-    if (error) { $('#entrarError').textContent = errorBonito(error); return; }
-    $('#formCorreo').hidden = true;
-    $('#formCodigo').hidden = false;
-    $('#entrarTexto').textContent = 'Te mandé un código a ' + correoUsado + '. Escríbelo aquí (si no llega, revisa el correo no deseado).';
-    $('#codigo').focus();
-  });
-  $('#formCodigo').addEventListener('submit', async (ev) => {
+  $('#formEntrar').addEventListener('submit', async (ev) => {
     ev.preventDefault();
     const b = ev.target.querySelector('button');
     b.disabled = true; b.textContent = 'Entrando…';
-    const { data, error } = await sb.auth.verifyOtp({ email: correoUsado, token: $('#codigo').value.replace(/\D/g, ''), type: 'email' });
+    $('#entrarError').textContent = '';
+    const { data, error } = await sb.auth.signInWithPassword({ email: $('#correo').value.trim().toLowerCase(), password: $('#clave').value });
     b.disabled = false; b.textContent = 'Entrar';
     if (error || !data || !data.user) { $('#entrarError').textContent = errorBonito(error || 'invalid'); return; }
+    $('#clave').value = '';
     sinSesion = false;
     entrar(data.user);
   });
-  $('#otroCorreo').addEventListener('click', () => { $('#formCodigo').hidden = true; $('#formCorreo').hidden = false; $('#entrarError').textContent = ''; });
-
   // ---------- Navegar y pintar ----------
   function ir(v) {
     vista = v;
@@ -933,7 +919,7 @@
     comoInstalar: () => abrirHoja('<h2>Instalar en el iPhone</h2><ol style="padding-left:22px;line-height:1.8"><li>Abre esta página en <b>Safari</b>.</li>' +
       '<li>Toca <b>Compartir</b> (el cuadrito con la flecha hacia arriba).</li><li>Elige <b>Agregar a pantalla de inicio</b> y toca <b>Agregar</b>.</li>' +
       '<li>Abre Liz desde el ícono nuevo (la placa de Petri).</li></ol><div class="botones"><button class="bt grande" data-cerrar>Entendido</button></div>'),
-    volverEntrar: () => { $('#formCorreo').hidden = false; $('#formCodigo').hidden = true; mostrarEntrar(); },
+    volverEntrar: () => mostrarEntrar(),
     salir: async () => {
       const p = porSubir();
       if (!(await confirmar('¿Cerrar sesión?', (p ? 'OJO: hay ' + p + ' cambios que todavía no se subieron y se perderían. ' : '') + 'Se borra lo guardado en este celular (en la compu sigue).', 'Cerrar sesión', true))) return;

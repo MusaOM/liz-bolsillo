@@ -80,7 +80,7 @@ svg.ic { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-wid
   box-shadow: 0 0 0 4px var(--t-acento-suave), 0 12px 40px rgba(142, 107, 255, .45); }
 #entrar h1 { text-shadow: 0 0 20px rgba(169, 139, 255, .6); }
 #entrar form { display: grid; gap: 12px; margin-top: 22px; }
-input[type=email], input[type=text], input[type=search], input[type=date], input[type=time], textarea, select {
+input[type=email], input[type=password], input[type=text], input[type=search], input[type=date], input[type=time], textarea, select {
   width: 100%; min-height: 52px; padding: 13px 16px; border-radius: 18px; border: 2px solid var(--t-borde); background: var(--t-campo); color: var(--t-texto);
   font-size: 17px; outline: none; transition: border-color .2s, box-shadow .2s; -webkit-appearance: none; appearance: none; }
 input:focus, textarea:focus, select:focus { border-color: var(--t-acento); box-shadow: 0 0 0 4px var(--t-acento-suave); }

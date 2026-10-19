@@ -1,7 +1,7 @@
 // sw.js — el "service worker" de la Liz de bolsillo: guarda la app en el celular para que abra SIN internet,
 // y muestra el aviso diario ("Tienes N tarjetas para hoy 🧫") que manda Supabase.
 // Al cambiar archivos de la app, subir VERSION: así el celular baja la versión nueva.
-const VERSION = 'liz-bolsillo-2';
+const VERSION = 'liz-bolsillo-3';
 const ARCHIVOS = [
   './', 'index.html', 'manifest.webmanifest', 'css/estilo.css',
   'js/config.js', 'js/nucleo.js', 'js/sincro.js', 'js/organizar.js', 'js/agenda.js', 'js/frases.js', 'js/almacen.js', 'js/fondo.js', 'js/app.js',
