@@ -771,3 +771,14 @@ body.enCharla::after, body.cargando::after, body:not(:has(#menu:not([hidden]))):
 @keyframes brillaB { 0%, 100% { opacity: .46; } 50% { opacity: .26; } }
 body.quieto #micro .flota { animation: none; }
 .icoLinea { width: 22px; height: 22px; fill: none; stroke: var(--especial); stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.crear .subir.ancho { grid-column: 1 / -1; padding: 11px 14px; }
+.crear .subir.ancho .e { font-size: 26px; line-height: 1; }
+.crear .subir.ancho .txt b { font-size: 16.5px; }
+.crear .subir.ancho .txt span { display: block; font-size: 12.5px; line-height: 1.3; margin-top: 2px; }
+.importar .imO { margin: 12px 0 6px; text-align: center; font-size: 14px; }
+#hoja #imTexto { min-height: 150px; font: 600 13.5px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+.resumenImp { margin: 14px 4px 2px; }
+.archivoImp { margin: 0 4px 6px; font-size: 13.5px; overflow-wrap: anywhere; }
+.noImp { margin: 10px 4px 2px; font-size: 14px; }
+.problemasImp { margin: 6px 4px 4px; padding-left: 20px; font-size: 13.5px; line-height: 1.45; color: var(--medio); }
+.problemasImp li { margin: 3px 0; overflow-wrap: anywhere; }

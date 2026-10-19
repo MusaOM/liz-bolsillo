@@ -10,7 +10,7 @@
   else raiz.LizVersion = fabrica();
 })(typeof self !== 'undefined' ? self : this, function () {
   const liz = '1.0';
-  const bolsillo = 21;
+  const bolsillo = 22;
   return {
     liz,
     bolsillo,
@@ -20,7 +20,7 @@
     // Lo que trae Liz (sale en "Acerca de Liz"; después del regalo, aquí va lo nuevo de cada versión)
     novedades: [
       'Tu compañera de estudio: tarjetas que se repasan solas en el momento justo, en la compu y en el celular.',
-      'Hazte tarjetas con un texto pegado o subiendo tus apuntes (PDF, Word, PowerPoint).',
+      'Hazte tarjetas con un texto pegado o subiendo tus apuntes (PDF, Word, PowerPoint), o importa las que ya tengas hechas.',
       'Tu agenda: exámenes, eventos y recordatorios, con avisos aunque la app esté cerrada.',
       'Charla con Liz desde el celular: pregúntale, pídele recordatorios o que te explique algo.',
       '“¿Cómo te sientes hoy?”: tu diario de ánimo, y Liz se adapta a cómo estás.',
@@ -31,11 +31,11 @@
     // compu solo lo de la compu (loNuevoPC); nada de uno en el otro, tampoco en "Acerca de Liz". Para la próxima actualización de cada uno:
     // cambiar su "id" (así se vuelve a mostrar) y sus "cosas".
     loNuevoCelular: {
-      id: 'celular-21',
+      id: 'celular-22',
       cosas: [
-        'Ahora me muevo mucho más liviana: cada pantalla, la charla y escribir se sienten al instante, sin tirones.',
-        'Un fondo nuevo, como mirar por un microscopio de campo oscuro: diatomeas, bacterias de Gram y alguna colonia. Además gasta menos batería.',
-        'Con muchas tarjetas y repasos ya no me pongo lenta: hago las cuentas una sola vez.',
+        'Importa tarjetas ya hechas: en Estudiar → Mazos → “Importar tarjetas”, elige un archivo .json o pega su texto, y las guardo tal cual, sin cambiarles ni una palabra.',
+        'Te muestro antes un resumen (cuántos mazos y tarjetas traes), y si alguna tiene un problema te digo cuál.',
+        'Si ya tenías alguna de esas tarjetas, no la repito.',
       ],
     },
     loNuevoPC: {

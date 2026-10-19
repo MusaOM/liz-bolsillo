@@ -1323,7 +1323,9 @@
     v.innerHTML = segEstudiar('mazos') + (hay ? escena('microscopio', fija('pMaz', 'pMazos')) : '') +
       // (21-oct-2026, Liz 1.3) Las DOS formas de crear tarjetas, juntas arriba: pegar un texto o subir un archivo (PDF, Word, PowerPoint o fotos)
       '<div class="crear"><button class="subir mitad toque" data-a="pegarTexto"><span class="e">📋</span><span class="txt"><b>Pegar texto</b><span>Te hago tarjetas con lo que pegues</span></span></button>' +
-      '<button class="subir mitad toque" data-a="subirArchivo"><span class="e">📤</span><span class="txt"><b>Subir archivo</b><span>PDF, Word, PowerPoint o fotos</span></span></button></div>' +
+      '<button class="subir mitad toque" data-a="subirArchivo"><span class="e">📤</span><span class="txt"><b>Subir archivo</b><span>PDF, Word, PowerPoint o fotos</span></span></button>' +
+      // (19-oct-2026) La tercera forma: tarjetas YA HECHAS, tal cual (un .json o pegando el texto)
+      '<button class="subir ancho toque" data-a="importarTarjetas"><span class="e">📥</span><span class="txt"><b>Importar tarjetas</b><span>Ya hechas, tal cual: un archivo .json o pegando su texto</span></span></button></div>' +
       enCamino() +
       '<input type="search" id="buscar" placeholder="🔎 Buscar en mis tarjetas" value="' + esc(buscando) + '" autocomplete="off">' +
       '<div id="resBusca"></div><div id="arbol">' +
@@ -2260,6 +2262,78 @@
       extra: { html: '<button class="bt chico prin" data-a="repasarMazo" data-id="' + esc(mz.id) + '">▶ Repasarlas</button>' } });
   }
 
+  // ---------- (19-oct-2026) IMPORTAR TARJETAS YA HECHAS: un .json del celular o pegando su texto, TAL CUAL ----------
+  // Las preguntas, las respuestas y su contexto no pasan por el cerebro ni se cambian: js/importar.js las revisa y las crea con las MISMAS
+  // funciones de siempre (así se sincronizan con la compu y se repasan y califican como las demás). Primero un resumen ("4 mazos · 104
+  // tarjetas") con el botón Importar; al terminar, Liz con su microscopio dice cuántas nuevas quedaron y cuántas ya existían. Si el archivo
+  // entero está mal, no se importa nada; una tarjeta sin pregunta o sin respuesta no entra, y Liz dice cuál.
+  const MAX_JSON = 5 * 1024 * 1024;
+  const plural = (n, uno, varios) => n + ' ' + (n === 1 ? uno : varios);
+  const listaProblemas = (l) => '<ul class="problemasImp">' + l.slice(0, 6).map((p) => '<li>' + esc(Importar.problemaTexto(p)) + '</li>').join('') +
+    (l.length > 6 ? '<li>…y ' + plural(l.length - 6, 'más', 'más') + '</li>' : '') + '</ul>';
+  function hojaImportar(dice, texto, extra) {
+    const h = abrirHoja(conMicro(dice || '¿Ya tienes tarjetas hechas? Tráelas: las guardo <b>tal cual</b>, sin cambiarles ni una palabra.') + (extra || '') +
+      '<div class="importar"><button class="bt prin grande" id="imArchivo">📂 Elegir un archivo .json</button>' +
+      '<p class="suave imO">o pega aquí su texto</p>' +
+      '<textarea id="imTexto" class="grande" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="[ { &quot;mazo&quot;: &quot;…&quot;, &quot;materia&quot;: &quot;…&quot;, &quot;tarjetas&quot;: [ { &quot;pregunta&quot;: &quot;…&quot;, &quot;respuesta&quot;: &quot;…&quot; } ] } ]">' +
+      esc(texto || '') + '</textarea>' +
+      '<div class="botones"><button class="bt grande" id="imRevisar">Revisar lo que pegué</button><button class="bt grande" data-cerrar>Cancelar</button></div></div>');
+    $('#imArchivo', h).onclick = () => $('#elegirJson').click();
+    $('#imRevisar', h).onclick = () => revisarImportar($('#imTexto', h).value, null);
+    return h;
+  }
+  const ERROR_IMPORTAR = {
+    vacio: 'Está vacío: pega el texto del archivo, o elige el archivo .json.',
+    json: 'Eso no es un JSON que yo pueda leer: parece que le falta o le sobra algo (una coma, una llave, unas comillas…).',
+    forma: 'Lo leí, pero no tiene la forma que espero: una lista de mazos, cada uno con su "mazo" y sus "tarjetas", y cada tarjeta con su "pregunta" y su "respuesta".',
+    'sin-tarjetas': 'Lo leí, pero no encontré ninguna tarjeta adentro.',
+    'todas-mal': 'No pude importar ninguna: a todas les falta algo (abajo te digo qué).',
+  };
+  // Lee y revisa (sin importar nada todavía): si algo está mal, Liz lo dice; si no, el resumen con el botón Importar
+  function revisarImportar(texto, archivo) {
+    const r = Importar.leer(texto);
+    if (r.error) {
+      const dice = esc((archivo ? '“' + archivo + '”: ' : '') + ERROR_IMPORTAR[r.error] + (r.error === 'json' && r.linea ? ' Mira cerca de la línea ' + r.linea + '.' : '')) + ' <b>No importé nada.</b>';
+      return hojaImportar(dice, archivo ? '' : texto, (r.problemas || []).length ? listaProblemas(r.problemas) : '');
+    }
+    const p = r.problemas.length;
+    const h = abrirHoja(conMicro(p ? (p === 1 ? 'Hay una cosa que no puedo importar (abajo te digo cuál); lo demás está perfecto.' : 'Hay ' + p + ' cosas que no puedo importar (abajo te digo cuáles); lo demás está perfecto.')
+      : '¡Todo en orden! Mira lo que traes: lo guardo tal cual.') +
+      '<h2 class="resumenImp">' + plural(r.mazos.length, 'mazo', 'mazos') + ' · ' + plural(r.total, 'tarjeta', 'tarjetas') + '</h2>' +
+      (archivo ? '<p class="suave archivoImp">📄 ' + esc(archivo) + '</p>' : '') +
+      '<div class="panel"><ul class="lista">' + r.mazos.map((m) => '<li><div class="item"><span class="ico">🗂️</span><span class="txt"><b>' + esc(m.nombre) + '</b><small>' +
+        esc(m.materia) + ' · ' + plural(m.tarjetas.length, 'tarjeta', 'tarjetas') + '</small></span></div></li>').join('') + '</ul></div>' +
+      (p ? '<p class="suave noImp">Esto no lo importo:</p>' + listaProblemas(r.problemas) : '') +
+      '<div class="botones"><button class="bt prin grande" id="imYa">📥 Importar</button><button class="bt grande" data-cerrar>Cancelar</button></div>');
+    $('#imYa', h).onclick = (ev) => { ev.currentTarget.disabled = true; importarYa(r); };
+  }
+  function importarYa(plan) {
+    const r = Importar.aplicar(E, plan, DISP);
+    cambio();
+    const primero = r.porMazo[0];
+    const dice = r.nuevas ? '¡Listo! Importé <b>' + plural(r.nuevas, 'tarjeta nueva', 'tarjetas nuevas') + '</b>' + (r.existian ? ' y ' + (r.existian === 1 ? '1 ya la tenías' : r.existian + ' ya las tenías') : '') + '.'
+      : 'Esas ' + r.existian + ' tarjetas ya las tenías todas: no repetí ninguna.';
+    const archivados = r.porMazo.filter((m) => m.archivado);
+    const h = abrirHoja(conMicro(dice) +
+      '<div class="panel"><ul class="lista">' + r.porMazo.map((m) => '<li><div class="item"><span class="ico">🗂️</span><span class="txt"><b>' + esc(m.nombre) + '</b><small>' +
+        plural(m.nuevas, 'nueva', 'nuevas') + (m.existian ? ' · ' + m.existian + ' ya estaba' + (m.existian === 1 ? '' : 'n') : '') + (m.archivado ? ' · 📦 archivado' : '') + '</small></span></div></li>').join('') + '</ul></div>' +
+      (archivados.length ? '<p class="suave noImp">📦 ' + esc(archivados.map((m) => m.nombre).join(', ')) + (archivados.length === 1 ? ' está archivado' : ' están archivados') +
+        ': sus tarjetas no salen en el repaso hasta que lo saques de Más → Archivados.</p>' : '') +
+      '<div class="botones"><button class="bt prin grande" id="imRepasar">▶ Repasarlas ahora</button><button class="bt grande" data-cerrar>Después</button></div>');
+    vibrar('bien');
+    if (r.nuevas) confeti(30);
+    $('#imRepasar', h).onclick = () => { cerrarHoja(true); if (primero) empezar(Org.paraRepasar(E, { mazo: primero.id }), primero.nombre); };
+  }
+  $('#elegirJson').addEventListener('change', async (ev) => {
+    const f = ev.target.files && ev.target.files[0];
+    ev.target.value = '';
+    if (!f) return;
+    if (f.size > MAX_JSON) return void hojaImportar(esc('“' + f.name + '” es muy grande para ser un archivo de tarjetas (' + tamTxt(f.size) + '). ¿Seguro que es el .json?') + ' <b>No importé nada.</b>');
+    let t = '';
+    try { t = await f.text(); } catch (e) { return void hojaImportar(esc('No pude leer “' + f.name + '”: ' + (e.message || e)) + ' <b>No importé nada.</b>'); }
+    revisarImportar(t, f.name);
+  });
+
   // ---------- Botones (data-a) ----------
   const A = {
     ir: (d) => ir(d.v),
@@ -2301,6 +2375,7 @@
       enviarCharla(d.k === 'hoy' ? '¿Qué me toca hoy?' : 'Dame ánimo para mi próximo examen, porfa.');
     },
     pegarTexto: () => hojaPegar(),
+    importarTarjetas: () => hojaImportar(),        // (19-oct-2026) tarjetas ya hechas, tal cual
     abrirArch: (d) => abrirArchivoYa(d.id),
     salirSesion: () => { sesion = null; ir('hoy'); },
     marcarFav: (d, b) => { const t = E.tarjetas[sesion.cola[sesion.i].id]; Org.marcar(E, t.id, 'favorita', !t.favorita, DISP); b.classList.toggle('on', !!E.tarjetas[t.id].favorita); guardarLocal(); pedirSincro(); },

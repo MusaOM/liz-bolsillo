@@ -76,12 +76,15 @@
 <div id="aviso" role="status" aria-live="polite"></div>
 <label id="haptico" aria-hidden="true"><input type="checkbox" switch tabindex="-1"></label>
 <input type="file" id="elegirArchivo" accept=".pdf,.docx,.pptx,.txt,.md,image/*,application/pdf" hidden>
+<!-- (19-oct-2026) Importar tarjetas ya hechas: un .json del celular (en el iPhone, desde la app Archivos). Se lee aquí mismo: no se sube a ningún lado -->
+<input type="file" id="elegirJson" accept="application/json,.json,text/json,text/plain" hidden>
 
 <script src="vendor/supabase.js"></script>
 <script src="js/config.js"></script>
 <script src="js/nucleo.js"></script>
 <script src="js/sincro.js"></script>
 <script src="js/organizar.js"></script>
+<script src="js/importar.js"></script>
 <script src="js/agenda.js"></script>
 <script src="js/frases-liz.js"></script>
 <script src="js/frases.js"></script>
