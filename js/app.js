@@ -346,6 +346,7 @@
     // (21-oct-2026) "¿Cómo te sientes hoy?" (si no hay internet para saber si ya lo marcó en la compu) y, de vez en cuando, una frase de cariño
     setTimeout(revisarTrailer, 2600);                          // (19-oct-2026: el tráiler, la primera vez; si ya se sabía cuál es)
     setTimeout(revisarAnimoDia, 7000);
+    setInterval(revisarAnimoDia, 10 * MIN);                    // (19-oct-2026: también si la app sigue abierta; al volver a ella, ver visibilitychange)
     setTimeout(revisarCarino, 9000);
     setInterval(revisarCarino, 10 * MIN);
     setTimeout(revisarCartaAniversario, 6000);                 // (19-oct-2026: también sin internet, con lo guardado; y si el día empieza con la app abierta)
@@ -477,10 +478,12 @@
   }
   // Un enlace a una pantalla (lo usan los avisos al tocarlos): #hoy, #repasar, #charla, #agenda, #recordatorios, #archivos, #mazo=<id>
   function irPorEnlace(h) {
-    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro|carta)$|^mazo=([\w-]+)$/);
+    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro|carta|animo)$|^mazo=([\w-]+)$/);
     if (!m) return false;
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     if (m[1] === 'carta') { abrirCarta(); return true; }        // (19-oct-2026) Acerca de Liz, justo en la carta
+    // (19-oct-2026) El aviso "¿Cómo te sientes hoy?": abre Hoy y la hoja de las caritas
+    if (m[1] === 'animo') { ir('hoy'); setTimeout(() => { if (Animo && $('#hoja').hidden) hojaAnimo(!Animo.debePreguntar(E)); }, 450); return true; }
     // (21-oct-2026) Si el mazo todavía no llegó (el aviso "Ya te hice N tarjetas" puede llegar antes que la sincronización), se abre al llegar
     if (m[2]) { if (!E.mazos[m[2]]) { mazoPendiente = m[2]; ir('mazos'); return true; } vista = 'mazos'; ir('mazos'); mazoAbierto = m[2]; pintar(); return true; }
     ir(m[1]);
@@ -829,9 +832,9 @@
   };
   const frasesCel = () => (perfil.lizc && perfil.lizc.frases) || (DEMO ? FRASES_DEMO : { sorpresa: [], secreto: [] });
   const PREGUNTA_ANIMO = ['¿Cómo te sientes hoy?', 'Cuéntame, ¿cómo amaneciste hoy?', 'Antes de empezar: ¿cómo te sientes hoy?'];
-  let preguntadoAnimo = false, carinoActual = null;
+  let animoPreguntadoEn = 0, carinoActual = null;
   function hojaAnimo(aMano) {
-    preguntadoAnimo = true;
+    animoPreguntadoEn = Date.now();
     let sel = Animo.deHoy(E).slice();
     const h = abrirHoja('<div class="hojaAnimo"><div class="escena"><div class="marcoLiz"><div class="aura"></div>' + fotoLiz(animoHoy(), 'respira') + '</div>' +
       '<div class="comic cola-izq">' + esc(aMano ? '¿Cómo te sientes ahora?' : PREGUNTA_ANIMO[Math.floor(Math.random() * PREGUNTA_ANIMO.length)]) + '</div></div>' +
@@ -892,14 +895,19 @@
       V.loNuevoCelular.cosas.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div><div class="botones"><button class="bt prin grande" data-cerrar>¡Genial!</button></div>' +
       '<button class="enlaceAgenda" data-a="verPrivacidad">🔒 Leer cómo cuido tu privacidad ›</button>');
   }
+  // (19-oct-2026) "¿CÓMO TE SIENTES HOY?" — Catalina: "si está en la app y no lo ha puesto, que le salga para ponerlo". Antes salía UNA vez por
+  // arranque de la app, y el iPhone deja la app viva por detrás: podía pasar el día entero sin preguntarle. Ahora se revisa al abrir, al VOLVER
+  // a la app y cada 10 min con la app a la vista: si hoy no lo marcó (en ningún aparato) ni dijo "Ahora no", sale (de 6 a. m. a 11 p. m.). Si
+  // cerró la hoja sin elegir, otra vez en 30 min. Nunca mientras repasa, charla o escribe. (Y si no entra a la app: el aviso de las 10 a. m.,
+  // supabase/avisos.sql.) "Ahora no" = ese día no se le insiste, en ningún aparato (Animo.saltar).
   let esperasAnimo = 0;
   function revisarAnimoDia() {
-    if (!Animo || preguntadoAnimo || !Animo.debePreguntar(E) || sesion || vista === 'charla') return;
-    // (prueba 18) Después de actualizarse, "Lo nuevo" va PRIMERO (antes, la pregunta le ganaba y "Lo nuevo" salía 20 s después en cualquier
-    // pantalla). Si hay una hoja abierta, espera a que se cierre (como mucho ~1 min) y solo pregunta si él sigue en Hoy.
-    // (19-oct-2026: y el TRÁILER, la primera vez, también va antes)
+    if (!Animo || document.hidden || !$('#entrar').hidden || !Animo.debePreguntar(E) || sesion || vista === 'charla' || escribiendo()) return;
+    if (Date.now() - animoPreguntadoEn < 30 * MIN) return;
+    // (prueba 18) Después de actualizarse, "Lo nuevo" va PRIMERO; (19-oct-2026) y el TRÁILER, la primera vez. Si hay una hoja abierta, espera
+    // a que se cierre (como mucho ~1 min; si no, la próxima revisión).
     if (loNuevoPendiente || trailerPend || !$('#cine').hidden || document.querySelector('#hoja:not([hidden])')) { if (esperasAnimo++ < 4) setTimeout(revisarAnimoDia, 15000); return; }
-    if (esperasAnimo && vista !== 'hoy') return;
+    esperasAnimo = 0;
     const h = N.enCR(Date.now()).h;
     if (h < 6 || h >= 23) return;
     hojaAnimo(false);
@@ -2833,6 +2841,15 @@
     const r = await sb.from('avisos_push').update({ estudio: !!p.on, hora_estudio: p.hora === '' ? null : Number(p.hora) }).eq('id', id);
     if (r.error && h && $('#aErr', h)) $('#aErr', h).textContent = 'Lo guardé en el celular. Para que llegue con la app cerrada falta un paso en Supabase (correr avisos.sql otra vez).';
   }
+  // (19-oct-2026) "Preguntarme cómo me siento": el aviso de las 10 a. m. si hoy no ha dicho cómo se siente (columna animo de avisos_push)
+  function animoAvisoPref() { try { return localStorage.getItem('liz-animo-aviso') !== '0'; } catch (e) { return true; } }
+  async function guardarAnimoAviso(on, h) {
+    try { localStorage.setItem('liz-animo-aviso', on ? '1' : '0'); } catch (e) {}
+    const id = (() => { try { return localStorage.getItem('liz-aviso-id'); } catch (e) { return null; } })();
+    if (!id || !sb || DEMO) return;
+    const r = await sb.from('avisos_push').update({ animo: !!on }).eq('id', id);
+    if (r.error && h && $('#aErr', h)) $('#aErr', h).textContent = 'Lo guardé en el celular. Para que llegue con la app cerrada falta un paso en Supabase (correr avisos.sql otra vez).';
+  }
   // (Liz 1.0 · prueba 17) LA SUSCRIPCIÓN SE REFRESCA SOLA: al abrir la app (y al volver después de un rato), si tiene permiso, se vuelve a
   // guardar en el servidor la suscripción ACTUAL de este iPhone (avisos_push). Antes solo se guardaba al encender el interruptor: si iOS la
   // cambiaba, si se borró la fila o si se reinstaló la app, el servidor mandaba los avisos a una dirección muerta y no llegaba nada.
@@ -2849,12 +2866,14 @@
     try {
       const s = await conTope((await navigator.serviceWorker.ready).pushManager.getSubscription(), 8000, 'la suscripción');
       if (!s) return (avisosEstado = 'reactivar');
-      const p = estudioPref(), hora = +(localStorage.getItem('liz-aviso-hora') || 8);
-      const firma = JSON.stringify([id, s.endpoint, hora, !!p.on, p.hora]);
+      const p = estudioPref(), hora = +(localStorage.getItem('liz-aviso-hora') || 8), an = animoAvisoPref();
+      const firma = JSON.stringify([id, s.endpoint, hora, !!p.on, p.hora, an]);
       let guardada = null;
       try { guardada = JSON.parse(localStorage.getItem('liz-aviso-guardado') || 'null'); } catch (e) {}
       if (!forzar && guardada && guardada.firma === firma && Date.now() - guardada.ms < DIA) { avisosEstado = 'activados'; if (vista === 'mas') pintarSuave(); return avisosEstado; }
-      let r = await sb.from('avisos_push').upsert({ id, suscripcion: s.toJSON(), hora, estudio: !!p.on, hora_estudio: p.hora === '' ? null : Number(p.hora) });
+      const est = { estudio: !!p.on, hora_estudio: p.hora === '' ? null : Number(p.hora) };
+      let r = await sb.from('avisos_push').upsert(Object.assign({ id, suscripcion: s.toJSON(), hora, animo: an }, est));
+      if (r.error) r = await sb.from('avisos_push').upsert(Object.assign({ id, suscripcion: s.toJSON(), hora }, est));       // (sin avisos.sql del 19-oct: sin "animo")
       if (r.error) r = await sb.from('avisos_push').upsert({ id, suscripcion: s.toJSON(), hora });       // (sin avisos.sql nuevo: sin esas columnas)
       if (!r.error) try { localStorage.setItem('liz-aviso-guardado', JSON.stringify({ firma, ms: Date.now() })); } catch (e) {}
       avisosEstado = r.error ? avisosEstado : 'activados';
@@ -2902,12 +2921,16 @@
       '<span class="interruptor' + (activo ? ' on' : '') + '"></span></button></li>' +
       (activo ? '<li><button class="item" id="aEstudio"><span class="ico verde">📚</span><span class="txt"><b>Recordarme estudiar</b></span><span class="interruptor' + (est.on ? ' on' : '') + '"></span></button></li>' +
         (est.on ? '<li><div class="item"><span class="ico">🕖</span><span class="txt"><b>¿A qué hora?</b></span><select id="aHoraEst" class="selChico">' + horasEst + '</select></div></li>' : '') : '') +
+      // (19-oct-2026) "Preguntarme cómo me siento" (el aviso de las 10 a. m. si hoy no me lo ha dicho)
+      (activo ? '<li><button class="item" id="aAnimo"><span class="ico">😊</span><span class="txt"><b>Preguntarme cómo me siento</b></span><span class="interruptor' + (animoAvisoPref() ? ' on' : '') + '"></span></button></li>' : '') +
       '</ul></div>' + (activo && est.on ? '<p class="suave ayudaAvisos">📚 Te recuerdo estudiar una vez al día si te quedan tarjetas de hoy (nunca mientras estás en clase). Automático = 6 p. m. (o al salir de clase).</p>' : '') +
+      (activo && animoAvisoPref() ? '<p class="suave ayudaAvisos">😊 Si a las 10 a. m. todavía no me has dicho cómo te sientes, te pregunto (una vez al día; nunca digo lo que respondes).</p>' : '') +
       ayuda + '<p class="error" id="aErr"></p>' +
       (activo ? '<div class="botones"><button class="bt grande" id="aProbar">🔔 Probar aviso</button></div><p class="suave ayudaAvisos" id="aServidor"></p>' : '') +
       '<button class="enlaceAgenda" data-a="irRecordatorios">Tus recordatorios se crean en Agenda → Recordatorios ›</button>');
     if (activo) {
       $('#aEstudio', h).onclick = async () => { const p = estudioPref(); p.on = !p.on; await guardarEstudio(p, h); hojaAvisos(); };
+      $('#aAnimo', h).onclick = async () => { await guardarAnimoAviso(!animoAvisoPref(), h); hojaAvisos(); };
       const sel = $('#aHoraEst', h);
       if (sel) sel.onchange = async () => { const p = estudioPref(); p.hora = sel.value; await guardarEstudio(p, h); avisar(p.hora ? 'Te recuerdo estudiar a las ' + (p.hora > 12 ? p.hora - 12 : p.hora) + ':00.' : 'Te lo recuerdo cuando estés libre.'); };
     }
@@ -3169,6 +3192,8 @@
       // Volvió después de un rato: lo saluda (de noche, bosteza)
       if (ocultaDesde && Date.now() - ocultaDesde > 15 * MIN) setTimeout(() => gestoLiz(deNoche() ? 'bostezo' : 'saludo'), 500);
     }
+    // (19-oct-2026) Volvió a la app: si hoy no ha dicho cómo se siente, se le pregunta (también sin internet; la sincronización lo vuelve a revisar)
+    if (document.visibilityState === 'visible') setTimeout(revisarAnimoDia, 3000);
   });
 
   // ---------- Modo de prueba (?demo): datos de ejemplo, como si vinieran de la compu ----------
@@ -3287,7 +3312,8 @@
     cartaDemo: (c, para, de) => { if (!DEMO || !c) return false; perfil.lizc = Object.assign({}, perfil.lizc || {}, { carta: c, dueno: para || '', creadora: de || '' }); if (vista === 'acerca') pintar(); return true; },
     revisarCarta: () => revisarCartaAniversario(),
     // (19-oct-2026) para probar-charla-movil.js: lo que sabe el cerebro, la pregunta del ánimo y los avisos con la app abierta
-    contexto: () => contextoTexto(), revisarAnimo: () => { preguntadoAnimo = false; esperasAnimo = 0; revisarAnimoDia(); }, revisarAvisos: () => revisarAvisosAbierta(),
+    contexto: () => contextoTexto(), revisarAnimo: () => { animoPreguntadoEn = 0; esperasAnimo = 0; revisarAnimoDia(); }, revisarAvisos: () => revisarAvisosAbierta(),
+    animoHace: (ms) => { animoPreguntadoEn = Date.now() - ms; revisarAnimoDia(); },      // (19-oct-2026: "pasaron N ms desde que le preguntó")
     // (19-oct-2026) para probar-trailer-movil.js: un tráiler de prueba (una dirección local, solo en ?demo) y volver a ofrecerlo
     trailerDemo: (url, v) => { if (!DEMO) return false; perfil.trailer = { v: v || 'demo', ruta: 'demo', demo: url }; esperasTrailer = 0; revisarTrailer(); return true; },
     olvidarTrailer: () => { try { localStorage.removeItem(VISTO_TRAILER); } catch (e) {} },
