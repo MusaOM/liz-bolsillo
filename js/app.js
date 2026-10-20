@@ -1473,9 +1473,7 @@
       '<div class="nombreLiz">LIZ</div><div class="verLiz">' + esc(V.texto) + '</div>' +
       // (21-oct-2026) La autora, con su nombre completo; la dedicatoria (privada, llega de la PC) se queda igual
       '<p class="autoraLiz">Creada por <b>' + esc(V.autora) + '</b></p>' +
-      '<p class="dedica">' + esc(lc.dedicatoria || 'Creada con mucho cariño') + '</p><p class="queEs">Tu compañera de estudio y microbióloga junior.</p>' +
-      // (19-oct-2026) El tráiler, para verlo cuando quiera (la primera vez sale solo: revisarTrailer)
-      (perfil.trailer ? '<button class="bt prin trailerBt" data-a="verTrailer">🎬 Ver el tráiler</button>' : '') + '</div>' +
+      '<p class="dedica">' + esc(lc.dedicatoria || 'Creada con mucho cariño') + '</p><p class="queEs">Tu compañera de estudio y microbióloga junior.</p></div>' +
       // (19-oct-2026) La CARTA: justo debajo de Liz, quién la creó y la dedicatoria (js/carta.js arma la sección; el texto llega privado)
       (lc.carta && self.LizCarta ? LizCarta.html(lc.carta, { para: lc.dueno || perfil.nombre || '', de: lc.creadora || '', id: 'secCarta' }) : '') +
       // (Liz 1.0 · prueba 14) Lo nuevo de esta actualización y "Tu privacidad" (version.js: lo mismo que en la compu)
@@ -1490,16 +1488,17 @@
       '<p class="derechos">' + esc(V.derechos) + '</p>';
     $('#fotoSecreto', v).onclick = tocarSecreto;
   }
-  // ---------- (19-oct-2026) EL TRÁILER DE LIZ ----------
+  // ---------- (19-oct-2026) EL TRÁILER DE LIZ ("La primera vez te cuento mi historia") ----------
   // Lo hace Catalina; la PC lo sube PRIVADO a su cuenta (src/main/movil.js, assets/trailer/trailer-liz.mp4) y aquí se ve en pantalla completa
-  // (#cine): la PRIMERA vez que llega uno (o uno nuevo) sale solo, antes de "¿Cómo te sientes hoy?", con Liz diciendo que tiene algo para él,
-  // "▶ Ver" (con sonido: el iPhone solo deja sonar un video si él lo toca) y "Ahora no"; después queda en Acerca de Liz → "🎬 Ver el tráiler".
-  // La dirección del video es firmada (sirve 1 hora): nunca es pública.
+  // (#cine) UNA SOLA VEZ: la primera vez que llega (o si llega uno NUEVO: otra versión), sale solo, antes de "¿Cómo te sientes hoy?", con Liz
+  // diciendo que tiene algo para él y SOLO "▶ Ver" (con sonido: el iPhone solo deja sonar un video si él lo toca). Queda visto al TERMINAR el
+  // video o al CERRARLO (✕, o al salir del reproductor del iPhone) y no vuelve a salir nunca: no queda en ningún lado para verlo otra vez
+  // (Catalina, 19-oct-2026: antes también estaba en Acerca de Liz y tenía "Ahora no"). La dirección del video es firmada (1 hora): nunca es pública.
   const VISTO_TRAILER = 'liz-trailer-visto';
   let trailerPend = false, esperasTrailer = 0, cineUrl = null;
   const trailerVisto = () => { try { return !!perfil.trailer && localStorage.getItem(VISTO_TRAILER) === perfil.trailer.v; } catch (e) { return false; } };
   async function urlTrailer() {
-    if (!perfil.trailer) return null;
+    if (!perfil.trailer || trailerVisto()) return null;
     if (perfil.trailer.demo) return perfil.trailer.demo;
     if (cineUrl && cineUrl.ruta === perfil.trailer.ruta && cineUrl.hasta > Date.now() + 5 * MIN) return cineUrl.url;
     if (!sb) return null;
@@ -1513,36 +1512,34 @@
   function revisarTrailer() {
     trailerPend = !!perfil.trailer && !trailerVisto();
     if (!trailerPend || !$('#cine').hidden) return;
-    // Si está repasando, en la charla o hay otra hoja abierta, espera (como mucho ~2 minutos)
+    // Si está repasando, en la charla o hay otra hoja abierta, espera (como mucho ~2 minutos; si no, la próxima vez que abra la app)
     if (sesion || vista === 'charla' || document.querySelector('#hoja:not([hidden])') || document.body.classList.contains('cargando')) { if (esperasTrailer++ < 30) setTimeout(revisarTrailer, 4000); return; }
-    abrirCine(true);
+    abrirCine();
   }
-  async function abrirCine(primera) {
+  async function abrirCine() {
     const c = $('#cine');
     const url = await urlTrailer();
-    if (!url) { if (!primera) avisar('No pude abrir el tráiler. ¿Hay internet?'); else if (esperasTrailer++ < 30) setTimeout(revisarTrailer, 8000); return; }
-    const visto = () => { try { localStorage.setItem(VISTO_TRAILER, perfil.trailer.v); } catch (e) {} trailerPend = false; };
-    c.innerHTML = '<div class="cineTapa">' + escena('saludo', primera ? '¡Hola! Antes de empezar, tengo algo para ti 🎬' : 'Mi tráiler 🎬') +
-      '<div class="botones"><button class="bt prin grande" id="cineVer">▶ Ver</button>' + (primera ? '<button class="bt grande" id="cineNo">Ahora no</button>' : '') + '</div>' +
-      (primera ? '<p class="nota centro">Después lo encuentras en Más → Acerca de Liz.</p>' : '') + '</div>' +
+    if (!url) { if (trailerPend && esperasTrailer++ < 30) setTimeout(revisarTrailer, 8000); return; }
+    // Visto para siempre (esta versión del tráiler): ni la dirección ni el tráiler se vuelven a usar
+    const visto = () => { try { localStorage.setItem(VISTO_TRAILER, perfil.trailer.v); } catch (e) {} trailerPend = false; cineUrl = null; };
+    c.innerHTML = '<div class="cineTapa">' + escena('saludo', '¡Hola! Antes de empezar, tengo algo para ti 🎬') +
+      '<div class="botones"><button class="bt prin grande" id="cineVer">▶ Ver</button></div></div>' +
       '<video id="cineVideo" playsinline preload="auto" controls src="' + esc(url) + '"></video><button class="cineCerrar" id="cineCerrar" aria-label="Cerrar">✕</button>';
     c.hidden = false;
     requestAnimationFrame(() => c.classList.add('ver'));
     const v = $('#cineVideo');
     // (el play() va DENTRO del toque: así el iPhone deja que suene) En el iPhone se abre en SU reproductor de pantalla completa: el tráiler
-    // es horizontal y ahí se puede girar el teléfono para verlo grande; al cerrarlo (o al terminar) se vuelve a la app.
+    // es horizontal y ahí se puede girar el teléfono para verlo grande; al terminar (o al salir del reproductor) se vuelve a la app.
     const esIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     $('#cineVer').onclick = () => {
-      visto();
       c.classList.add('play');
       const p = v.play();
       if (p && p.catch) p.catch(() => {});
       if (esIOS && v.webkitEnterFullscreen) { try { v.webkitEnterFullscreen(); } catch (e) {} }
     };
-    v.addEventListener('webkitendfullscreen', () => setTimeout(cerrarCine, 200));
-    if ($('#cineNo')) $('#cineNo').onclick = () => { visto(); cerrarCine(); };
+    v.addEventListener('webkitendfullscreen', () => { visto(); setTimeout(cerrarCine, 200); });
     $('#cineCerrar').onclick = () => { visto(); cerrarCine(); };
-    v.onended = () => { try { if (v.webkitDisplayingFullscreen && v.webkitExitFullscreen) v.webkitExitFullscreen(); } catch (e) {} setTimeout(cerrarCine, 700); };
+    v.onended = () => { visto(); try { if (v.webkitDisplayingFullscreen && v.webkitExitFullscreen) v.webkitExitFullscreen(); } catch (e) {} setTimeout(cerrarCine, 700); };
   }
   function cerrarCine() {
     const c = $('#cine'), v = $('#cineVideo');
@@ -2497,7 +2494,6 @@
     // (21-oct-2026) un día pesado: solo unas poquitas (las primeras: las que más tocan)
     repasarSuave: () => empezar(Org.paraRepasar(E, { soloHoy: true }).slice(0, Animo.tarjetasSugeridas(Animo.deHoy(E), 999)), 'Con calma'),
     animoHoy: () => hojaAnimo(!Animo.debePreguntar(E)),
-    verTrailer: () => abrirCine(false),
     repasarFav: () => empezar(Org.paraRepasar(E, { favoritas: true }), '⭐ Favoritas'),
     repasarDif: () => empezar(Org.paraRepasar(E, { dificiles: true }), '🔥 Difíciles'),
     repasarTodas: () => empezar(Org.paraRepasar(E, {}).slice(0, 20), 'Repaso libre'),

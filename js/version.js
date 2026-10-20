@@ -10,7 +10,7 @@
   else raiz.LizVersion = fabrica();
 })(typeof self !== 'undefined' ? self : this, function () {
   const liz = '1.0';
-  const bolsillo = 26;
+  const bolsillo = 27;
   return {
     liz,
     bolsillo,
@@ -34,7 +34,7 @@
       id: 'celular-26',
       cosas: [
         '😊 Si hoy no me has dicho cómo te sientes, te lo pregunto cuando entras a la app; y si no entras, te mando un avisito a las 10 a. m. (se apaga en Más → Ajustes → Avisos).',
-        '🎬 Mi tráiler: la primera vez sale solo, y después lo encuentras en Más → Acerca de Liz.',
+        '🎬 La primera vez te cuento mi historia.',
         'Te aviso aunque la app esté cerrada, en menos de un minuto (con la app abierta, a la hora exacta).',
       ],
     },
