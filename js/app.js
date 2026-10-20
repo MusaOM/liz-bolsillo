@@ -220,7 +220,11 @@
     // (19-oct-2026) + la CARTA (el poema de su creadora, privado: solo llega aquí, por la nube privada) y el nombre de su dueño
     if (lc) perfil.lizc = { frases: lc.frasesCarino || null, dedicatoria: lc.dedicatoria || '', creadora: lc.creadora || '', apoyo: lc.apoyo || '', masculino: lc.masculino !== false,
       fechas: Array.isArray(lc.fechas) ? lc.fechas : [], carta: lc.carta && self.LizCarta && LizCarta.valida(lc.carta) ? lc.carta : null, dueno: lc.dueno || '' };
+    // (19-oct-2026) EL TRÁILER: vive PRIVADO en su cuenta (lo sube la PC); aquí solo se anota cuál es. La dirección para verlo se pide al verlo.
+    const tr = data.datos && data.datos.trailer;
+    perfil.trailer = tr && tr.ruta && tr.v ? { v: String(tr.v), ruta: String(tr.ruta) } : null;
     Almacen.guardar(K + 'perfil', perfil);
+    setTimeout(revisarTrailer, 1200);
   }
   const aDataURL = (blob) => new Promise((ok, mal) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = mal; f.readAsDataURL(blob); });
   // (19-oct-2026, "el celular se siente pegado") Las fotos de Liz se GUARDAN en el celular como texto (data:…;base64, decenas o cientos de
@@ -340,6 +344,7 @@
     setTimeout(refrescarAvisos, 4000);      // (prueba 17: el servidor queda con la suscripción ACTUAL de este iPhone)
     setTimeout(() => gestoLiz(deNoche() ? 'bostezo' : 'saludo'), 1900);     // (cuando ya se fue la pantalla de carga)
     // (21-oct-2026) "¿Cómo te sientes hoy?" (si no hay internet para saber si ya lo marcó en la compu) y, de vez en cuando, una frase de cariño
+    setTimeout(revisarTrailer, 2600);                          // (19-oct-2026: el tráiler, la primera vez; si ya se sabía cuál es)
     setTimeout(revisarAnimoDia, 7000);
     setTimeout(revisarCarino, 9000);
     setInterval(revisarCarino, 10 * MIN);
@@ -892,7 +897,8 @@
     if (!Animo || preguntadoAnimo || !Animo.debePreguntar(E) || sesion || vista === 'charla') return;
     // (prueba 18) Después de actualizarse, "Lo nuevo" va PRIMERO (antes, la pregunta le ganaba y "Lo nuevo" salía 20 s después en cualquier
     // pantalla). Si hay una hoja abierta, espera a que se cierre (como mucho ~1 min) y solo pregunta si él sigue en Hoy.
-    if (loNuevoPendiente || document.querySelector('#hoja:not([hidden])')) { if (esperasAnimo++ < 4) setTimeout(revisarAnimoDia, 15000); return; }
+    // (19-oct-2026: y el TRÁILER, la primera vez, también va antes)
+    if (loNuevoPendiente || trailerPend || !$('#cine').hidden || document.querySelector('#hoja:not([hidden])')) { if (esperasAnimo++ < 4) setTimeout(revisarAnimoDia, 15000); return; }
     if (esperasAnimo && vista !== 'hoy') return;
     const h = N.enCR(Date.now()).h;
     if (h < 6 || h >= 23) return;
@@ -1412,8 +1418,9 @@
       (cuesta.length ? '<ul class="lista">' + cuesta.map((x) => filaTarjeta(x.t)).join('') + '</ul><div style="padding:6px 10px 10px"><button class="bt grande" data-a="repasarCuestan">Repasar estas ' + cuesta.length + '</button></div>'
         : '<p class="nota">Todavía nada. Cuando falles alguna, aparece aquí.</p>') + '</div>' +
       '<h3>📦 Cómo van tus tarjetas</h3><div class="panel"><div class="cajas">' + cajas.map((c) => '<div style="height:' + Math.max(4, Math.round((c / maxC) * 100)) + '%"></div>').join('') +
-      '</div><div class="cajasN">' + cajas.map((c, i) => '<span>' + c + '<br>' + (i < 5 ? 'caja ' + (i + 1) : '🎓 sabidas') + '</span>').join('') + '</div>' +
-      '<p class="nota">Caja 1: aprendiendo · caja 5: ¡dominadas! Cada vez que la sabes, sube una caja y vuelve más tarde. 🎓: las que marcaste "ya me la sé" (aprendidas).' +
+      // (19-oct-2026) "🎓 ya me las sé" (antes decía "sabidas": Catalina, "esa palabra no existe"), igual que el botón "🎓 Ya me la sé"
+      '</div><div class="cajasN">' + cajas.map((c, i) => '<span>' + c + (i < 5 ? '<br>caja ' + (i + 1) : ' 🎓<br>ya me<br>las sé') + '</span>').join('') + '</div>' +
+      '<p class="nota">Caja 1: aprendiendo · caja 5: ¡dominadas! Cada vez que la sabes, sube una caja y vuelve más tarde. 🎓: las que marcaste "Ya me la sé".' +
       (archivadas ? ' Además tienes ' + archivadas + ' en 📦 Archivados.' : '') + '</p></div>';
   }
 
@@ -1458,7 +1465,9 @@
       '<div class="nombreLiz">LIZ</div><div class="verLiz">' + esc(V.texto) + '</div>' +
       // (21-oct-2026) La autora, con su nombre completo; la dedicatoria (privada, llega de la PC) se queda igual
       '<p class="autoraLiz">Creada por <b>' + esc(V.autora) + '</b></p>' +
-      '<p class="dedica">' + esc(lc.dedicatoria || 'Creada con mucho cariño') + '</p><p class="queEs">Tu compañera de estudio y microbióloga junior.</p></div>' +
+      '<p class="dedica">' + esc(lc.dedicatoria || 'Creada con mucho cariño') + '</p><p class="queEs">Tu compañera de estudio y microbióloga junior.</p>' +
+      // (19-oct-2026) El tráiler, para verlo cuando quiera (la primera vez sale solo: revisarTrailer)
+      (perfil.trailer ? '<button class="bt prin trailerBt" data-a="verTrailer">🎬 Ver el tráiler</button>' : '') + '</div>' +
       // (19-oct-2026) La CARTA: justo debajo de Liz, quién la creó y la dedicatoria (js/carta.js arma la sección; el texto llega privado)
       (lc.carta && self.LizCarta ? LizCarta.html(lc.carta, { para: lc.dueno || perfil.nombre || '', de: lc.creadora || '', id: 'secCarta' }) : '') +
       // (Liz 1.0 · prueba 14) Lo nuevo de esta actualización y "Tu privacidad" (version.js: lo mismo que en la compu)
@@ -1473,6 +1482,67 @@
       '<p class="derechos">' + esc(V.derechos) + '</p>';
     $('#fotoSecreto', v).onclick = tocarSecreto;
   }
+  // ---------- (19-oct-2026) EL TRÁILER DE LIZ ----------
+  // Lo hace Catalina; la PC lo sube PRIVADO a su cuenta (src/main/movil.js, assets/trailer/trailer-liz.mp4) y aquí se ve en pantalla completa
+  // (#cine): la PRIMERA vez que llega uno (o uno nuevo) sale solo, antes de "¿Cómo te sientes hoy?", con Liz diciendo que tiene algo para él,
+  // "▶ Ver" (con sonido: el iPhone solo deja sonar un video si él lo toca) y "Ahora no"; después queda en Acerca de Liz → "🎬 Ver el tráiler".
+  // La dirección del video es firmada (sirve 1 hora): nunca es pública.
+  const VISTO_TRAILER = 'liz-trailer-visto';
+  let trailerPend = false, esperasTrailer = 0, cineUrl = null;
+  const trailerVisto = () => { try { return !!perfil.trailer && localStorage.getItem(VISTO_TRAILER) === perfil.trailer.v; } catch (e) { return false; } };
+  async function urlTrailer() {
+    if (!perfil.trailer) return null;
+    if (perfil.trailer.demo) return perfil.trailer.demo;
+    if (cineUrl && cineUrl.ruta === perfil.trailer.ruta && cineUrl.hasta > Date.now() + 5 * MIN) return cineUrl.url;
+    if (!sb) return null;
+    try {
+      const r = await sb.storage.from('liz-privado').createSignedUrl(perfil.trailer.ruta, 3600);
+      if (r.error || !r.data) return null;
+      cineUrl = { ruta: perfil.trailer.ruta, url: r.data.signedUrl, hasta: Date.now() + 3600000 };
+      return cineUrl.url;
+    } catch (e) { return null; }
+  }
+  function revisarTrailer() {
+    trailerPend = !!perfil.trailer && !trailerVisto();
+    if (!trailerPend || !$('#cine').hidden) return;
+    // Si está repasando, en la charla o hay otra hoja abierta, espera (como mucho ~2 minutos)
+    if (sesion || vista === 'charla' || document.querySelector('#hoja:not([hidden])') || document.body.classList.contains('cargando')) { if (esperasTrailer++ < 30) setTimeout(revisarTrailer, 4000); return; }
+    abrirCine(true);
+  }
+  async function abrirCine(primera) {
+    const c = $('#cine');
+    const url = await urlTrailer();
+    if (!url) { if (!primera) avisar('No pude abrir el tráiler. ¿Hay internet?'); else if (esperasTrailer++ < 30) setTimeout(revisarTrailer, 8000); return; }
+    const visto = () => { try { localStorage.setItem(VISTO_TRAILER, perfil.trailer.v); } catch (e) {} trailerPend = false; };
+    c.innerHTML = '<div class="cineTapa">' + escena('saludo', primera ? '¡Hola! Antes de empezar, tengo algo para ti 🎬' : 'Mi tráiler 🎬') +
+      '<div class="botones"><button class="bt prin grande" id="cineVer">▶ Ver</button>' + (primera ? '<button class="bt grande" id="cineNo">Ahora no</button>' : '') + '</div>' +
+      (primera ? '<p class="nota centro">Después lo encuentras en Más → Acerca de Liz.</p>' : '') + '</div>' +
+      '<video id="cineVideo" playsinline preload="auto" controls src="' + esc(url) + '"></video><button class="cineCerrar" id="cineCerrar" aria-label="Cerrar">✕</button>';
+    c.hidden = false;
+    requestAnimationFrame(() => c.classList.add('ver'));
+    const v = $('#cineVideo');
+    // (el play() va DENTRO del toque: así el iPhone deja que suene) En el iPhone se abre en SU reproductor de pantalla completa: el tráiler
+    // es horizontal y ahí se puede girar el teléfono para verlo grande; al cerrarlo (o al terminar) se vuelve a la app.
+    const esIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    $('#cineVer').onclick = () => {
+      visto();
+      c.classList.add('play');
+      const p = v.play();
+      if (p && p.catch) p.catch(() => {});
+      if (esIOS && v.webkitEnterFullscreen) { try { v.webkitEnterFullscreen(); } catch (e) {} }
+    };
+    v.addEventListener('webkitendfullscreen', () => setTimeout(cerrarCine, 200));
+    if ($('#cineNo')) $('#cineNo').onclick = () => { visto(); cerrarCine(); };
+    $('#cineCerrar').onclick = () => { visto(); cerrarCine(); };
+    v.onended = () => { try { if (v.webkitDisplayingFullscreen && v.webkitExitFullscreen) v.webkitExitFullscreen(); } catch (e) {} setTimeout(cerrarCine, 700); };
+  }
+  function cerrarCine() {
+    const c = $('#cine'), v = $('#cineVideo');
+    if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {} }
+    c.classList.remove('ver', 'play');
+    setTimeout(() => { c.hidden = true; c.innerHTML = ''; }, 320);
+  }
+
   // (19-oct-2026) Abrir "Acerca de Liz" justo en la CARTA (el enlace #carta y el botón del mensaje del aniversario)
   function abrirCarta() {
     ir('acerca');
@@ -2419,6 +2489,7 @@
     // (21-oct-2026) un día pesado: solo unas poquitas (las primeras: las que más tocan)
     repasarSuave: () => empezar(Org.paraRepasar(E, { soloHoy: true }).slice(0, Animo.tarjetasSugeridas(Animo.deHoy(E), 999)), 'Con calma'),
     animoHoy: () => hojaAnimo(!Animo.debePreguntar(E)),
+    verTrailer: () => abrirCine(false),
     repasarFav: () => empezar(Org.paraRepasar(E, { favoritas: true }), '⭐ Favoritas'),
     repasarDif: () => empezar(Org.paraRepasar(E, { dificiles: true }), '🔥 Difíciles'),
     repasarTodas: () => empezar(Org.paraRepasar(E, {}).slice(0, 20), 'Repaso libre'),
@@ -3217,6 +3288,9 @@
     revisarCarta: () => revisarCartaAniversario(),
     // (19-oct-2026) para probar-charla-movil.js: lo que sabe el cerebro, la pregunta del ánimo y los avisos con la app abierta
     contexto: () => contextoTexto(), revisarAnimo: () => { preguntadoAnimo = false; esperasAnimo = 0; revisarAnimoDia(); }, revisarAvisos: () => revisarAvisosAbierta(),
+    // (19-oct-2026) para probar-trailer-movil.js: un tráiler de prueba (una dirección local, solo en ?demo) y volver a ofrecerlo
+    trailerDemo: (url, v) => { if (!DEMO) return false; perfil.trailer = { v: v || 'demo', ruta: 'demo', demo: url }; esperasTrailer = 0; revisarTrailer(); return true; },
+    olvidarTrailer: () => { try { localStorage.removeItem(VISTO_TRAILER); } catch (e) {} },
     pomo: () => pomoEstado(),
     pomoPoner: (s) => { pomoGuardar(s); pomoRevisar(); },      // (19-oct-2026: para las pruebas: "adelantar el reloj" del pomodoro; el estado vive en memoria)
     pantalla: (curar) => { medirHueco(curar); return { pantalla: altoPantalla(), vista: innerHeight, rayita: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--abajo')) || 0, hueco }; },   // (para las pruebas: ¿iOS midió la vista más corta?)
