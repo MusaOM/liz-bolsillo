@@ -2,7 +2,16 @@
  "id": "h-monocito",
  "area": "hematologia",
  "areaNombre": "Hematología",
- "pista": "Frotis de sangre, Wright",
+ "tipo": "leucocito",
+ "muestra": "Frotis de sangre, Wright",
+ "pregunta": "Identifica la célula señalada.",
+ "fijate": "Fíjate en la forma del núcleo (¿lóbulos, redondo, en herradura?) y en el color y tamaño de los gránulos.",
+ "flecha": [
+  0.69,
+  0.59
+ ],
+ "opcion": "Monocito",
+ "opciones": null,
  "respuesta": "Monocito.",
  "claves": "Leucocito grande con el núcleo indentado o en forma de herradura. Son el 1-6 % de los leucocitos; al salir de la sangre se llaman macrófagos y células dendríticas.",
  "fuenteClaves": "OpenStax Microbiology, sección 17.3 (tabla de los elementos de la sangre)",

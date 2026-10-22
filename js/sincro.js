@@ -16,8 +16,9 @@
 })(typeof self !== 'undefined' ? self : this, function (Nucleo) {
   // (21-oct-2026, Liz 1.1) "animo" = el diario de ánimo (una fila por día). Es OPCIONAL: si todavía no se corrió supabase/animo.sql,
   // se salta sin frenar lo demás (y lo de aquí se sube cuando exista).
-  const TABLAS = ['materias', 'mazos', 'tarjetas', 'eventos', 'examenes', 'recordatorios', 'archivos', 'animo'];
-  const OPCIONALES = ['animo'];
+  // (22-oct-2026) "tcu" = la bitácora del TCU (una fila por jornada; supabase/tcu.sql). También OPCIONAL.
+  const TABLAS = ['materias', 'mazos', 'tarjetas', 'eventos', 'examenes', 'recordatorios', 'archivos', 'animo', 'tcu'];
+  const OPCIONALES = ['animo', 'tcu'];
   const AGREGAR = { repasos: 'pendientes', avisos: 'pendAvisos' };          // tabla de "solo agregar" → su lista de pendientes
   const SOLAPE_MS = 5000;                                     // el cursor retrocede 5 s: así no se pierde nada que llegó a la vez
 
@@ -82,7 +83,7 @@
   const repasosDe = (E, tarjetaId) => (indices ? indice(E).mapa.get(tarjetaId) || [] : Object.values(E.repasos).filter((r) => r.tarjeta_id === tarjetaId));
   const estado = (E, t) => Nucleo.estadoDe(t, repasosDe(E, t.id));
 
-  const NUMEROS = ['actualizado', 'creada', 'borrado_en', 'fecha', 'cuando', 'hecho', 'ocurrencia', 'tamano'];
+  const NUMEROS = ['actualizado', 'creada', 'borrado_en', 'fecha', 'cuando', 'hecho', 'ocurrencia', 'tamano', 'horas'];
   function normal(f) {
     const o = Object.assign({}, f);
     for (const k of NUMEROS) if (o[k] !== undefined && o[k] !== null) o[k] = Number(o[k]);
@@ -129,7 +130,13 @@
       const version = {};
       for (const f of filas) version[f.id] = f.actualizado;
       try { for (let i = 0; i < filas.length; i += 200) await cli.guardar(tabla, filas.slice(i, i + 200)); }
-      catch (e) { if (e && e.falta) continue; throw e; }      // (la tabla aún no existe en el servidor: queda pendiente)
+      catch (e) {
+        if (e && e.falta) continue;                            // (la tabla aún no existe en el servidor: queda pendiente)
+        // (22-oct-2026) cualquier OTRO error de una tabla opcional (como el choque del ánimo del 21-oct) queda pendiente y se anota, pero ya NO
+        // frena la subida de lo demás (antes, los repasos y los avisos se quedaban sin subir)
+        if (OPCIONALES.includes(tabla)) { r.errores = (r.errores || []).concat(tabla + ': ' + ((e && e.message) || e)); continue; }
+        throw e;
+      }
       r.subidos += filas.length;
       // (si se volvió a cambiar MIENTRAS se subía, sigue pendiente para la próxima vez)
       E.sucios[tabla] = E.sucios[tabla].filter((id) => !ids.includes(id) || (E[tabla][id] && E[tabla][id].actualizado !== version[id]));
@@ -190,8 +197,9 @@
       async agregarRepasos(filas) { ok(await sb.from('repasos').upsert(filas, { onConflict: 'id', ignoreDuplicates: true })); },
       async borrar(tabla, ids) { for (let i = 0; i < ids.length; i += 200) ok(await sb.from(tabla).delete().in('id', ids.slice(i, i + 200))); },
       async alBorrar(tabla, filas) {
-        if (tabla !== 'archivos') return;
-        const rutas = filas.map((f) => f && f.ruta).filter(Boolean);
+        // (archivos: el archivo; tcu: las fotos de prueba de esa jornada y sus miniaturas)
+        const rutas = tabla === 'archivos' ? filas.map((f) => f && f.ruta).filter(Boolean)
+          : tabla === 'tcu' ? filas.flatMap((f) => (f && Array.isArray(f.fotos) ? f.fotos.flatMap((x) => [x.ruta, x.mini]) : [])).filter(Boolean) : [];
         if (rutas.length) await sb.storage.from('liz-privado').remove(rutas).catch(() => {});
       },
     };

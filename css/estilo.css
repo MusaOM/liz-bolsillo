@@ -106,7 +106,7 @@ body.cargando #app, body.cargando #menu, body.cargando #entrar, body.cargando #a
 #entrar .escenaEntrar .liz2d.sin { width: 130px; height: 130px; margin-bottom: 40px; }
 #entrar h1 { font-size: 34px; font-weight: 900; margin: 6px 0; text-shadow: 0 0 22px rgba(169, 139, 255, .6); }
 #entrar form { display: grid; gap: 12px; margin-top: 20px; }
-input[type=email], input[type=password], input[type=text], input[type=search], input[type=date], input[type=time], textarea, select {
+input[type=email], input[type=password], input[type=text], input[type=search], input[type=date], input[type=time], input[type=number], textarea, select {
   width: 100%; min-height: 54px; padding: 13px 18px; border-radius: 18px; border: 1.5px solid var(--vidrio-borde); background: rgba(30, 24, 40, .85); color: var(--t-texto);
   font: 700 17px var(--letra); outline: none; transition: border-color .2s, box-shadow .25s; -webkit-appearance: none; appearance: none; }
 input:focus, textarea:focus, select:focus { border-color: var(--t-acento); box-shadow: 0 0 0 4px rgba(169, 139, 255, .2), 0 0 20px rgba(169, 139, 255, .25); }
@@ -937,10 +937,55 @@ body.quieto .lgCasilla.nuevo .lgMarco { animation: none; box-shadow: 0 0 0 1.5px
 .retoFb.ok { background: rgba(76, 214, 154, .12); border-color: rgba(76, 214, 154, .45); } .retoFb.mal { background: rgba(255, 200, 87, .1); border-color: rgba(255, 200, 87, .4); }
 .retoFb .porque { display: block; margin-top: 8px; font-style: italic; }
 .pracImg { margin: 0 0 12px; border-radius: 16px; overflow: hidden; background: #000; text-align: center; }
-.pracImg img { display: block; width: 100%; max-height: 46vh; object-fit: contain; }
+.pracImg .marcoImg { position: relative; display: inline-block; max-width: 100%; vertical-align: top; }
+.pracImg .marcoImg img { display: block; max-width: 100%; width: auto; height: auto; max-height: 46vh; }
+.flechaImg { position: absolute; width: 44px; height: 44px; transform: translate(6px, -50px); pointer-events: none; filter: drop-shadow(0 0 2px rgba(0, 0, 0, .9)); }
+.flechaImg path { stroke: #ffe14d; stroke-width: 5; stroke-linecap: round; fill: none; } .flechaImg .punta { fill: #ffe14d; stroke-width: 2; stroke-linejoin: round; }
+.muestraImg { margin: -4px 4px 6px; font-size: 12.5px; font-weight: 800; color: var(--t-texto-suave); }
+.pistaBt { margin-top: 10px; }
+.pistaImg { margin: 10px 0 0; padding: 9px 12px; border-radius: 12px; font-size: 14px; background: rgba(255, 225, 77, .08); border: 1px solid rgba(255, 225, 77, .3); }
 .credito { margin: 4px 4px 8px; font-size: 11px; line-height: 1.35; color: var(--t-texto-suave); }
 .credito a { color: inherit; }
 .retoRes { padding: 12px 16px; } .retoRes p { margin: 6px 0; }
 .sinMaterial { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 14px; padding: 11px 14px; border-radius: 18px; text-align: left; color: var(--t-texto);
   background: rgba(76, 201, 240, .1); border: 1px dashed rgba(76, 201, 240, .45); }
 .sinMaterial .e { font-size: 24px; } .sinMaterial .t { flex: 1; display: flex; flex-direction: column; gap: 2px; } .sinMaterial .t b { font-size: 15px; } .sinMaterial .t small { font-size: 12.5px; color: var(--t-texto-suave); }
+.retoTexto { width: 100%; min-height: 84px; margin-top: 8px; padding: 10px 12px; border-radius: 14px; font: inherit; font-size: 15.5px; line-height: 1.4; resize: vertical;
+  background: rgba(255, 255, 255, .06); color: var(--t-texto); border: 1px solid rgba(160, 140, 255, .35); }
+.retoEscribir { display: flex; justify-content: flex-end; margin-top: 6px; }
+.retoCaja .suya { margin-top: 6px; padding: 10px 12px; border-radius: 14px; background: rgba(160, 140, 255, .12); font-size: 15px; line-height: 1.4; white-space: pre-line; }
+.retoCaja .suya small, .retoCaja .r small { display: block; margin-bottom: 3px; font-size: 11.5px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; color: var(--t-texto-suave); }
+.retoFb.comp { background: rgba(160, 140, 255, .1); border-color: rgba(160, 140, 255, .4); }
+.respuestas button.sugerida { outline: 3px solid rgba(255, 255, 255, .85); outline-offset: 2px; }
+.tcuInicio { padding: 14px 16px; }
+.tcuInicio label small, #hoja label small { font-weight: 600; color: var(--t-texto-suave); }
+.tcuProg { padding: 16px 18px 12px; }
+.tcuNum { display: flex; align-items: baseline; gap: 8px; }
+.tcuNum b { font-size: 34px; font-weight: 900; color: var(--t-acento-fuerte, #8e6bff); }
+.tcuNum span { color: var(--t-texto-suave); font-weight: 700; }
+.tcuBarra { margin: 10px 0 10px; }
+.tcuFrase { margin: 0; font-size: 14.5px; line-height: 1.45; }
+.tcuRitmo { margin: 6px 0 0; font-size: 12.5px; }
+.tcuJor .txt small { white-space: normal; }
+.tcuMinis { display: flex; gap: 4px; margin-top: 6px; }
+.tcuMinis img, .tcuMinis i { width: 34px; height: 34px; border-radius: 8px; object-fit: cover; font-style: normal; display: grid; place-items: center; font-size: 12px; background: rgba(255, 255, 255, .06); }
+.tcuPie { text-align: center; font-size: 12.5px; margin: 14px 0 4px; }
+.tcuPie .enlaceAgenda { display: inline; margin: 0; padding: 0; font-size: inherit; }
+.tcuHoras { display: grid; grid-template-columns: 1fr; gap: 2px; }
+.tcuAjuste { display: flex; align-items: center; gap: 4px; }
+.tcuAjuste input { flex: 1; min-width: 0; text-align: center; }
+.tcuAjuste button { flex: none; width: 40px; height: 40px; border-radius: 12px; border: 1px solid rgba(160, 140, 255, .35); background: rgba(255, 255, 255, .05); color: var(--t-texto); font-weight: 800; font-size: 13px; }
+.tcuFotos { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 2px; }
+.tcuFoto { position: relative; width: 70px; height: 70px; border-radius: 12px; overflow: hidden; display: grid; place-items: center; background: rgba(255, 255, 255, .06); border: 1px solid rgba(160, 140, 255, .3); }
+.tcuFoto img { width: 100%; height: 100%; object-fit: cover; }
+.tcuFoto button { position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: rgba(0, 0, 0, .6); color: #fff; font-size: 11px; }
+.tcuFoto.mas { cursor: pointer; font-size: 22px; font-weight: 800; color: var(--t-acento, #a98bff); flex-direction: column; gap: 0; }
+.tcuFoto.mas small { font-size: 11px; font-weight: 700; }
+.tcuNota { font-size: 12px; margin: 6px 0 4px; }
+#tcuInforme { position: fixed; inset: 0; z-index: 60; background: #0e0b13; display: flex; flex-direction: column; padding-top: var(--arriba, 0px); }
+#tcuInforme .tcuInfBar { display: flex; gap: 8px; justify-content: flex-end; padding: 8px 12px; }
+#tcuInforme iframe { flex: 1; width: 100%; border: 0; background: #fff; }
+.relojEx { margin: 10px 0 0; font-size: 14px; color: var(--t-texto-suave); }
+.relojEx b { color: #ffe14d; font-size: 18px; }
+.modoExBt { margin: 10px 0 0 8px; }
+.modoExBt.on { border-color: rgba(255, 225, 77, .55); color: #ffe14d; }

@@ -156,7 +156,12 @@
     // El caso de Banco de Sangre y la imagen, en medio
     for (const x of extras) {
       const q = x === 'caso' ? casoSangre(r) : { tipo: 'imagen', curso: /micolog/.test(cursos.map((c) => Ag.materiaDeClase(c.nombre).clave).join(' ')) && r() < 0.5 ? 'Micología' : 'Hematología', area: null };
-      if (q.tipo === 'imagen') q.area = q.curso === 'Micología' ? 'micologia' : 'hematologia';
+      if (q.tipo === 'imagen') {
+        q.area = q.curso === 'Micología' ? 'micologia' : 'hematologia';
+        // (con el nombre del curso de su horario: "Micología médica", no "Micología" suelto; así el resumen no lo cuenta como otro curso)
+        const c = cursos.find((y) => (q.area === 'micologia' ? /micolog/ : /^hematolog/).test(Ag.materiaDeClase(y.nombre).clave));
+        if (c) q.curso = c.nombre;
+      }
       mezcla.splice(Math.min(mezcla.length, 2 + Math.floor(r() * Math.max(1, mezcla.length - 2))), 0, q);
     }
     mezcla = mezcla.slice(0, total);
@@ -188,8 +193,103 @@
     const rac = N.racha(Object.values(E.repasos || {}), ahora);
     const a = Object.values(E.avisos || {}).find((x) => x && x.clave === 'reto:' + N.diaCR(ahora));
     const res = a ? { bien: Math.floor((Number(a.ocurrencia) - N.inicioDiaCR(ahora)) / 100), total: (Number(a.ocurrencia) - N.inicioDiaCR(ahora)) % 100 } : null;
-    return 'EL RETO DEL DÍA (10 minutos de preguntas mezcladas de sus cursos, en el celular; en la compu, 5 en voz alta): ' + (res ? 'hoy ya lo hizo' + (res.total ? ' (' + res.bien + ' de ' + res.total + ')' : '') + '. Celébralo con una frase si viene al caso.'
-      : 'hoy todavía no lo hace; si viene al caso, invítalo con cariño una vez, sin culpa ni presión.') + (rac >= 2 ? ' Lleva ' + rac + ' días seguidos estudiando (no lo uses para presionar).' : '');
+    const va = !res ? progreso(E, N.diaCR(ahora)).size : 0;
+    return 'EL RETO DEL DÍA (10 minutos de preguntas mezcladas de sus cursos; el MISMO en el celular y en la compu, y sigue donde quedó): ' + (res ? 'hoy ya lo hizo' + (res.total ? ' (' + res.bien + ' de ' + res.total + ')' : '') + '. Celébralo con una frase si viene al caso.'
+      : (va ? 'hoy lo empezó (lleva ' + va + ' preguntas) y no lo ha terminado; si viene al caso, invítalo a terminarlo, sin presión.' : 'hoy todavía no lo hace; si viene al caso, invítalo con cariño una vez, sin culpa ni presión.')) +
+      (rac >= 2 ? ' Lleva ' + rac + ' días seguidos estudiando (no lo uses para presionar).' : '');
   }
-  return { armar, cursosActuales, cursoDe, mismaMateria, casoSangre, hecho, anotar, resumen, pomodoroExtra, diaLargo, partePrompt, FUENTE_SANGRE, azar };
+
+  // ---------- (22-oct-2026, lo pidió la autora) EL MISMO RETO en la compu y en el celular, PREGUNTA POR PREGUNTA ----------
+  // · La lista del día queda FIJA: se arma con lo que había al empezar el día (las tarjetas y los repasos de ANTES de hoy), con la semilla de
+  //   la cuenta (E.usuario) y la hora en que lo empezó (aviso "reto-ini:<día>"). Así, contestar en un aparato no cambia las preguntas del otro.
+  //   La imagen va siempre en la lista (si un aparato no la puede mostrar, se la salta y la otra la muestra).
+  // · Cada respuesta va a "avisos" (solo se agregan: nunca se pisan): "reto-r:<día>:<n.º>:<b|m|x>" → el otro aparato sigue en la que falta,
+  //   sin repetir. Con todas contestadas, "reto:<día>" (hecho, como siempre).
+  const vistas = typeof WeakMap === 'function' ? new WeakMap() : null;
+  function vistaDelDia(E, d0) {
+    const reps = E.repasos || {}, c = vistas && vistas.get(reps), n = Object.keys(reps).length;
+    if (c && c.d0 === d0 && c.n === n && c.nt === Object.keys(E.tarjetas || {}).length) return c.E;
+    const filtrar = (o, f) => { const r = {}; for (const k in o) if (f(o[k])) r[k] = o[k]; return r; };
+    const Ev = Object.assign({}, E, { repasos: filtrar(reps, (x) => x && Number(x.fecha) < d0), tarjetas: filtrar(E.tarjetas || {}, (t) => t && !(Number(t.creada) >= d0)) });
+    if (vistas) vistas.set(reps, { d0, n, nt: Object.keys(E.tarjetas || {}).length, E: Ev });
+    return Ev;
+  }
+  const RES = { b: 'bien', m: 'medio', x: 'mal' };
+  const inicioDe = (E, dia) => { const a = Object.values(E.avisos || {}).filter((x) => x && x.clave === 'reto-ini:' + dia).sort((p, q) => Number(p.ocurrencia) - Number(q.ocurrencia))[0]; return a ? Number(a.ocurrencia) : null; };
+  function armarDelDia(E, ahora, opc) {
+    ahora = ahora || Date.now();
+    const dia = N.diaCR(ahora), ini = inicioDe(E, dia);
+    const d = armar(vistaDelDia(E, N.inicioDiaCR(ahora)), ini || ahora, Object.assign({}, opc || {}, { conImagen: true }));
+    d.dia = dia;
+    d.inicio = ini;
+    return d;
+  }
+  function empezar(E, disp, ahora) {
+    ahora = ahora || Date.now();
+    const dia = N.diaCR(ahora);
+    if (inicioDe(E, dia)) return false;
+    Sincro.agregar(E, 'avisos', { clave: 'reto-ini:' + dia, ocurrencia: ahora, dispositivo: disp, presente: true, fecha: ahora });
+    return true;
+  }
+  // Lo que ya contestó hoy (en cualquier aparato): número de pregunta → 'bien' | 'medio' | 'mal' (la primera vez que se anotó)
+  function progreso(E, dia) {
+    const m = new Map(), pre = 'reto-r:' + dia + ':';
+    const l = Object.values(E.avisos || {}).filter((a) => a && typeof a.clave === 'string' && a.clave.startsWith(pre)).sort((a, b) => Number(a.fecha) - Number(b.fecha));
+    for (const a of l) { const [i, r] = a.clave.slice(pre.length).split(':'); if (RES[r] && !m.has(+i)) m.set(+i, RES[r]); }
+    return m;
+  }
+  function anotarRespuesta(E, disp, ahora, i, res) {
+    ahora = ahora || Date.now();
+    const dia = N.diaCR(ahora), code = res === 'bien' ? 'b' : res === 'medio' ? 'm' : 'x';
+    if (progreso(E, dia).has(i)) return false;          // (ya la contestó en el otro aparato: no se repite)
+    Sincro.agregar(E, 'avisos', { clave: 'reto-r:' + dia + ':' + i + ':' + code, ocurrencia: N.inicioDiaCR(ahora) + i, dispositivo: disp, presente: true, fecha: ahora });
+    return true;
+  }
+  const siguiente = (d, prog, desde) => { for (let i = desde || 0; i < d.preguntas.length; i++) if (!prog.has(i)) return i; return -1; };
+  const resultados = (d, prog) => [...prog.entries()].filter(([i]) => d.preguntas[i]).map(([i, r]) => ({ curso: d.preguntas[i].curso, ok: r === 'bien' }));
+  // Todas contestadas (las imágenes que este aparato no puede mostrar no cuentan si "saltar" lo dice)
+  const completo = (d, prog, saltar) => d.preguntas.every((q, i) => prog.has(i) || (saltar && saltar(q, i)));
+
+  // ---------- La imagen del día (la misma en los dos aparatos) ----------
+  // ix = el índice del banco (movil/practico/indice.json). Opciones SOLO del mismo tipo; la correcta, del pie de foto (herramientas/practico-lista.js)
+  function imagenDelDia(ix, area, dia, semilla) {
+    const l = (ix && ix.imagenes || []).filter((x) => x.area === area && x.tipo);
+    if (!l.length) return null;
+    return barajar(l, azar('img|' + dia + '|' + area + '|' + (semilla || '')))[0];
+  }
+  function opcionesImagen(f, ix, dia, semilla) {
+    const r = azar('img-op|' + dia + '|' + f.id + '|' + (semilla || ''));
+    if (f.opciones) return barajar(f.opciones, r);
+    const otras = [...new Set((ix.imagenes || []).filter((x) => x.area === f.area && x.tipo === f.tipo && x.opcion && x.opcion !== f.opcion).map((x) => x.opcion))];
+    return barajar([f.opcion].concat(barajar(otras, r).slice(0, 3)), r);
+  }
+  const MODO_EXAMEN_SEG = 60;          // (modo examen: sin pista y con tiempo, en las preguntas con imagen)
+
+  // ---------- Pregunta abierta: qué tuvo y qué le faltó (al instante, SOLO con la respuesta guardada; nada inventado) ----------
+  const PARADAS = new Set('para porque como cuando donde entre sobre desde hasta tiene tienen esta este estos estas pero sino solo tambien muy mas menos cada otro otra otros otras sus ellos ellas cual cuales que los las del una uno unos unas con por sin son ser'.split(' '));
+  const plano = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  const clavesDe = (t) => [...new Set(plano(t).replace(/[^a-z0-9ñ ]+/g, ' ').split(/\s+/).filter((w) => w.length >= 4 && !PARADAS.has(w)))];
+  function compararLocal(suya, correcta) {
+    const k = clavesDe(correcta);
+    if (!k.length || !String(suya || '').trim()) return { frase: '', nivel: null };
+    const s = plano(suya), tiene = k.filter((w) => s.includes(w.slice(0, Math.max(4, w.length - 2)))), faltan = k.filter((w) => !tiene.includes(w));
+    const p = tiene.length / k.length;
+    return { nivel: p >= 0.7 ? 'bien' : p >= 0.35 ? 'medio' : 'mal', frase: p >= 0.7 ? 'Tienes lo principal de la respuesta.' : faltan.length ? 'Te faltó: ' + faltan.slice(0, 4).join(', ') + '.' : '' };
+  }
+  // Una respuesta HABLADA a una pregunta de opciones: "la segunda", "la b", "verdadero", o el texto de una opción
+  function opcionDeTexto(texto, opciones) {
+    const t = plano(texto).replace(/[¿?¡!.,]/g, ' ').trim();
+    if (!t) return -1;
+    const ords = [/\b(primer[ao]?|la a|opcion a|uno)\b/, /\b(segund[ao]|la b|opcion b|dos)\b/, /\b(tercer[ao]?|la c|opcion c|tres)\b/, /\b(cuart[ao]|la d|opcion d|cuatro)\b/];
+    if (opciones.length === 2 && plano(opciones[0]) === 'verdadero') { if (/\b(verdadero|cierto|correcto|si)\b/.test(t)) return 0; if (/\b(falso|incorrecto|no)\b/.test(t)) return 1; }
+    if (opciones.length === 2 && /^si,? es compatible/.test(plano(opciones[0]))) { if (/\bno\b/.test(t)) return 1; if (/\b(si|compatible)\b/.test(t)) return 0; }
+    let mejor = -1, punt = 0;
+    opciones.forEach((o, i) => { const k = clavesDe(o); if (!k.length) return; const p = k.filter((w) => t.includes(w.slice(0, Math.max(4, w.length - 2)))).length / k.length; if (p > punt) { punt = p; mejor = i; } });
+    if (punt >= 0.5) return mejor;
+    for (let i = 0; i < Math.min(4, opciones.length); i++) if (ords[i].test(t)) return i;
+    return -1;
+  }
+
+  return { armar, cursosActuales, cursoDe, mismaMateria, casoSangre, hecho, anotar, resumen, pomodoroExtra, diaLargo, partePrompt, FUENTE_SANGRE, azar,
+    armarDelDia, empezar, progreso, anotarRespuesta, siguiente, resultados, completo, imagenDelDia, opcionesImagen, compararLocal, opcionDeTexto, MODO_EXAMEN_SEG, vistaDelDia };
 });

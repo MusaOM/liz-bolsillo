@@ -2,7 +2,16 @@
  "id": "h-linfocito",
  "area": "hematologia",
  "areaNombre": "Hematología",
- "pista": "Frotis de sangre, Wright",
+ "tipo": "leucocito",
+ "muestra": "Frotis de sangre, Wright",
+ "pregunta": "Identifica la célula señalada.",
+ "fijate": "Fíjate en la forma del núcleo (¿lóbulos, redondo, en herradura?) y en el color y tamaño de los gránulos.",
+ "flecha": [
+  0.54,
+  0.53
+ ],
+ "opcion": "Linfocito",
+ "opciones": null,
  "respuesta": "Linfocito.",
  "claves": "Célula esférica con un solo núcleo, a menudo grande, que ocupa casi toda la célula; se tiñe morado. Son el 20-40 % de los leucocitos.",
  "fuenteClaves": "OpenStax Microbiology, sección 17.3 (tabla de los elementos de la sangre)",

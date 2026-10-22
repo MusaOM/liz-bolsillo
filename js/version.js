@@ -16,9 +16,11 @@
   // (22-oct-2026) bolsillo 1.1.1 = arreglos: deslizar hacia abajo cierra las hojas; los nombres de "Mi horario" ya no se aprietan
   // (22-oct-2026, tramo final, tanda A) PC 1.4 / bolsillo 1.2 = CUIDADO Y BIENESTAR: tendencia del diario, nunca el único apoyo, señales,
   // protector de sueño (y el protocolo de crisis, hecho pero apagado)
-  const versiones = { pc: '1.4', bolsillo: '1.2' };
+  // (22-oct-2026, noche) PC 1.5 / bolsillo 1.3 = la BITÁCORA DEL TCU, el reto del día completo y sincronizado (también en la compu), preguntas abiertas,
+  // imágenes como en el examen (modo examen) y el puntito de la charla
+  const versiones = { pc: '1.5', bolsillo: '1.3' };
   const liz = versiones[app] || versiones.bolsillo;
-  const bolsillo = 30;
+  const bolsillo = 31;
   // (20-oct-2026, tanda final) El número de PRUEBA de la compu (no se muestra: lo visible sigue siendo "Liz 1.0"). Lo usan las actualizaciones de
   // la Liz de su dueño (herramientas/armar-actualizacion.js y src/main/actualizar.js): cada actualización lo sube. 28 = el regalo.
   // 29 = la primera actualización (21-oct-2026): los clics de la tarjeta de ánimo, no volver a preguntar y nada de PowerShell escondido.
@@ -27,7 +29,8 @@
   // 32 = Liz de PC 1.3: su vida de estudiante (Tu historia + sus recuerdos), sube los logros del celular y sabe cuáles ganó; su horario por materia, "Por entregar",
   //      la intensidad de los recordatorios y las fechas de la U (22-oct-2026).
   // 33 = Liz de PC 1.4: cuidado y bienestar (tanda A del tramo final).
-  const prueba = 33;
+  // 34 = Liz de PC 1.5: la bitácora del TCU y el reto del día completo en la compu (el mismo del celular, sigue donde quedó).
+  const prueba = 34;
   return {
     app,            // 'pc' o 'bolsillo': cuál Liz lo está leyendo
     versiones,      // las dos (la PC usa la de bolsillo para lo que la Liz del celular dice de sí misma)
@@ -51,35 +54,50 @@
     // compu solo lo de la compu (loNuevoPC); nada de uno en el otro, tampoco en "Acerca de Liz". Para la próxima actualización de cada uno:
     // cambiar su "id" (así se vuelve a mostrar) y sus "cosas".
     // (21-oct-2026) Sin contar QUÉ es lo de Estudiar: es sorpresa (la primera vez que entra, Liz le muestra "algo nuevo")
+    // (22-oct-2026, regla de la autora) LO QUE YA VIO NO SE REPITE: cada novedad lleva su "id" FIJO (nunca se le cambia a una que ya se mostró).
+    // Cada aparato anota los ids que ya enseñó (el celular también en la nube: "nuevo-cel:<id>", así no se repite aunque reinstale; la compu en
+    // lo-nuevo-visto.json) y en una actualización enseña SOLO las que nunca vio; si no queda ninguna, la lista no sale. Para la próxima
+    // actualización: cambiar el "id" de la lista y agregar las novedades nuevas con un id nuevo (las viejas se pueden quitar o dejar: no se repiten).
     loNuevoCelular: {
-      id: 'celular-30',
+      id: 'celular-31',
       cosas: [
-        '⚡ Tu reto del día, arriba en Hoy: 10 minutos (5 los días largos) de preguntas mezcladas de tus cursos, con imágenes y casos de Banco de Sangre. Tu racha no se pierde por un día libre a la semana.',
-        '🔢 Tus materias ahora llevan su código (MC-4000…): tócalo en Mi horario para cambiarlo.',
-        '🌈 En Progreso → Cómo te has sentido, ahora ves tus últimas 4 semanas y te cuento qué patrón veo (por ejemplo, cómo te pegan las semanas de parcial).',
-        '🤍 Te cuido sin ser tu único apoyo: de vez en cuando te pregunto por tus amigos y tus compañeros, y si llevas semanas pesadas te sugiero con cariño pedir una cita.',
-        '😴 Si estudias tarde varias noches, te lo digo una vez y con datos; nada de regaños.',
-        '👆 Desliza una hoja hacia abajo para cerrarla.',
-        '✨ Hay algo nuevo esperándote en Estudiar. Entra cuando quieras… (mejor con internet).',
-        '🎓 Tu horario ahora entiende tus materias: teoría y laboratorio juntos (o aparte), cada una con su color, y tus tutorías y el TCU.',
-        '📌 Lo que tienes que entregar sale siempre arriba de la Agenda.',
-        '🔔 Te aviso con tiempo: 4 y 3 días antes de un parcial o una presentación, y la matrícula hasta que la marques lista. Lo mío nunca te cae en medio de una clase.',
-        '⏰ Si me pides un recordatorio en la charla, te digo a qué hora te lo recuerdo.',
-        '🍅 “Estudiar con Liz” ahora está en Repasar.',
+        { id: 'tcu-bitacora', t: '🤝 Tu bitácora del TCU, en Más → Ajustes → TCU: anota tus horas (con fotos de prueba), mira cuánto te falta para las 300 y guárdala en PDF. Los lunes, al salir, te pregunto si las marcamos.' },
+        { id: 'reto-escribir', t: '✍️ En el reto, las preguntas abiertas ahora se contestan: escribes o dictas tu respuesta, la ves junto a la correcta y te digo qué te faltó.' },
+        { id: 'reto-imagenes', t: '🔬 Las imágenes del reto, como en el práctico: sin pistas (si pides una, cuenta como «más o menos»), opciones del mismo tipo y ⏱ modo examen.' },
+        { id: 'reto-sigue', t: '🔁 Tu reto es el mismo en la compu y aquí: si lo empiezas en un lado, lo sigues en el otro donde quedaste.' },
+        { id: 'charla-puntito', t: '💬 Si te escribo mientras estás en otra pantalla, la pestaña Liz te dice cuántos mensajes tienes sin leer.' },
+        { id: 'reto-dia', t: '⚡ Tu reto del día, arriba en Hoy: 10 minutos (5 los días largos) de preguntas mezcladas de tus cursos, con imágenes y casos de Banco de Sangre. Tu racha no se pierde por un día libre a la semana.' },
+        { id: 'codigos-cursos', t: '🔢 Tus materias ahora llevan su código (MC-4000…): tócalo en Mi horario para cambiarlo.' },
+        { id: 'tendencia-animo', t: '🌈 En Progreso → Cómo te has sentido, ahora ves tus últimas 4 semanas y te cuento qué patrón veo (por ejemplo, cómo te pegan las semanas de parcial).' },
+        { id: 'apoyo-red', t: '🤍 Te cuido sin ser tu único apoyo: de vez en cuando te pregunto por tus amigos y tus compañeros, y si llevas semanas pesadas te sugiero con cariño pedir una cita.' },
+        { id: 'sueno-tarde', t: '😴 Si estudias tarde varias noches, te lo digo una vez y con datos; nada de regaños.' },
+        { id: 'deslizar-hoja', t: '👆 Desliza una hoja hacia abajo para cerrarla.' },
       ],
     },
     loNuevoPC: {
-      id: 'pc-33',
+      id: 'pc-34',
       cosas: [
-        '⚡ El reto del día: si me dices que vas a estudiar, te hago 5 preguntas en voz alta y tú me contestas hablando. Y si un curso no tiene tarjetas, te las armo de tus apuntes.',
-        '🔢 Conozco el código de tus cursos: "el parcial de MC-4000" ya sé que es Hematología.',
-        '🤍 Te cuido mejor: noto si duermes poco o si una semana viene pesada, te pregunto de vez en cuando por tus amigos, y en Acerca de Liz → Cómo te has sentido ves tus últimas 4 semanas.',
-        '📖 Ahora te puedo contar más de mi vida de estudiante, antes de conocerte. Pregúntame cuando quieras.',
-        '🎓 Conozco tu horario por materia (teoría, laboratorio, tutorías y TCU) y en el calendario está arriba lo que tienes que entregar.',
-        '🔔 Te aviso con tiempo los parciales y la matrícula, y te pregunto por las fechas de la U antes de que salgan.',
-        '🔢 Soy la versión 1.4.',
+        { id: 'pc-tcu-bitacora', t: '🤝 Tu bitácora del TCU, en ⚙ Ajustes → TCU: tus horas, tus fotos de prueba, cuánto te falta y un PDF para tu informe. Los lunes, al salir, te pregunto si las marcamos.' },
+        { id: 'pc-reto-completo', t: '⚡ El reto del día completo aquí también (el mismo del celular): imágenes en grande, preguntas abiertas y casos. Contestas escribiendo o hablando; te lo leo solo si me lo pides. Está en el juego de estudio, o dime "hagamos el reto".' },
+        { id: 'pc-reto-sigue', t: '🔁 Si empiezas el reto aquí y lo sigues en el celular (o al revés), sigue donde quedaste.' },
+        { id: 'pc-version-1-5', t: '🔢 Soy la versión 1.5.' },
+        { id: 'pc-reto-voz', t: '⚡ El reto del día: si me dices que vas a estudiar, te hago 5 preguntas en voz alta y tú me contestas hablando. Y si un curso no tiene tarjetas, te las armo de tus apuntes.' },
+        { id: 'pc-codigos', t: '🔢 Conozco el código de tus cursos: "el parcial de MC-4000" ya sé que es Hematología.' },
+        { id: 'pc-cuidado', t: '🤍 Te cuido mejor: noto si duermes poco o si una semana viene pesada, te pregunto de vez en cuando por tus amigos, y en Acerca de Liz → Cómo te has sentido ves tus últimas 4 semanas.' },
+        { id: 'pc-vida-estudiante', t: '📖 Ahora te puedo contar más de mi vida de estudiante, antes de conocerte. Pregúntame cuando quieras.' },
+        { id: 'pc-horario', t: '🎓 Conozco tu horario por materia (teoría, laboratorio, tutorías y TCU) y en el calendario está arriba lo que tienes que entregar.' },
+        { id: 'pc-avisos-u', t: '🔔 Te aviso con tiempo los parciales y la matrícula, y te pregunto por las fechas de la U antes de que salgan.' },
+        { id: 'pc-version-1-4', t: '🔢 Soy la versión 1.4.' },
       ],
     },
+    // Las listas que YA se enseñaron antes de que existieran los ids (la bolsillo 1.2 y la PC 1.4, publicadas el 22-oct-2026): un aparato que ya
+    // vio esa lista (su "id") ya vio estas novedades
+    yaMostradas: {
+      'celular-30': ['reto-dia', 'codigos-cursos', 'tendencia-animo', 'apoyo-red', 'sueno-tarde', 'deslizar-hoja'],
+      'pc-33': ['pc-reto-voz', 'pc-codigos', 'pc-cuidado', 'pc-vida-estudiante', 'pc-horario', 'pc-avisos-u', 'pc-version-1-4'],
+    },
+    // (OJO: aquí solo DATOS, nada de funciones: este objeto viaja por IPC a las ventanas de la compu y una función lo rompería.
+    //  Cada novedad es { id, t }; las de antes eran solo texto.)
     // (Liz 1.0 · prueba 14) TU PRIVACIDAD (en "Acerca de Liz", en la compu y en el celular). REVISADO EN EL CÓDIGO el 21-oct-2026: qué se
     // guarda dónde (compu: %APPDATA%; celular: IndexedDB; nube: tablas con RLS "solo su dueño" + carpeta privada liz-privado/<su cuenta>),
     // qué sale a cada servicio (main.js, liz-cerebro), que la cámara y la pantalla no se guardan, y que liz-cerebro no anota el contenido.
@@ -88,7 +106,7 @@
       ['Dónde se guardan tus cosas', [
         'En tu compu: lo que recuerdo de ti, nuestras charlas, mi diario, tus apuntes y, si me la enseñaste, la huella de tu voz.',
         'En tu celular: tus tarjetas, tu agenda y lo que hablamos ahí, para que funcione aunque no haya internet.',
-        'En la nube (Supabase), en tu cuenta privada: tus tarjetas, mazos y progreso, tu agenda, los archivos que subes, cómo te has sentido, lo que hablamos en el celular y un respaldo diario de lo de tu compu. Así tu compu y tu celular se ponen de acuerdo, y si uno se daña no pierdes nada.',
+        'En la nube (Supabase), en tu cuenta privada: tus tarjetas, mazos y progreso, tu agenda, los archivos que subes, tu bitácora del TCU (con sus fotos), cómo te has sentido, lo que hablamos en el celular y un respaldo diario de lo de tu compu. Así tu compu y tu celular se ponen de acuerdo, y si uno se daña no pierdes nada.',
         'Las reglas de la nube solo dejan entrar a tu cuenta. Las fotos de tu cámara y de tu pantalla no las guardo en ningún lado, y mi voz se hace en tu propia compu.',
       ]],
       ['A quién le pregunto para responderte', [

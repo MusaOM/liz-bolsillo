@@ -2,7 +2,16 @@
  "id": "h-eosinofilo",
  "area": "hematologia",
  "areaNombre": "Hematología",
- "pista": "Frotis de sangre",
+ "tipo": "leucocito",
+ "muestra": "Frotis de sangre",
+ "pregunta": "Identifica la célula señalada.",
+ "fijate": "Fíjate en la forma del núcleo (¿lóbulos, redondo, en herradura?) y en el color y tamaño de los gránulos.",
+ "flecha": [
+  0.62,
+  0.45
+ ],
+ "opcion": "Eosinófilo",
+ "opciones": null,
  "respuesta": "Eosinófilo.",
  "claves": "Núcleo casi siempre de dos lóbulos y gránulos rojo anaranjado brillante. Son el 1-3 % de los leucocitos; ayudan contra los parásitos y en las alergias.",
  "fuenteClaves": "OpenStax Microbiology, sección 17.3 (tabla de los elementos de la sangre)",

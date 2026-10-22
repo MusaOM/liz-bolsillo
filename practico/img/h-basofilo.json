@@ -2,7 +2,16 @@
  "id": "h-basofilo",
  "area": "hematologia",
  "areaNombre": "Hematología",
- "pista": "Frotis de sangre",
+ "tipo": "leucocito",
+ "muestra": "Frotis de sangre",
+ "pregunta": "Identifica la célula señalada.",
+ "fijate": "Fíjate en la forma del núcleo (¿lóbulos, redondo, en herradura?) y en el color y tamaño de los gránulos.",
+ "flecha": [
+  0.43,
+  0.41
+ ],
+ "opcion": "Basófilo",
+ "opciones": null,
  "respuesta": "Basófilo.",
  "claves": "Núcleo de dos lóbulos difícil de ver por los gránulos densos y morado oscuro. Son menos del 1 % de los leucocitos: el menos común.",
  "fuenteClaves": "OpenStax Microbiology, sección 17.3 (tabla de los elementos de la sangre)",

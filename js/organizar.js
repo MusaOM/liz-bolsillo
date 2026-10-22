@@ -96,9 +96,11 @@
     ahora = ahora || Date.now();
     const l = [];
     // (Parte 2: también lo del calendario y los archivos)
-    for (const tabla of ['materias', 'mazos', 'tarjetas', 'eventos', 'examenes', 'recordatorios', 'archivos']) {
+    // (22-oct-2026) + las jornadas de la bitácora del TCU (tcu.js; la fila de "lo que ya llevaba" no se borra)
+    for (const tabla of ['materias', 'mazos', 'tarjetas', 'eventos', 'examenes', 'recordatorios', 'archivos', 'tcu']) {
       for (const x of Object.values(E[tabla] || {})) {
         if (!x.borrado_en || vaciado(x) || (x.datos && x.datos.pomodoro)) continue;      // (los bloques del pomodoro: ocultos, ver agenda.js)
+        if (tabla === 'tcu') { l.push({ tabla, id: x.id, nombre: 'TCU ' + (x.fecha || '') + (x.que ? ': ' + x.que : ''), borrado_en: x.borrado_en, quedan: Math.max(0, Nucleo.PAPELERA_DIAS - Math.floor((ahora - x.borrado_en) / Nucleo.DIA)) }); continue; }
         // Una tarjeta borrada junto con su mazo se muestra solo como el mazo
         if (tabla === 'tarjetas') { const m = E.mazos[x.mazo_id]; if (m && m.borrado_en === x.borrado_en) continue; }
         if (tabla === 'mazos') { const ma = E.materias[x.materia_id]; if (ma && ma.borrado_en === x.borrado_en) continue; }
@@ -134,9 +136,12 @@
     for (const { tabla, x } of filas) {
       const cambio = { id: x.id, borrado_en: Math.min(x.borrado_en, vence), datos: { vaciado: ahora } };
       for (const k of TEXTOS) if (typeof x[k] === 'string') cambio[k] = '';
+      if (tabla === 'tcu') { cambio.fotos = []; cambio.lugar = ''; }
       Sincro.cambiar(E, tabla, cambio, disp, ahora);
     }
-    return { ok: true, borrados: filas.length, archivos: filas.filter((f) => f.tabla === 'archivos').map((f) => f.x) };
+    // (las fotos de una jornada del TCU se borran de la nube ya, como un archivo)
+    const fotosTcu = filas.filter((f) => f.tabla === 'tcu').flatMap((f) => (Array.isArray(f.x.fotos) ? f.x.fotos : []).flatMap((p) => [p.ruta, p.mini])).filter(Boolean);
+    return { ok: true, borrados: filas.length, archivos: filas.filter((f) => f.tabla === 'archivos').map((f) => f.x), fotosTcu };
   }
 
   // ---------- Mazos y materias ----------

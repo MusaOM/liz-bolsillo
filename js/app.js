@@ -40,9 +40,9 @@
   let sincronizando = false, otraVez = false, ultimoError = '', sinSesion = false;
   const TITULOS = { hoy: 'Hoy', repasar: 'Estudiar', charla: 'Liz', agenda: 'Agenda', mazos: 'Estudiar', mas: 'Más', recordatorios: 'Agenda', archivos: 'Archivos',
     progreso: 'Mi progreso', papelera: 'Papelera', acerca: 'Acerca de Liz', archivados: 'Archivados', pomodoro: 'Estudiar con Liz', logros: 'Logros',
-    practico: 'Examen práctico', ritual: 'Antes del examen', reto: 'Reto del día' };      // (22-oct-2026, tanda B y el reto)
+    practico: 'Examen práctico', ritual: 'Antes del examen', reto: 'Reto del día', tcu: 'Mi TCU' };      // (22-oct-2026, tanda B, el reto y la bitácora del TCU)
   // (21-oct-2026) Cada cosa en UN solo lugar: Recordatorios vive en Agenda (pestaña "Recordatorios"); Archivados, en Más
-  const DE_MAS = ['archivos', 'progreso', 'papelera', 'acerca', 'archivados'];
+  const DE_MAS = ['archivos', 'progreso', 'papelera', 'acerca', 'archivados', 'tcu'];
   const DE_AGENDA = ['recordatorios'];
   // (21-oct-2026, Liz 1.3) La pestaña "Estudiar" junta Repasar y Mazos (un selector de 2 partes arriba); recuerda dónde quedó
   const DE_ESTUDIAR = ['repasar', 'mazos'];
@@ -118,6 +118,7 @@
       if (mazoPendiente && E.mazos[mazoPendiente] && !E.mazos[mazoPendiente].borrado_en && vista === 'mazos') { mazoAbierto = mazoPendiente; mazoPendiente = null; pintar(); }
       if (motivo === 'abrir') setTimeout(revisarExamenPasado, 1200);
       if (motivo === 'abrir') setTimeout(revisarAnimoDia, 1800);            // (21-oct-2026: ya se sabe si lo marcó en la compu)
+      setTimeout(revisarTcuHoy, 2400);                                      // (22-oct-2026: los lunes, ¿marcamos las horas del TCU? ya se sabe si la compu preguntó)
       if (motivo === 'abrir') setTimeout(revisarCartaAniversario, 2600);    // (19-oct-2026: el aniversario, con la carta ya al día)
       if (motivo === 'abrir') setTimeout(revisarPreguntaAgenda, 15000);     // (21-oct-2026: "¿tienes algún parcial pronto?", de vez en cuando)
       if (r.cambiosDe.animo && $('#hoja:not([hidden]) .caritas') && Animo.deHoy(E).length) cerrarHoja(null);   // (lo marcó en la compu)
@@ -366,6 +367,7 @@
     setTimeout(revisarTrailer, 2600);                          // (19-oct-2026: el tráiler, la primera vez; si ya se sabía cuál es)
     setTimeout(revisarAnimoDia, 7000);
     setInterval(revisarAnimoDia, 10 * MIN);                    // (19-oct-2026: también si la app sigue abierta; al volver a ella, ver visibilitychange)
+    setInterval(revisarTcuHoy, 10 * MIN);                      // (22-oct-2026: los lunes después de su TCU; solo mira el horario, no gasta)
     setTimeout(revisarCarino, 9000);
     setInterval(revisarCarino, 10 * MIN);
     setTimeout(revisarCartaAniversario, 6000);                 // (19-oct-2026: también sin internet, con lo guardado; y si el día empieza con la app abierta)
@@ -442,7 +444,7 @@
   }
   const PINTA = { hoy: pintarHoy, repasar: pintarRepasar, charla: pintarCharla, agenda: pintarAgenda, mazos: pintarMazos, mas: pintarMas,
     archivos: pintarArchivos, progreso: pintarProgreso, papelera: pintarPapelera, acerca: pintarAcerca, archivados: pintarArchivados, pomodoro: pintarPomodoro,
-    logros: pintarLogros, practico: pintarPractico, ritual: pintarRitual, reto: pintarReto };
+    logros: pintarLogros, practico: pintarPractico, ritual: pintarRitual, reto: pintarReto, tcu: pintarTcu };
   // (prueba 17) Si una pantalla falla al dibujarse (un dato raro que llegó de la nube, por ejemplo), no queda en blanco ni "trabada":
   // sale un aviso con el motivo y un botón para volver a intentar (y las demás pestañas siguen andando).
   function pintarVista(v) {
@@ -481,6 +483,8 @@
   // con una hoja abierta (la pantalla de atrás queda al día) o mientras escribe una respuesta (como antes con pintar(): lo escrito se conserva)
   function pintarSuave(forzar) {
     if (!forzar && (document.querySelector('#hoja:not([hidden])') || respondiendo || (vista === 'repasar' && sesion && sesion.escrito))) return;
+    // (22-oct-2026) en el reto, mientras escribe su respuesta, la pantalla no se repinta sola (se perdería lo escrito)
+    if (!forzar && vista === 'reto' && reto && reto.fase === 'pregunta' && document.getElementById('retoTexto')) return;
     olvidarCalculos();
     if (vista === 'charla') { pintarCarita(); pintarMenu(); return; }    // (la charla no se repinta sola: se perdería lo que escribe)
     const v = $('#vista');
@@ -512,7 +516,7 @@
   }
   // Un enlace a una pantalla (lo usan los avisos al tocarlos): #hoy, #repasar, #charla, #agenda, #recordatorios, #archivos, #mazo=<id>
   function irPorEnlace(h) {
-    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro|carta|animo|prelab|practico|ritual|reto)$|^mazo=([\w-]+)$|^(quiz|ritual)=([\w-]+)$/);
+    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro|carta|animo|prelab|practico|ritual|reto|tcu)$|^mazo=([\w-]+)$|^(quiz|ritual)=([\w-]+)$/);
     if (!m) return false;
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     // (22-oct-2026, tanda B) los avisos del modo parcial (#quiz=<examen>), del pre-lab (#prelab) y del ritual (#ritual=<examen>)
@@ -534,15 +538,22 @@
     let p = b.querySelector('.punto');
     if (n) { if (!p) { p = document.createElement('i'); p.className = 'punto'; b.appendChild(p); } p.textContent = n > 99 ? '99+' : n; }
     else if (p) p.remove();
-    // (20-oct-2026) Un puntito en la pestaña Liz si ella escribió algo en la charla (la pregunta después de un examen)
-    if (vista === 'charla') avisoCharla = false;
-    if (avisoGuardado !== avisoCharla) { avisoGuardado = avisoCharla; try { localStorage.setItem('liz-aviso-charla', avisoCharla ? '1' : '0'); } catch (e) {} }
+    // (20-oct-2026) Un puntito en la pestaña Liz si ella escribió algo en la charla. (22-oct-2026) Con CUÁNTOS sin leer; se quita solo cuando
+    // de verdad ve la charla (si la app está en segundo plano con la charla abierta, todavía no lo vio)
+    if (vista === 'charla' && !document.hidden) { avisoCharla = false; sinLeer = 0; }
+    if (avisoCharla && !sinLeer) sinLeer = 1;
+    if (!avisoCharla) sinLeer = 0;
+    const guardar = avisoCharla ? String(sinLeer) : '0';
+    if (avisoGuardado !== guardar) { avisoGuardado = guardar; try { localStorage.setItem('liz-aviso-charla', guardar); } catch (e) {} }
     const bc = document.querySelector('#menu [data-v=charla]');
     let pc = bc && bc.querySelector('.punto');
-    if (bc && avisoCharla && !pc) { pc = document.createElement('i'); pc.className = 'punto'; pc.textContent = '1'; bc.appendChild(pc); }
+    if (bc && avisoCharla) { if (!pc) { pc = document.createElement('i'); pc.className = 'punto'; bc.appendChild(pc); } if (pc.textContent !== String(sinLeer)) pc.textContent = String(sinLeer); }
     else if (pc && !avisoCharla) pc.remove();
-    // (19-oct-2026: solo si cambió; antes se escribía en cada pintado)
-    if (navigator.setAppBadge && n !== insigniaPuesta) { insigniaPuesta = n; (n ? navigator.setAppBadge(n) : navigator.clearAppBadge()).catch(() => {}); }
+    // El número del ÍCONO: las tarjetas de hoy + los mensajes de Liz sin leer. (19-oct-2026: solo si cambió; antes se escribía en cada pintado)
+    const ni = n + (avisoCharla ? sinLeer : 0);
+    if (navigator.setAppBadge && ni !== insigniaPuesta) { insigniaPuesta = ni; (ni ? navigator.setAppBadge(ni) : navigator.clearAppBadge()).catch(() => {}); }
+    // al ver la charla, el aviso local que quedó en el iPhone ya no hace falta
+    if (!avisoCharla && navigator.serviceWorker && (!DEMO || self.__probarAvisoCharla)) navigator.serviceWorker.ready.then((r) => r.getNotifications({ tag: 'liz-charla' })).then((l) => l.forEach((x) => x.close())).catch(() => {});
   }
   let avisoGuardado = null, insigniaPuesta = null;
   function hace(ms) {
@@ -925,7 +936,7 @@
       agregarMsg({ quien: 'liz', texto: r, animo: Animo.animoLiz(lista) || 'tierna' });
       Animo.anotarRespuesta(E, r, DISP);
       guardarLocal(); pedirSincro();
-      avisoCharla = vista !== 'charla';
+      if (vista !== 'charla') avisoCharla = true;
       pintarMenu();
     }
     pintarSuave();
@@ -937,19 +948,40 @@
   // (Liz 1.0 · prueba 14) "LO NUEVO EN ESTA VERSIÓN": una sola vez después de actualizarse (version.js → loNuevo.id). En una instalación nueva
   // no sale (se anota y listo). Si está repasando, charlando o hay otra hoja abierta, espera. La lista queda en Acerca de Liz.
   let loNuevoPendiente = false;
+  // (22-oct-2026, regla de la autora) LO QUE YA VIO NO SE REPITE: cada novedad tiene su id (version.js); aquí se anotan las que ya se enseñaron
+  // (en el celular y en la nube: "nuevo-cel:<id>", así no se repiten aunque reinstale la app) y en cada actualización salen SOLO las nuevas.
+  const textoNuevo = (n) => (typeof n === 'string' ? n : (n && n.t) || '');
+  const idNuevo = (n) => (typeof n === 'string' ? 'texto:' + n.slice(0, 60) : (n && n.id) || '');
+  function nuevasVistas(versionVista) {
+    const s = new Set();
+    try { for (const x of JSON.parse(localStorage.getItem('liz-lo-nuevo-vistas') || '[]')) s.add(x); } catch (e) {}
+    for (const a of Object.values((E && E.avisos) || {})) if (a && typeof a.clave === 'string' && a.clave.startsWith('nuevo-cel:')) s.add(a.clave.slice(10));
+    for (const [lista, ids] of Object.entries((V && V.yaMostradas) || {})) if (lista === versionVista) for (const x of ids) s.add(x);
+    return s;
+  }
+  function anotarNuevasVistas(ids) {
+    const s = nuevasVistas();
+    try { localStorage.setItem('liz-lo-nuevo-vistas', JSON.stringify([...new Set([...s, ...ids])])); } catch (e) {}
+    const enNube = new Set(Object.values(E.avisos || {}).filter((a) => a && typeof a.clave === 'string').map((a) => a.clave));
+    for (const id of ids) if (!enNube.has('nuevo-cel:' + id)) Sincro.agregar(E, 'avisos', { clave: 'nuevo-cel:' + id, ocurrencia: 0, dispositivo: DISP, presente: true, fecha: Date.now() });
+    guardarLocal(); pedirSincro();
+  }
   function revisarLoNuevo(forzar, yaUsada) {
     if (!V || !V.loNuevoCelular) return;
     let visto = null;
     try { visto = localStorage.getItem('liz-lo-nuevo'); } catch (e) {}
-    const anotar = () => { loNuevoPendiente = false; try { localStorage.setItem('liz-lo-nuevo', V.loNuevoCelular.id); } catch (e) {} };
+    const todas = V.loNuevoCelular.cosas, vistas = nuevasVistas(visto);
+    const pendientes = forzar ? todas : todas.filter((n) => !vistas.has(idNuevo(n)));
+    const anotar = () => { loNuevoPendiente = false; try { localStorage.setItem('liz-lo-nuevo', V.loNuevoCelular.id); } catch (e) {} anotarNuevasVistas(todas.map(idNuevo)); };
     if (!forzar) {
       if (visto === V.loNuevoCelular.id) { loNuevoPendiente = false; return; }
-      if (!visto && !yaUsada && !DEMO) return anotar();
+      if (!visto && !yaUsada && !DEMO) return anotar();         // (una instalación nueva: nada que mostrar; quedan como vistas)
+      if (!pendientes.length) return anotar();                  // (todo lo de esta lista ya lo había visto: no sale)
       if (sesion || vista === 'charla' || document.querySelector('#hoja:not([hidden])')) return void setTimeout(() => revisarLoNuevo(false, true), 20000);
     }
     anotar();
     abrirHoja(escena('feliz', '¡Me actualicé! Mira lo nuevo 💜') + '<h2>🆕 Lo nuevo en esta versión</h2><div class="panel"><ul class="nuevo">' +
-      V.loNuevoCelular.cosas.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div><div class="botones"><button class="bt prin grande" data-cerrar>¡Genial!</button></div>' +
+      pendientes.map((n) => '<li>' + esc(textoNuevo(n)) + '</li>').join('') + '</ul></div><div class="botones"><button class="bt prin grande" data-cerrar>¡Genial!</button></div>' +
       '<button class="enlaceAgenda" data-a="verPrivacidad">🔒 Leer cómo cuido tu privacidad ›</button>');
   }
   // (19-oct-2026) "¿CÓMO TE SIENTES HOY?" — la autora: "si está en la app y no lo ha puesto, que le salga para ponerlo". Antes salía UNA vez por
@@ -1257,8 +1289,9 @@
     if (!Rt || !total) return '';
     if (Rt.hecho(E, ahora)) return '<div class="retoHecho"><span>✅ <b>Reto de hoy, listo</b>' + (racha >= 2 ? ' · ' + racha + ' días seguidos' : '') + '</span>' +
       '<button class="bt chico" data-a="reto">Otra ronda</button></div>';
-    return '<button class="retoBt toque" data-a="reto"><span class="e">⚡</span><span class="t"><b>Tu reto de hoy</b><small>' + (Rt.diaLargo(E, ahora) ? '5 minutos' : '10 minutos') +
-      ' · preguntas mezcladas de tus cursos</small></span><span class="flecha">▶</span></button>';
+    const va = Rt.progreso(E, N.diaCR(ahora)).size;          // (22-oct-2026: lo empezó aquí o en la compu)
+    return '<button class="retoBt toque" data-a="reto"><span class="e">⚡</span><span class="t"><b>' + (va ? 'Sigue tu reto de hoy' : 'Tu reto de hoy') + '</b><small>' +
+      (va ? 'llevas ' + va + (va === 1 ? ' pregunta' : ' preguntas') + ' · sigues donde quedaste' : (Rt.diaLargo(E, ahora) ? '5 minutos' : '10 minutos') + ' · preguntas mezcladas de tus cursos') + '</small></span><span class="flecha">▶</span></button>';
   }
   // Los cursos de ahora (del horario) sin tarjetas ni apuntes subidos todavía
   function cursosSinMaterial() {
@@ -1273,33 +1306,58 @@
     for (const t of unaPorMazo.values()) { if (con.size === cursos.length) break; const c = Rt.cursoDe(E, t, cursos); if (c) con.add(c.nombre); }
     return cursos.filter((c) => !con.has(c.nombre)).map((c) => c.nombre);
   }
+  // (22-oct-2026, lo pidió la autora) EL MISMO RETO que en la compu, pregunta por pregunta: la lista del día es fija (Rt.armarDelDia) y cada
+  // respuesta se anota en la nube (Rt.anotarRespuesta); al abrirlo, sigue en la primera que falta (aunque la haya empezado en la compu).
+  // Con el reto de hoy ya hecho, "Otra ronda" es libre (otras preguntas, no se anota).
   function abrirReto() {
     if (!Rt) { ir('hoy'); return; }
-    const t0 = performance.now();
-    const d = Rt.armar(E, Date.now(), { conImagen: navigator.onLine || DEMO, semilla: E.usuario || '' });
-    reto = { d, i: 0, res: [], fase: 'pregunta', ms: Math.round(performance.now() - t0), elegida: null };
+    const t0 = performance.now(), ahora = Date.now(), sem = E.usuario || '';
+    const libre = Rt.hecho(E, ahora);
+    const d = libre ? Rt.armar(E, ahora, { conImagen: true, semilla: sem + '|otra|' + ahora }) : Rt.armarDelDia(E, ahora, { semilla: sem });
+    if (!libre && Rt.empezar(E, DISP, ahora)) { guardarLocal(); pedirSincro(); }
+    reto = { d, i: 0, res: [], fase: 'pregunta', ms: 0, elegida: null, libre, saltadas: new Set() };
+    if (!libre) {
+      const prog = Rt.progreso(E, d.dia);
+      reto.res = Rt.resultados(d, prog);
+      reto.i = sigReto(0);
+      if (prog.size && reto.i >= 0) setTimeout(() => avisar('Sigues donde quedaste: pregunta ' + (reto.i + 1) + ' de ' + d.preguntas.length + '.'), 400);
+      if (reto.i < 0) { reto.i = d.preguntas.length; terminarReto(); }
+    }
+    reto.ms = Math.round(performance.now() - t0);
     const qi = d.preguntas.find((q) => q.tipo === 'imagen');
     if (qi) qi.p = prepararImagenReto(qi);           // (se baja por detrás mientras contesta las primeras)
     ir('reto');
   }
-  // La imagen: una del área (hematología o micología) del banco del práctico, con 4 opciones (su respuesta y las de otras 3 de la misma área)
+  // La que sigue: la primera que falta (de cualquier aparato), sin las que este no puede mostrar (una imagen sin internet)
+  function sigReto(desde) {
+    if (reto.libre) return desde < reto.d.preguntas.length ? desde : -1;
+    const prog = Rt.progreso(E, reto.d.dia), n = reto.d.preguntas.length;
+    for (let k = 0; k < n; k++) { const i = (desde + k) % n; if (!prog.has(i) && !reto.saltadas.has(i)) return i; }      // (desde ahí en adelante, y después las de antes)
+    return -1;
+  }
+  // La imagen: una del área (hematología o micología) del banco del práctico. (22-oct-2026, lo pidió la autora) Como en el examen práctico:
+  // las opciones son TODAS del mismo tipo (todas células, todas alteraciones, todos hongos…: el "tipo" de herramientas/practico-lista.js), la
+  // correcta sale del pie de foto original, la pregunta no regala la respuesta (con flecha: "Identifica la célula señalada") y NO hay pista
+  // a menos que la pida (botón "Pista": si la usa, cuenta como "Más o menos" aunque acierte). La imagen y sus opciones salen de la semilla
+  // del día (Rt.imagenDelDia): la misma en la compu. "Modo examen" (⏱): sin pista y con tiempo.
   let pracIx = null;
+  let modoExamen = (() => { try { return localStorage.getItem('liz-modo-examen') === '1'; } catch (e) { return false; } })();
+  let relojExamen = null;
+  const flechaImg = (p) => p ? '<svg class="flechaImg" style="left:' + (p[0] * 100).toFixed(1) + '%;top:' + (p[1] * 100).toFixed(1) + '%" viewBox="0 0 44 44" aria-hidden="true">' +
+    '<path d="M42 2 L12 32" /><path class="punta" d="M4 40 L9 20 L24 35 Z" /></svg>' : '';
   async function indicePractico() { if (pracIx) return pracIx; const r = await fetch('practico/indice.json'); if (!r.ok) throw new Error('sin índice'); pracIx = await r.json(); return pracIx; }
   const fichaPractico = async (id) => { const r = await fetch('practico/img/' + encodeURIComponent(id) + '.json'); if (!r.ok) throw new Error('sin ficha'); return r.json(); };
   const barajarCon = (l, r) => { const a = l.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
   async function prepararImagenReto(q) {
     try {
-      const ix = await indicePractico();
-      const l = ix.imagenes.filter((x) => x.area === q.area);
-      if (l.length < 4) throw new Error('pocas');
-      let vistas = {};
-      try { vistas = JSON.parse(localStorage.getItem('liz-practico-visto') || '{}'); } catch (e) {}
-      const r = Rt.azar('img|' + reto.d.dia + '|' + q.area);
-      const orden = barajarCon(l, r).sort((a, b) => (vistas[a.id] || 0) - (vistas[b.id] || 0));
-      const [f, ...o] = await Promise.all(orden.slice(0, 4).map((x) => fichaPractico(x.id)));
-      const ops = barajarCon([f.respuesta].concat(o.map((x) => x.respuesta)), r);
-      Object.assign(q, { id: f.id, img: 'practico/img/' + f.id + '.webp', enunciado: '¿Qué ves en esta imagen? (' + f.pista + ')', opciones: ops, correcta: ops.indexOf(f.respuesta),
-        explicacion: f.claves, fuente: f.fuenteClaves, credito: f.imagen || {}, listo: true });
+      const ix = await indicePractico(), sem = reto.libre ? String(Date.now()) : E.usuario || '';
+      const e = Rt.imagenDelDia(ix, q.area, reto.d.dia, sem);
+      if (!e) throw new Error('pocas');
+      const f = await fichaPractico(e.id);
+      const ops = Rt.opcionesImagen(f, ix, reto.d.dia, sem), buena = f.opciones ? f.opciones[0] : f.opcion;
+      if (ops.length < 3 || !ops.includes(buena)) throw new Error('pocas opciones');
+      Object.assign(q, { id: f.id, img: 'practico/img/' + f.id + '.webp', enunciado: f.pregunta, muestra: f.muestra, fijate: f.fijate, flecha: f.flecha,
+        opciones: ops, correcta: ops.indexOf(buena), explicacion: 'Pie de foto: ' + f.respuesta + ' ' + f.claves, fuente: f.fuenteClaves, credito: f.imagen || {}, listo: true });
       const im = new Image(); im.src = q.img;          // (que ya esté cuando le toque)
       return true;
     } catch (e) { q.fallo = true; return false; }
@@ -1317,7 +1375,8 @@
     if (reto.fase === 'fin' || reto.i >= n) return pintarRetoFin(v);
     const q = d.preguntas[reto.i];
     if (q.tipo === 'imagen' && !q.listo) {
-      if (q.fallo) { reto.i++; return pintarReto(v); }        // (sin internet: esa se salta)
+      // (sin internet: esa se salta aquí; si es el reto del día, la puede contestar en la compu)
+      if (q.fallo) { reto.saltadas.add(reto.i); const s = sigReto(reto.i); if (s < 0) { terminarReto(); return pintarRetoFin(v); } reto.i = s; return pintarReto(v); }
       v.innerHTML = '<p class="suave" style="text-align:center;margin-top:40px">Preparando la imagen…</p>';
       (q.p || (q.p = prepararImagenReto(q))).then(() => { if (vista === 'reto' && reto && reto.d === d) pintarSuave(true); });
       return;
@@ -1325,18 +1384,33 @@
     const fb = reto.fase === 'feedback', ver = reto.fase === 'ver';
     const cab = '<div class="sesion reto"><div class="sesionCab"><strong>⚡ Reto de hoy</strong><span class="suave">' + (reto.i + 1) + ' de ' + n + '</span><button class="bt chico" data-a="retoSalir">Terminar</button></div>' +
       '<div class="barraProg"><i style="width:' + Math.round((reto.i / n) * 100) + '%"></i></div><div class="retoCurso">' + esc(q.curso || '') + (d.modo === 'vispera' ? ' · repaso de la víspera' : '') + '</div>';
-    let cuerpo = '<div class="retoCaja">' + (q.img ? '<div class="pracImg"><img src="' + esc(q.img) + '" alt="Imagen para identificar" decoding="async"></div>' : '') +
-      '<p class="p">' + esc(q.enunciado) + '</p>' + (q.tipo === 'vf' ? '<p class="afirma">Respuesta: «' + esc(q.afirmacion) + '»</p><p class="suave">¿Es correcta?</p>' : '');
+    let cuerpo = '<div class="retoCaja">' + (q.img ? '<div class="pracImg"><span class="marcoImg"><img src="' + esc(q.img) + '" alt="Imagen para identificar" decoding="async">' + flechaImg(q.flecha) + '</span></div>' +
+      (q.muestra ? '<p class="muestraImg">' + esc(q.muestra) + '</p>' : '') : '') +
+      '<p class="p">' + esc(q.enunciado) + '</p>' +(q.tipo === 'vf' ? '<p class="afirma">Respuesta: «' + esc(q.afirmacion) + '»</p><p class="suave">¿Es correcta?</p>' : '');
     if (q.tipo === 'tarjeta') {
-      cuerpo += (ver ? '<div class="r">' + esc(q.respuesta) + '</div>' + (q.fuente ? '<p class="fuente">📖 ' + esc(q.fuente) + '</p>' : '') : '') + '</div>';
-      cuerpo += ver ? '<p class="suave" style="text-align:center;margin:8px 0 4px">¿Cómo te fue?</p><div class="respuestas"><button class="r-mal" data-a="retoAuto" data-r="mal"><span>😕</span>No la sabía</button>' +
-        '<button class="r-medio" data-a="retoAuto" data-r="medio"><span>🤏</span>A medias</button><button class="r-bien" data-a="retoAuto" data-r="bien"><span>😄</span>La sabía</button></div>'
-        : '<button class="bt prin grande" data-a="retoVer">Ver la respuesta</button>';
+      // (22-oct-2026, lo pidió la autora al probarlo) Pregunta ABIERTA: primero la escribe (o la dicta); "Ver la respuesta" pone la suya junto a la
+      // correcta y Liz compara en una frase (con la respuesta y el fragmento de la tarjeta, citando la fuente); después él elige cómo le fue.
+      // "Pensé la respuesta": se salta la escritura.
+      const sug = reto.sug, b = (r, e, t) => '<button class="r-' + r + (sug === r ? ' sugerida' : '') + '" data-a="retoAuto" data-r="' + r + '"><span>' + e + '</span>' + t + '</button>';
+      if (ver) {
+        cuerpo += (reto.escrito ? '<div class="suya"><small>Tu respuesta</small>' + esc(reto.escrito) + '</div>' : '') +
+          '<div class="r"><small>La respuesta</small>' + esc(q.respuesta) + '</div>' + (q.fuente ? '<p class="fuente">📖 ' + esc(q.fuente) + '</p>' : '') + '</div>' +
+          (reto.comp ? '<div class="retoFb comp">' + esc(reto.comp) + '</div>' : '') +
+          '<p class="suave" style="text-align:center;margin:8px 0 4px">¿Cómo te fue?</p><div class="respuestas">' + b('bien', '😄', 'La sabía') + b('medio', '🤏', 'Más o menos') + b('mal', '😕', 'No la sabía') + '</div>';
+      } else {
+        cuerpo += '<textarea id="retoTexto" class="retoTexto" placeholder="Escribe tu respuesta… (o díctala)" maxlength="600">' + esc(reto.escrito || '') + '</textarea>' +
+          '<div class="retoEscribir"><button class="bt chico" data-a="retoDictar" aria-label="Dictar con el micrófono">🎤 Dictar</button></div></div>' +
+          '<div class="dosBotones"><button class="bt grande" data-a="retoPense">Pensé la respuesta</button><button class="bt prin grande" data-a="retoVer">Ver la respuesta</button></div>';
+      }
     } else {
-      cuerpo += '<div class="retoOps">' + q.opciones.map((o, i) => '<button class="retoOp' + (fb ? (i === q.correcta ? ' ok' : i === reto.elegida ? ' mal' : ' apagada') : '') + '" data-a="retoOpcion" data-i="' + i + '"' + (fb ? ' disabled' : '') + '>' + esc(o) + '</button>').join('') + '</div></div>';
+      cuerpo += '<div class="retoOps">' + q.opciones.map((o, i) => '<button class="retoOp' + (fb ? (i === q.correcta ? ' ok' : i === reto.elegida ? ' mal' : ' apagada') : '') + '" data-a="retoOpcion" data-i="' + i + '"' + (fb ? ' disabled' : '') + '>' + esc(o) + '</button>').join('') + '</div>' +
+        // la pista, SOLO si la pide (como en el examen, por defecto no hay); en MODO EXAMEN, ni pista: un reloj
+        (q.tipo === 'imagen' ? (modoExamen ? (!fb ? '<p class="relojEx">⏱ <b id="relojEx">' + Math.max(0, Math.ceil(((reto.hasta || 0) - Date.now()) / 1000)) + '</b> s · modo examen</p>' : '')
+          : q.fijate ? (reto.pista ? '<p class="pistaImg">💡 ' + esc(q.fijate) + '</p>' : !fb ? '<button class="bt chico pistaBt" data-a="retoPista">💡 Pista</button>' : '') : '') +
+          (!fb ? '<button class="bt chico modoExBt' + (modoExamen ? ' on' : '') + '" data-a="retoModoExamen">' + (modoExamen ? '✓ Modo examen' : '⏱ Modo examen') + '</button>' : '') : '') + '</div>';
       if (fb) {
         const bien = reto.elegida === q.correcta;
-        cuerpo += '<div class="retoFb ' + (bien ? 'ok' : 'mal') + '"><b>' + (bien ? '¡Eso!' : q.tipo === 'vf' ? 'No: la respuesta es otra.' : 'Casi.') + '</b> ' +
+        cuerpo += '<div class="retoFb ' + (bien ? 'ok' : 'mal') + '"><b>' + (bien ? (reto.pista && q.tipo === 'imagen' ? '¡Eso! Con pista, cuenta como «Más o menos».' : '¡Eso!') : reto.tiempo ? 'Se acabó el tiempo.' : q.tipo === 'vf' ? 'No: la respuesta es otra.' : 'Casi.') + '</b> ' +
           esc(q.tipo === 'vf' ? 'La respuesta: ' + q.respuesta + '.' : !bien && q.tipo !== 'caso' ? 'Era: ' + q.opciones[q.correcta] + '.' : '') + ' ' + esc(q.explicacion || '') +
           (q.fuente ? '<small>📖 ' + esc(q.fuente) + '</small>' : '') + (reto.porque ? '<span class="porque">' + esc(reto.porque) + '</span>' : '') + '</div>' +
           (q.credito ? creditoImg(q.credito) : '') +
@@ -1344,25 +1418,81 @@
       }
     }
     v.innerHTML = cab + cuerpo + '</div>';
+    // Modo examen: el reloj de la imagen (al llegar a 0, cuenta como no contestada)
+    clearInterval(relojExamen);
+    if (q.tipo === 'imagen' && modoExamen && reto.fase === 'pregunta') {
+      if (!reto.hasta) reto.hasta = Date.now() + Rt.MODO_EXAMEN_SEG * 1000;
+      relojExamen = setInterval(() => {
+        const s = Math.ceil((reto.hasta - Date.now()) / 1000), el = $('#relojEx');
+        if (el) el.textContent = String(Math.max(0, s));
+        if (s <= 0 && reto && reto.fase === 'pregunta') { clearInterval(relojExamen); reto.elegida = -1; reto.tiempo = true; reto.fase = 'feedback'; anotarRespuestaReto(q, 'mal'); pintarSuave(true); }
+      }, 250);
+    }
   }
-  // Se anota lo que contestó: las de tarjetas cuentan para el repaso espaciado (como siempre); la imagen y el caso, solo para el resumen
+  // Se anota lo que contestó: las de tarjetas cuentan para el repaso espaciado (como siempre); la imagen y el caso, solo para el resumen.
+  // (22-oct-2026) Y en la nube, pregunta por pregunta (el reto del día): así la compu sigue en la que falta.
   function anotarRespuestaReto(q, res) {
-    if (q.tarjetaId && E.tarjetas[q.tarjetaId] && !E.tarjetas[q.tarjetaId].borrado_en) { Sincro.repasar(E, q.tarjetaId, res, DISP); guardarLocal(); pedirSincro(); }
-    if (q.tipo === 'imagen' && q.id) { try { const vv = JSON.parse(localStorage.getItem('liz-practico-visto') || '{}'); vv[q.id] = Date.now(); localStorage.setItem('liz-practico-visto', JSON.stringify(vv)); } catch (e) {} }
-    reto.res.push({ curso: q.curso, ok: res === 'bien' });
+    if (q.tarjetaId && E.tarjetas[q.tarjetaId] && !E.tarjetas[q.tarjetaId].borrado_en) Sincro.repasar(E, q.tarjetaId, res, DISP);
+    if (!reto.libre) Rt.anotarRespuesta(E, DISP, Date.now(), reto.i, res);
+    guardarLocal(); pedirSincro();
+    reto.res = reto.libre ? reto.res.concat({ curso: q.curso, ok: res === 'bien' }) : Rt.resultados(reto.d, Rt.progreso(E, reto.d.dia));
     vibrar(res === 'bien' ? 'bien' : 'mal'); sonar(res === 'bien' ? 'bien' : 'mal');
   }
+  // La comparación SIN cerebro (al instante, sin internet): Rt.compararLocal (la misma en la compu). Solo usa la respuesta guardada.
+  const compararLocal = (suya, correcta) => Rt.compararLocal(suya, correcta);
+  async function verRespuestaReto(conTexto) {
+    if (!reto) return;
+    const q = reto.d.preguntas[reto.i], ta = $('#retoTexto');
+    reto.escrito = conTexto && ta ? ta.value.trim() : '';
+    reto.fase = 'ver';
+    const loc = compararLocal(reto.escrito, q.respuesta);
+    reto.comp = loc.frase; reto.sug = loc.nivel;
+    pintarSuave(true);
+    if (!reto.escrito || !puedeCerebro() || !E.tarjetas[q.tarjetaId]) return;
+    const d = reto.d, i = reto.i, t = E.tarjetas[q.tarjetaId];
+    const r = await cerebro('calificar', { tarjeta: { pregunta: t.pregunta, respuesta: t.respuesta, contexto: t.contexto || '', fuente: t.fuente || '' }, respuesta: reto.escrito, hilo: [] }).catch(() => null);
+    if (!reto || reto.d !== d || reto.i !== i || reto.fase !== 'ver' || !r || !r.dice || !['bien', 'medio', 'mal'].includes(r.nivel)) return;
+    // una o dos frases de Liz, como mucho
+    reto.comp = (r.dice.match(/[^.!?]+[.!?]/g) || [r.dice]).slice(0, 2).join(' ').trim().slice(0, 260);
+    reto.sug = r.nivel;
+    pintarSuave(true);
+  }
+  // Dictar: con el reconocimiento de voz del navegador si lo hay; si no, el micrófono del teclado del iPhone
+  let dictando = null;
+  function dictarReto() {
+    const ta = $('#retoTexto');
+    if (!ta) return;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) { ta.focus(); avisar('Toca el 🎤 del teclado para dictar tu respuesta.'); return; }
+    if (dictando) { try { dictando.stop(); } catch (e) {} dictando = null; return; }
+    try {
+      const rec = new SR();
+      rec.lang = 'es-CR'; rec.interimResults = false; rec.maxAlternatives = 1;
+      rec.onresult = (ev) => { const t = ev.results[0] && ev.results[0][0] ? ev.results[0][0].transcript : ''; const x = $('#retoTexto'); if (x && t) { x.value = (x.value ? x.value.trim() + ' ' : '') + t; if (reto) reto.escrito = x.value; } };
+      rec.onend = () => { dictando = null; const b = document.querySelector('[data-a=retoDictar]'); if (b) b.textContent = '🎤 Dictar'; };
+      rec.onerror = () => { dictando = null; ta.focus(); avisar('No pude escucharte. Prueba con el 🎤 del teclado.'); };
+      rec.start();
+      dictando = rec;
+      const b = document.querySelector('[data-a=retoDictar]');
+      if (b) b.textContent = '⏹ Listo';
+    } catch (e) { ta.focus(); avisar('Toca el 🎤 del teclado para dictar tu respuesta.'); }
+  }
   function siguienteReto() {
-    reto.i++; reto.fase = 'pregunta'; reto.elegida = null; reto.porque = '';
-    if (reto.i >= reto.d.preguntas.length) terminarReto();
+    clearInterval(relojExamen);
+    reto.fase = 'pregunta'; reto.elegida = null; reto.porque = ''; reto.escrito = ''; reto.comp = ''; reto.sug = null; reto.pista = false; reto.hasta = 0; reto.tiempo = false;
+    const s = sigReto(reto.i + 1);
+    if (s < 0) { reto.i = reto.d.preguntas.length; terminarReto(); } else reto.i = s;
     pintarSuave(true);
     arribaDeTodo();
   }
-  function terminarReto() {
+  // parcial = él tocó "Terminar" antes de acabar: el reto de hoy NO queda hecho (lo sigue donde quedó, aquí o en la compu)
+  function terminarReto(parcial) {
     if (reto.fase === 'fin') return;
+    clearInterval(relojExamen);
     reto.fase = 'fin';
+    reto.parcial = !!parcial && !reto.libre;
     const r = Rt.resumen(reto.res);
-    if (!Rt.hecho(E, Date.now())) Rt.anotar(E, DISP, Date.now(), r.bien, r.total);
+    if (!reto.libre && !reto.parcial && !Rt.hecho(E, Date.now())) Rt.anotar(E, DISP, Date.now(), r.bien, r.total);
     guardarLocal(); subirYa();
     if (r.total && r.bien / r.total >= 0.7) setTimeout(() => confeti(30), 200);
     setTimeout(() => revisarLogros('ronda'), 1400);
@@ -1740,7 +1870,7 @@
       // (19-oct-2026) La CARTA: justo debajo de Liz, quién la creó y la dedicatoria (js/carta.js arma la sección; el texto llega privado)
       (lc.carta && self.LizCarta ? LizCarta.html(lc.carta, { para: lc.dueno || perfil.nombre || '', de: lc.creadora || '', id: 'secCarta' }) : '') +
       // (Liz 1.0 · prueba 14) Lo nuevo de esta actualización y "Tu privacidad" (version.js: lo mismo que en la compu)
-      (V.loNuevoCelular ? '<h3 id="secNuevo">🆕 Lo nuevo en esta versión</h3><div class="panel"><ul class="nuevo">' + V.loNuevoCelular.cosas.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' : '') +
+      (V.loNuevoCelular ? '<h3 id="secNuevo">🆕 Lo nuevo en esta versión</h3><div class="panel"><ul class="nuevo">' + V.loNuevoCelular.cosas.map((n) => '<li>' + esc(textoNuevo(n)) + '</li>').join('') + '</ul></div>' : '') +
       '<h3>✨ Lo que trae Liz ' + esc(V.liz) + '</h3><div class="panel"><ul class="nuevo">' + V.novedades.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div>' +
       (V.privacidad ? '<h3 id="secPrivacidad">🔒 Tu privacidad</h3><div class="panel privacidad"><p class="intro">Lo que hablas conmigo es tuyo. Así lo cuido:</p>' +
         V.privacidad.map(([t, ls]) => '<h4>' + esc(t) + '</h4>' + ls.map((l) => '<p>' + esc(l.replace('{creadora}', creadoraCel()).replace(/^./, (c) => c.toUpperCase())) + '</p>').join('')).join('') + '</div>' : '') +
@@ -2179,7 +2309,7 @@
     pedirSincro();
     agregarMsg({ quien: 'liz', animo: 'tierna', texto: (lc.creadora || 'Alguien') + ' te dejó algo. Está en Acerca de Liz → Para ' + (lc.dueno || perfil.nombre || ''),
       extra: { html: '<button class="bt chico prin" data-a="abrirCarta">Abrir</button>' } });
-    avisoCharla = vista !== 'charla';
+    if (vista !== 'charla') avisoCharla = true;
     pintarMenu();
     return true;
   }
@@ -2240,6 +2370,8 @@
         interruptor('alternarVibra', '📳', '', 'Vibración', pref.vibra) +
         interruptor('alternarSonido', '🔊', '', 'Sonido', pref.sonido) +
         interruptor('alternarQuieto', '🫧', '', 'Reducir movimiento', pref.quieto) +
+        // (22-oct-2026) la bitácora del TCU: SOLO aquí (la autora: "para no sobrecargar")
+        (Tc ? fila('ir', '🤝', 'verde', 'TCU', Tc.inicio(E) ? horasTxt(Tc.total(E)) + ' de ' + Tc.META + ' h' : '', aV('tcu')) : '') +
         (instalada ? '' : fila('comoInstalar', '📲', '', 'Instalar en el iPhone')) +
         fila('sincronizarYa', '🔄', 'celeste', 'Sincronización', esc(estadoSync().t), '', undefined, 'filaSync') +
         // (19-oct-2026) una línea discreta: qué cerebro usa el chat del celular y lo gastado este mes
@@ -2266,11 +2398,211 @@
     if (!(await confirmar(uno ? '¿Borrar esto para siempre?' : '¿Vaciar la papelera?', uno ? 'Se borra del celular, de la compu y de la nube. No se puede deshacer.'
       : '¿Borrar para siempre todo lo que hay en la papelera? No se puede deshacer.', uno ? 'Borrar para siempre' : 'Vaciar', true))) return;
     const r = Org.borrarParaSiempre(E, cuales, DISP);
-    const rutas = r.archivos.map((a) => a.ruta).filter(Boolean);
+    const rutas = r.archivos.map((a) => a.ruta).filter(Boolean).concat(r.fotosTcu || []);      // (+ las fotos de una jornada del TCU)
     if (sb && rutas.length) sb.storage.from('liz-privado').remove(rutas).catch(() => {});      // (el archivo guardado en la nube, ya)
     avisar(uno ? 'Borrado para siempre.' : 'Papelera vacía.');
     vibrar('bien');
     cambio();
+  }
+
+  // ======================================================================================================
+  // (22-oct-2026, planes/semestre-actual.md) LA BITÁCORA DEL TCU: SOLO en Más → Ajustes → TCU (nada en Hoy, Agenda ni Estudiar). Las reglas
+  // en js/tcu.js (las mismas en la compu). Nada de esto se calcula al abrir la app: solo al entrar aquí (y la pregunta de los lunes).
+  // Las fotos se comprimen EN el celular (webp o jpg, ~1600 px, <400 KB, + miniatura) y van a la carpeta PRIVADA liz-privado/<cuenta>/tcu/;
+  // sus direcciones (firmadas, 10 min) viven solo en la memoria mientras la bitácora está abierta.
+  // ======================================================================================================
+  const Tc = self.Tcu || null;
+  const tcuUrl = {};                 // ruta → { url, hasta }
+  let tcuPidiendo = false;
+  function urlTcu(ruta) { const x = tcuUrl[ruta]; return x && x.hasta > Date.now() ? x.url : null; }
+  async function pedirUrlsTcu(rutas) {
+    const faltan = [...new Set(rutas.filter((r) => r && !urlTcu(r)))];
+    if (!faltan.length || !sb || DEMO) return false;
+    const r = await sb.storage.from('liz-privado').createSignedUrls(faltan, 600).catch(() => null);
+    if (!r || r.error || !r.data) return false;
+    for (const x of r.data) if (x.signedUrl) tcuUrl[x.path] = { url: x.signedUrl, hasta: Date.now() + 9 * MIN };
+    return true;
+  }
+  const horasTxt = (n) => String(Math.round((Number(n) || 0) * 100) / 100).replace('.', ',');
+  function pintarTcu(v) {
+    if (!Tc) { v.innerHTML = ''; setTimeout(() => ir('mas'), 0); return; }
+    const volver = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>';
+    const p = Tc.progreso(E, Date.now());
+    // La primera vez: cuántas horas lleva ya y desde cuándo (una sola vez; "Empiezo de 0" también cuenta)
+    if (!p.inicio) {
+      v.innerHTML = volver + escena('saludo', 'Antes de empezar tu bitácora: ¿cuántas horas de TCU llevas ya?') +
+        '<div class="panel tcuInicio"><form id="fTcuIni"><label for="tiH">Horas que ya llevas</label><input id="tiH" type="number" inputmode="decimal" min="0" max="300" step="0.25" placeholder="Por ejemplo, 60">' +
+        '<label for="tiD">¿Desde cuándo? (más o menos)</label><input id="tiD" type="date">' +
+        '<label for="tiM">¿Cuándo matriculaste el TCU? <small>(para saber tu plazo de 12 meses; si no te acuerdas, déjalo vacío)</small></label><input id="tiM" type="date">' +
+        '<p class="error" id="tiErr"></p><div class="botones"><button class="bt prin grande">Empezar mi bitácora</button>' +
+        '<button type="button" class="bt grande" data-a="tcuDeCero">Empiezo de 0</button></div></form></div>';
+      $('#fTcuIni').addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        const r = Tc.guardarInicio(E, { horas: $('#tiH').value || 0, desde: $('#tiD').value, matricula: $('#tiM').value }, DISP);
+        if (r.error) { $('#tiErr').textContent = r.error.charAt(0).toUpperCase() + r.error.slice(1) + '.'; return; }
+        avisar('¡Lista tu bitácora!'); vibrar('bien'); cambio();
+      });
+      return;
+    }
+    const l = Tc.jornadas(E);
+    const minis = l.flatMap((x) => (x.fotos || []).map((f) => f.mini || f.ruta));
+    if (!tcuPidiendo && minis.some((r) => !urlTcu(r))) { tcuPidiendo = true; pedirUrlsTcu(minis).then((ok) => { tcuPidiendo = false; if (ok && vista === 'tcu') pintarSuave(); }); }
+    const fila = (x) => '<li><button class="item tcuJor" data-a="tcuEditar" data-id="' + esc(x.id) + '"><span class="txt"><b>' + esc(N.fechaTxt(N.msDeCR(x.fecha, '12:00'))) +
+      (x.inicio && x.fin ? ' · ' + esc(x.inicio) + '–' + esc(x.fin) : '') + '</b><small>' + esc(x.que || 'Sin descripción') + (x.lugar ? ' · ' + esc(x.lugar) : '') + '</small>' +
+      ((x.fotos || []).length ? '<span class="tcuMinis">' + x.fotos.slice(0, 4).map((f) => { const u = urlTcu(f.mini || f.ruta); return u ? '<img src="' + esc(u) + '" alt="" loading="lazy">' : '<i>📷</i>'; }).join('') +
+        (x.fotos.length > 4 ? '<i>+' + (x.fotos.length - 4) + '</i>' : '') + '</span>' : '') + '</span><span class="dato">' + horasTxt(x.horas) + ' h</span></button></li>';
+    v.innerHTML = volver +
+      '<div class="panel tcuProg"><div class="tcuNum"><b>' + horasTxt(p.hechas) + '</b><span>de ' + p.meta + ' horas</span></div>' +
+      '<div class="barraProg tcuBarra"><i style="width:' + Math.min(100, p.pct) + '%"></i></div>' +
+      '<p class="tcuFrase">' + (p.faltan > 0 ? 'Te faltan <b>' + horasTxt(p.faltan) + ' h</b>. ' : '') + esc(Tc.fraseProgreso(p)) + '</p>' +
+      (p.ritmoActual != null ? '<p class="suave tcuRitmo">Tu ritmo de las últimas semanas: ~' + horasTxt(p.ritmoActual) + ' h por semana</p>' : '') + '</div>' +
+      '<div class="dosBotones"><button class="bt prin grande" data-a="tcuHoy">＋ Marcar horas de hoy</button><button class="bt grande" data-a="tcuExportar">📄 Exportar</button></div>' +
+      (l.length ? '<h3>Tus jornadas</h3><div class="panel compacta"><ul class="lista">' + l.map(fila).join('') + '</ul></div>' : vacioMini('dormida', 'Todavía no anotas ninguna jornada. Cuando vuelvas del TCU, toca “Marcar horas de hoy”.')) +
+      '<p class="suave tcuPie">Empezaste con ' + horasTxt(p.inicio.horas) + ' h' + (p.inicio.matricula ? ' · matrícula del TCU: ' + esc(N.fechaTxt(N.msDeCR(p.inicio.matricula, '12:00'))) : '') +
+      ' · <button class="enlaceAgenda" data-a="tcuInicio">cambiar</button></p>';
+  }
+  // Comprimir una foto EN el celular: lado mayor ≤ max px; webp si el navegador sabe (si no, jpg); bajando la calidad hasta pesar < kb
+  function comprimirFoto(file, max, kb) {
+    return new Promise((ok, no) => {
+      const u = URL.createObjectURL(file), img = new Image();
+      img.onload = async () => {
+        URL.revokeObjectURL(u);
+        const k = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight)), w = Math.round(img.naturalWidth * k), h = Math.round(img.naturalHeight * k);
+        const c = document.createElement('canvas');
+        c.width = w; c.height = h;
+        c.getContext('2d').drawImage(img, 0, 0, w, h);
+        let blob = null;
+        for (const q of [0.82, 0.72, 0.62, 0.5, 0.4]) {
+          blob = await new Promise((r) => c.toBlob(r, 'image/webp', q));
+          if (!blob || blob.type !== 'image/webp') blob = await new Promise((r) => c.toBlob(r, 'image/jpeg', q));
+          if (blob && blob.size <= kb * 1024) break;
+        }
+        blob ? ok({ blob, ancho: w, alto: h, ext: blob.type === 'image/webp' ? '.webp' : '.jpg' }) : no(new Error('no pude preparar la foto'));
+      };
+      img.onerror = () => { URL.revokeObjectURL(u); no(new Error('esa foto no se pudo abrir')); };
+      img.src = u;
+    });
+  }
+  // La hoja de una jornada (nueva, prellenada o para cambiarla)
+  function abrirJornada(id, prellenado) {
+    if (!Tc) return;
+    const x = id ? E.tcu[id] : null, d = x || prellenado || { fecha: N.diaCR(Date.now()), inicio: '', fin: '' };
+    const fotos = x ? (x.fotos || []).slice() : [];          // las que ya tiene (pueden quitarse)
+    const nuevas = [];                                        // { blob, mini, ancho, alto, ext, url }
+    const quitadas = [];
+    const pintarFotos = (h) => {
+      $('#jFotos', h).innerHTML = fotos.map((f, i) => { const u = urlTcu(f.mini || f.ruta); return '<span class="tcuFoto">' + (u ? '<img src="' + esc(u) + '" alt="">' : '📷') + '<button type="button" data-q="v' + i + '" aria-label="Quitar foto">✕</button></span>'; }).join('') +
+        nuevas.map((f, i) => '<span class="tcuFoto"><img src="' + esc(f.url) + '" alt=""><button type="button" data-q="n' + i + '" aria-label="Quitar foto">✕</button></span>').join('') +
+        (fotos.length + nuevas.length < Tc.MAX_FOTOS ? '<label class="tcuFoto mas"><input type="file" accept="image/*" multiple hidden id="jElegir">＋<small>Fotos</small></label>' : '');
+      const el = $('#jElegir', h);
+      if (el) el.onchange = async (ev) => {
+        const fs = [...(ev.target.files || [])].slice(0, Tc.MAX_FOTOS - fotos.length - nuevas.length);
+        ev.target.value = '';
+        for (const f of fs) {
+          try { const g = await comprimirFoto(f, 1600, 400), m = await comprimirFoto(f, 320, 40); nuevas.push(Object.assign(g, { mini: m.blob, miniExt: m.ext, url: URL.createObjectURL(m.blob) })); }
+          catch (e) { avisar('Una foto no se pudo preparar: ' + (e.message || e)); }
+        }
+        pintarFotos(h);
+      };
+    };
+    const h = abrirHoja('<h2>' + (x ? 'Tu jornada de TCU' : 'Marcar horas de TCU') + '</h2><form id="fJor">' +
+      '<label for="jF">Fecha</label><input id="jF" type="date" value="' + esc(d.fecha || '') + '" required>' +
+      '<div class="tcuHoras"><div><label for="jI">Entrada</label><div class="tcuAjuste"><button type="button" data-m="jI:-15">−15</button><input id="jI" type="time" value="' + esc(d.inicio || '') + '"><button type="button" data-m="jI:15">+15</button></div></div>' +
+      '<div><label for="jS">Salida</label><div class="tcuAjuste"><button type="button" data-m="jS:-15">−15</button><input id="jS" type="time" value="' + esc(d.fin || '') + '"><button type="button" data-m="jS:15">+15</button></div></div></div>' +
+      '<label for="jH">Horas <small>(salen solas; también puedes escribirlas)</small></label><input id="jH" type="number" inputmode="decimal" min="0" max="14" step="0.25" value="' + esc(x ? x.horas : d.horas || '') + '">' +
+      '<label for="jQ">¿Qué hiciste?</label><textarea id="jQ" maxlength="300" placeholder="Por ejemplo: charla de lavado de manos en la escuela">' + esc(x ? x.que || '' : '') + '</textarea>' +
+      '<label for="jL">Lugar <small>(opcional)</small></label><input id="jL" type="text" maxlength="80" value="' + esc(x ? x.lugar || '' : '') + '">' +
+      '<label>Fotos de prueba</label><div class="tcuFotos" id="jFotos"></div>' +
+      '<p class="suave tcuNota">Si salen niños u otras personas, mejor fotos sin caras que se reconozcan (o lo que pida tu proyecto). Se guardan solo en tu nube privada.</p>' +
+      '<p class="error" id="jErr"></p><div class="botones"><button class="bt prin grande" id="jGuardar">Guardar</button>' +
+      (x ? '<button type="button" class="bt grande peligro" id="jBorrar">🗑️ Borrar jornada</button>' : '') +
+      '<button type="button" class="bt grande" data-cerrar>Cancelar</button></div></form>');
+    pintarFotos(h);
+    if (fotos.length) pedirUrlsTcu(fotos.map((f) => f.mini || f.ruta)).then((ok) => { if (ok && !$('#hoja').hidden && $('#fJor')) pintarFotos(h); });
+    const recalcular = () => { const n = Tc.horasEntre($('#jI', h).value, $('#jS', h).value); if (n != null) $('#jH', h).value = n; };
+    $('#jI', h).onchange = recalcular; $('#jS', h).onchange = recalcular;
+    // (onclick, no addEventListener: la hoja es la misma de siempre y abrirHoja lo limpia; si no, el +15 se sumaba dos veces)
+    h.onclick = (ev) => {
+      const m = ev.target.closest('[data-m]');
+      if (m) { const [campo, d2] = m.dataset.m.split(':'); const el = $('#' + campo, h); if (el.value) { el.value = Tc.mover(el.value, Number(d2)); recalcular(); } return; }
+      const q = ev.target.closest('[data-q]');
+      if (q) { const k = q.dataset.q; if (k[0] === 'v') quitadas.push(...fotos.splice(+k.slice(1), 1)); else { const [f] = nuevas.splice(+k.slice(1), 1); if (f) URL.revokeObjectURL(f.url); } pintarFotos(h); }
+    };
+    $('#fJor', h).addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const jid = x ? x.id : N.uuid(), datos = { id: jid, fecha: $('#jF', h).value, inicio: $('#jI', h).value, fin: $('#jS', h).value, horas: $('#jH', h).value, que: $('#jQ', h).value, lugar: $('#jL', h).value };
+      const prueba = Tc.guardarJornada(Sincro.asegurar(JSON.parse(JSON.stringify({ tcu: E.tcu || {} }))), datos, DISP);      // (revisar antes de subir fotos)
+      if (prueba.error) { $('#jErr', h).textContent = prueba.error.charAt(0).toUpperCase() + prueba.error.slice(1) + '.'; return; }
+      const lista = fotos.slice();
+      if (nuevas.length) {
+        if (!DEMO && (!sb || !navigator.onLine)) { $('#jErr', h).textContent = 'Necesito internet para subir las fotos. Quítalas para guardar sin ellas, o inténtalo con internet.'; return; }
+        $('#jGuardar', h).disabled = true; $('#jGuardar', h).textContent = 'Subiendo fotos…';
+        for (let i = 0; i < nuevas.length; i++) {
+          const f = nuevas[i], base = (E.usuario || 'demo') + '/tcu/' + jid + '-' + Date.now().toString(36) + i;
+          const ruta = base + f.ext, mini = base + '-m' + f.miniExt;
+          if (!DEMO) {
+            try {
+              for (const [r, b] of [[ruta, f.blob], [mini, f.mini]]) {
+                const up = await conTope(sb.storage.from('liz-privado').upload(r, b, { contentType: b.type, upsert: false }), 2 * 60000, 'la foto');
+                if (up.error) throw new Error(up.error.message);
+              }
+            } catch (e) { $('#jGuardar', h).disabled = false; $('#jGuardar', h).textContent = 'Guardar'; $('#jErr', h).textContent = 'No pude subir una foto: ' + (e.message || e) + '. ¿Otra vez?'; return; }
+          }
+          tcuUrl[mini] = { url: f.url, hasta: Date.now() + 9 * MIN };
+          if (DEMO) tcuUrl[ruta] = { url: URL.createObjectURL(f.blob), hasta: Date.now() + 60 * MIN };
+          lista.push({ ruta, mini, ancho: f.ancho, alto: f.alto });
+        }
+      }
+      const antes = Tc.total(E);
+      datos.fotos = lista;
+      const r = Tc.guardarJornada(E, datos, DISP);
+      if (r.error) { $('#jErr', h).textContent = r.error; return; }
+      if (quitadas.length && sb && !DEMO) sb.storage.from('liz-privado').remove(quitadas.flatMap((f) => [f.ruta, f.mini]).filter(Boolean)).catch(() => {});
+      cerrarHoja(true);
+      cambio(); subirYa();
+      const hi = Tc.hito(antes, Tc.total(E));
+      if (hi) { setTimeout(() => confeti(40), 200); agregarMsg({ quien: 'liz', texto: hi >= Tc.META ? '¡Terminaste tus ' + Tc.META + ' horas de TCU! Qué orgullo, de verdad.' : '¡Llegaste a ' + hi + ' horas de TCU! Paso a paso, se nota todo lo que has dado.', animo: 'feliz' }); avisoCharla = true; pintarMenu(); }
+      avisar(x ? 'Jornada guardada.' : 'Listo: ' + horasTxt(r.fila.horas) + ' h anotadas.'); vibrar('bien');
+    });
+    if (x) $('#jBorrar', h).onclick = async () => {
+      if (!(await confirmar('¿Borrar esta jornada?', 'Va a la papelera (la recuperas en 30 días).', 'Borrar', true))) return abrirJornada(x.id);
+      Tc.borrarJornada(E, x.id, DISP); avisar('A la papelera.'); cambio();
+    };
+  }
+  // Exportar: el informe imprimible (tabla, total y fotos) en una ventana encima, con "Guardar como PDF / imprimir" y "Compartir"
+  async function exportarTcu() {
+    if (!Tc) return;
+    const l = Tc.jornadas(E), rutas = l.flatMap((x) => (x.fotos || []).map((f) => f.ruta));
+    if (rutas.length && !DEMO) { avisar('Preparando tu bitácora…'); await pedirUrlsTcu(rutas); }
+    const urls = {};
+    for (const r of rutas) { const u = urlTcu(r); if (u) urls[r] = u; }
+    const html = Tc.informeHTML(E, { urls, nombre: perfil.nombre || '' });
+    const capa = document.createElement('div');
+    capa.id = 'tcuInforme';
+    capa.innerHTML = '<div class="tcuInfBar"><button class="bt chico" data-x>✕ Cerrar</button><button class="bt chico prin" data-p>🖨️ Guardar PDF</button>' + (navigator.share ? '<button class="bt chico" data-s>Compartir</button>' : '') + '</div><iframe title="Bitácora del TCU"></iframe>';
+    document.body.appendChild(capa);
+    const fr = capa.querySelector('iframe');
+    fr.srcdoc = html;
+    capa.onclick = async (ev) => {
+      if (ev.target.closest('[data-x]')) capa.remove();
+      else if (ev.target.closest('[data-p]')) { try { fr.contentWindow.focus(); fr.contentWindow.print(); } catch (e) { avisar('Usa Compartir → Imprimir para guardarla como PDF.'); } }
+      else if (ev.target.closest('[data-s]')) { try { await navigator.share({ files: [new File([html], 'bitacora-tcu.html', { type: 'text/html' })], title: 'Bitácora del TCU' }); } catch (e) {} }
+    };
+  }
+  // Los lunes, al terminar su bloque de TCU: "¿marcamos tus horas de TCU de hoy?" UNA vez (en avisos: la compu no lo vuelve a preguntar)
+  let esperasTcu = 0;
+  function revisarTcuHoy() {
+    if (!Tc || document.hidden || !$('#entrar').hidden || sesion || vista === 'charla' || (vista === 'reto' && reto && reto.fase !== 'fin') || escribiendo()) return;
+    const pre = Tc.preguntaHoy(E, Date.now());
+    if (!pre) return;
+    if (loNuevoPendiente || trailerPend || !$('#cine').hidden || document.querySelector('#hoja:not([hidden])')) { if (esperasTcu++ < 6) setTimeout(revisarTcuHoy, 20000); return; }
+    esperasTcu = 0;
+    Tc.anotarPregunta(E, DISP, Date.now());
+    guardarLocal(); pedirSincro();
+    alCerrar = (si) => { if (si) { ir('tcu'); setTimeout(() => abrirJornada(null, pre), 350); } };
+    const h = abrirHoja(escena('saludo', '¿Marcamos tus horas de TCU de hoy?') + '<p style="text-align:center">Te dejo puesto de ' + esc(pre.inicio) + ' a ' + esc(pre.fin) + '; si llegaste más tarde o saliste antes, lo cambias.</p>' +
+      '<div class="botones"><button class="bt prin grande" data-si>Sí, marcarlas</button><button class="bt grande" data-cerrar>Hoy no fui</button></div>');
+    h.onclick = (ev) => { if (ev.target.closest('[data-si]')) cerrarHoja(true); };
   }
 
   // ---------- Detalles que dan vida: vibración, sonido y el brillo al tocar ----------
@@ -2895,7 +3227,26 @@
     // A la nube (para que la PC lo sepa). (prueba 17) Si no se pudo (sin internet), queda marcado y sube en la próxima sincronización:
     // antes se perdía y la Liz de la compu nunca se enteraba de lo que hablaron sin internet.
     if (!DEMO) { m.pend = true; subirCharlaPendiente(); }
+    // (22-oct-2026, lo pidió la autora) EN UN SOLO LUGAR: cada mensaje de Liz que él no está viendo (otra pestaña, o la app en segundo plano)
+    // pone el puntito de la pestaña Liz (con cuántos sin leer) y cuenta en el número del ícono; con la app en segundo plano, además, un aviso
+    // local "LIZ" con el inicio del mensaje que abre la charla (si ya hay uno de la charla sin abrir, no se pone otro)
+    if (m.quien === 'liz' && (vista !== 'charla' || document.hidden)) {
+      sinLeer = Math.min(99, sinLeer + 1);
+      avisoCharla = true;
+      pintarMenu();
+      if (document.hidden) avisoLocalCharla(m.texto);
+    }
     return m;
+  }
+  async function avisoLocalCharla(texto) {
+    try {
+      if (DEMO && !self.__probarAvisoCharla) return;
+      if (!('Notification' in self) || Notification.permission !== 'granted' || !navigator.serviceWorker) return;
+      const reg = await navigator.serviceWorker.ready;
+      if ((await reg.getNotifications({ tag: 'liz-charla' })).length) return;
+      const t = String(texto || '').replace(/\s+/g, ' ').trim();
+      await reg.showNotification('LIZ', { body: t.length > 110 ? t.slice(0, 107).replace(/\s+\S*$/, '') + '…' : t, icon: 'iconos/icono-192.png', badge: 'iconos/aviso-96.png', tag: 'liz-charla', data: { url: '#charla' } });
+    } catch (e) {}
   }
   let subiendoCharla = false;
   async function subirCharlaPendiente() {
@@ -3110,7 +3461,9 @@
   // Un día después de un examen (hasta 10 días), si nadie (ni la compu) preguntó todavía y su materia tiene tarjetas: Liz lo pregunta
   // en la charla, con dos botones. La marca "preguntoArchivar" va en el examen y se sincroniza: así no preguntan los dos.
   // (prueba 15) El puntito de la pestaña "Liz" sigue aunque se cierre la app, hasta que él abra la charla
-  let avisoCharla = (() => { try { return localStorage.getItem('liz-aviso-charla') === '1'; } catch (e) { return false; } })();
+  // (22-oct-2026) + sinLeer: cuántos mensajes de Liz no ha visto (lo pone agregarMsg; se guarda como número)
+  let sinLeer = (() => { try { return Math.max(0, parseInt(localStorage.getItem('liz-aviso-charla') || '0', 10) || 0); } catch (e) { return 0; } })();
+  let avisoCharla = sinLeer > 0;
   function revisarExamenPasado() {
     const ahora = Date.now(), h = N.enCR(ahora).h;
     if (h < 8 || h >= 22) return;
@@ -3125,7 +3478,7 @@
       ofertaArchivar = { tabla: b.tabla, id: b.fila.id, nombre: b.fila.nombre, ms: ahora };
       agregarMsg({ quien: 'liz', animo: 'tierna', texto: 'Ya pasó ' + N.nombreExamen(x) + '. ¿Cómo te fue? 💜 Y una cosa: ¿archivo esas ' + n + ' tarjetas de ' + b.fila.nombre + ' o las seguimos repasando?',
         extra: { html: '<button class="bt chico prin" data-a="archivarOferta" data-tabla="' + b.tabla + '" data-id="' + esc(b.fila.id) + '">📦 Archivarlas</button> <button class="bt chico" data-a="seguirOferta">Seguir repasando</button>' } });
-      avisoCharla = vista !== 'charla';
+      if (vista !== 'charla') avisoCharla = true;
       pintarMenu();
       return;
     }
@@ -3259,18 +3612,45 @@
   // ---------- Botones (data-a) ----------
   const A = {
     ir: (d) => ir(d.v),
+    // (22-oct-2026) LA BITÁCORA DEL TCU
+    tcuHoy: () => { const b = Tc && Tc.bloqueDeHoy(E, Date.now()), hoy = N.diaCR(Date.now()); abrirJornada(null, b ? { fecha: hoy, inicio: b.inicio, fin: b.finTxt, horas: Tc.horasEntre(b.inicio, b.finTxt) } : { fecha: hoy, inicio: '', fin: '' }); },
+    tcuEditar: (d) => abrirJornada(d.id),
+    tcuExportar: () => exportarTcu(),
+    tcuDeCero: () => { const r = Tc.guardarInicio(E, { horas: 0 }, DISP); if (r.ok) { avisar('¡Lista tu bitácora!'); cambio(); } },
+    tcuInicio: () => {
+      const i = Tc.inicio(E) || {}, m = (i.datos || {}).matricula || '';
+      const h = abrirHoja('<h2>Lo que ya llevabas</h2><form id="fTi"><label for="ti2H">Horas antes de la bitácora</label><input id="ti2H" type="number" inputmode="decimal" min="0" max="300" step="0.25" value="' + esc(i.horas || 0) + '">' +
+        '<label for="ti2D">¿Desde cuándo?</label><input id="ti2D" type="date" value="' + esc(i.fecha || '') + '"><label for="ti2M">Matrícula del TCU</label><input id="ti2M" type="date" value="' + esc(m) + '">' +
+        '<p class="error" id="ti2Err"></p><div class="botones"><button class="bt prin grande">Guardar</button><button type="button" class="bt grande" data-cerrar>Cancelar</button></div></form>');
+      $('#fTi', h).addEventListener('submit', (ev) => {
+        ev.preventDefault();
+        const r = Tc.guardarInicio(E, { horas: $('#ti2H', h).value || 0, desde: $('#ti2D', h).value, matricula: $('#ti2M', h).value }, DISP);
+        if (r.error) { $('#ti2Err', h).textContent = r.error; return; }
+        cerrarHoja(true); cambio();
+      });
+    },
     // (22-oct-2026) EL RETO DEL DÍA
     reto: () => abrirReto(),
-    retoSalir: () => { if (reto && reto.fase !== 'fin' && reto.res.length) terminarReto(); reto = null; ir('hoy'); },
-    retoVer: () => { if (!reto) return; reto.fase = 'ver'; pintarSuave(true); },
+    // (22-oct-2026) "Terminar" a la mitad del reto del día: lo contestado ya está en la nube; sigue donde quedó (aquí o en la compu)
+    retoSalir: () => {
+      clearInterval(relojExamen);
+      if (reto && reto.fase !== 'fin' && reto.libre && reto.res.length) terminarReto();
+      else if (reto && reto.fase !== 'fin' && !reto.libre && reto.res.length) avisar('Lo dejamos aquí: cuando quieras, sigues donde quedaste (aquí o en la compu).');
+      reto = null; ir('hoy');
+    },
+    retoModoExamen: () => { modoExamen = !modoExamen; try { localStorage.setItem('liz-modo-examen', modoExamen ? '1' : '0'); } catch (e) {} if (reto) { reto.hasta = 0; reto.pista = false; } pintarSuave(true); },
+    retoVer: () => verRespuestaReto(true),
+    retoPense: () => verRespuestaReto(false),
+    retoDictar: () => dictarReto(),
     retoAuto: (d) => { if (!reto || reto.fase !== 'ver') return; const q = reto.d.preguntas[reto.i]; anotarRespuestaReto(q, d.r); if (d.r === 'bien') gestoLiz('celebrar'); siguienteReto(); },
+    retoPista: () => { if (reto && reto.fase === 'pregunta') { reto.pista = true; pintarSuave(true); } },
     retoOpcion: (d) => {
       if (!reto || reto.fase !== 'pregunta') return;
       const q = reto.d.preguntas[reto.i];
       reto.elegida = Number(d.i);
       reto.fase = 'feedback';
       const bien = reto.elegida === q.correcta;
-      anotarRespuestaReto(q, bien ? 'bien' : 'mal');
+      anotarRespuestaReto(q, bien ? (reto.pista && q.tipo === 'imagen' ? 'medio' : 'bien') : 'mal');
       if (bien) confeti(10);
       pintarSuave(true);
     },
@@ -4016,6 +4396,8 @@
     }
     // (19-oct-2026) Volvió a la app: si hoy no ha dicho cómo se siente, se le pregunta (también sin internet; la sincronización lo vuelve a revisar)
     if (document.visibilityState === 'visible') setTimeout(revisarAnimoDia, 3000);
+    if (document.visibilityState === 'visible') setTimeout(revisarTcuHoy, 4500);
+    if (document.visibilityState === 'visible') pintarMenu();      // (22-oct-2026: si volvió a la charla, lo que llegó mientras tanto ya lo ve: se quita el puntito)
   });
 
   // ---------- Modo de prueba (?demo): datos de ejemplo, como si vinieran de la compu ----------
@@ -4126,6 +4508,8 @@
   self.LizApp = { estado: () => E, sincronizar, avisar, ir, foto: ponerFoto, liz2d: (m) => { liz2d = cortas(m); pintarFijas(); pintarSuave(); }, empezar: () => A.repasarHoy(), voltear: () => A.voltear(), accion: (n) => A[n]({}), formAgenda,   // (para las pruebas y las fotos)
     animos: (m) => { animos = cortas(m); pintar(); }, gestos: (m) => { gestos = clipsCortos(m); }, gesto: (n) => { gestoHasta = 0; return gestoLiz(n); }, animo: (a) => { animoForzado = a || null; pintar(); }, enviar: enviarCharla, escribir: (t) => { A.escribirResp(); setTimeout(() => revisarEscrito(t), 100); },
     pegar: hojaPegar, hacerTarjetas: hacerTarjetasDeTexto,
+    msgLiz: (t) => agregarMsg({ quien: 'liz', texto: t }),      // (22-oct-2026: el puntito y el aviso de la charla)
+    tcu: { preguntar: () => { esperasTcu = 0; revisarTcuHoy(); }, jornada: abrirJornada, exportar: exportarTcu },      // (22-oct-2026: la bitácora del TCU)
     teclado: (px) => { tecladoSimulado = px || null; ajustarTeclado(); },      // (para las capturas: simula el teclado abierto)
     loNuevo: () => revisarLoNuevo(true),      // (para las fotos)
     avisosEncendidos: () => { avisosDemo = true; hojaAvisos(); },
@@ -4155,6 +4539,8 @@
     cuidadoDemo: (d) => { if (!DEMO) return false; cuidadoDemo = d || null; return true; },
     // (22-oct-2026) el reto del día, para herramientas/probar-reto-movil.js
     reto: { abrir: () => abrirReto(), estado: () => reto, hecho: () => !!(Rt && Rt.hecho(E, Date.now())), datos: () => E },
+    // (22-oct-2026) "Lo nuevo" sin repetir lo que ya vio, para herramientas/probar-lo-nuevo-movil.js
+    loNuevo: (forzar, yaUsada) => revisarLoNuevo(forzar, yaUsada),
     cuidado: { opc: () => cuidadoOpc(), prompt: (t) => (Cd ? Cd.partePrompt(t, cuidadoOpc()) : ''), filtrar: (d, t) => (Cd ? Cd.filtrarRespuesta(d, t, cuidadoOpc()) : { dice: d, cambiada: false }),
       porSuCuenta: () => revisarCarino(), tendencia: () => (Cd ? Cd.tendencia(E, Date.now(), 4) : null) },
     logrosDemo: (lista, trailer, urls) => { if (!DEMO) return false; perfil.logros = { v: 'demo', carpeta: 'demo/logros/', lista: lista || [], trailer: trailer || null }; lgDemoUrls = urls || {}; pintarSuave(true); return true; },
