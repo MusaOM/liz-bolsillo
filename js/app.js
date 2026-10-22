@@ -2137,6 +2137,48 @@
     if (f) f(valor === undefined ? null : valor);
   }
   $('#velo').addEventListener('click', () => cerrarHoja(null));
+  // (22-oct-2026) DESLIZAR HACIA ABAJO para cerrar una hoja (como en el iPhone): si la hoja está arriba del todo (o se toma de la rayita),
+  // sigue al dedo; soltándola más de 110 px abajo, o con un tirón rápido, se cierra igual que con "Cancelar" / "Verlo luego" (cerrarHoja(null)).
+  // Mientras se escribe en un cuadro no hace nada (para no cerrarla sin querer).
+  (function () {
+    const h = $('#hoja');
+    let y0 = 0, t0 = 0, dy = 0, arrastrando = false, posible = false;
+    h.addEventListener('touchstart', (ev) => {
+      const r = h.getBoundingClientRect(), y = ev.touches[0].clientY;
+      posible = ev.touches.length === 1 && !escribiendo() && (h.scrollTop <= 0 || y - r.top < 44);
+      y0 = y; t0 = Date.now(); dy = 0; arrastrando = false;
+    }, { passive: true });
+    h.addEventListener('touchmove', (ev) => {
+      if (!posible) return;
+      dy = ev.touches[0].clientY - y0;
+      if (!arrastrando) {
+        if (dy < 8) { if (dy < -4) posible = false; return; }        // (hacia arriba: desplaza la hoja como siempre)
+        arrastrando = true;
+        h.style.transition = 'none';
+      }
+      if (ev.cancelable) ev.preventDefault();
+      h.style.transform = 'translateY(' + Math.max(0, dy) + 'px)';
+      $('#velo').style.opacity = String(Math.max(0.15, 1 - dy / 500));
+    }, { passive: false });
+    const soltar = () => {
+      if (!arrastrando) return;
+      arrastrando = false;
+      const rapido = dy > 40 && dy / Math.max(1, Date.now() - t0) > 0.6;
+      h.style.transition = 'transform .25s var(--suave)';
+      $('#velo').style.transition = 'opacity .25s';
+      if (dy > 110 || rapido) {
+        h.style.transform = 'translateY(100%)';
+        $('#velo').style.opacity = '0';
+        setTimeout(() => { cerrarHoja(null); h.style.transform = ''; h.style.transition = ''; $('#velo').style.opacity = ''; $('#velo').style.transition = ''; }, 240);
+      } else {
+        h.style.transform = '';
+        $('#velo').style.opacity = '';
+        setTimeout(() => { h.style.transition = ''; $('#velo').style.transition = ''; }, 260);
+      }
+    };
+    h.addEventListener('touchend', soltar);
+    h.addEventListener('touchcancel', soltar);
+  })();
   function pedirTexto(titulo, valor, ph) {
     return new Promise((ok) => {
       alCerrar = ok;
@@ -2192,7 +2234,7 @@
         // (21-oct-2026) un laboratorio puede ser parte de la materia o OTRO curso: aquí se separa o se vuelve a juntar (lo ya anotado)
         const conLab = !g.aparte && g.sesiones.some((s) => s.tipo === 'lab'), base = g.aparte && mats.find((o) => !o.aparte && 'laboratorio ' + o.clave === g.clave);
         const bt = conLab ? '<button class="bt chico labBt" data-a="separarLab" data-clave="' + esc(g.clave) + '" data-v="1">Separar el lab</button>'
-          : g.aparte ? '<button class="bt chico labBt" data-a="separarLab" data-clave="' + esc(g.clave) + '" data-v="0">' + (base ? 'Juntar con ' + esc(base.materia) : 'Es parte de la materia') + '</button>' : '';
+          : g.aparte ? '<button class="bt chico labBt" data-a="separarLab" data-clave="' + esc(g.clave) + '" data-v="0">' + (base ? 'Juntar con la teoría' : 'Es parte de la materia') + '</button>' : '';
         return '<li><div class="item">' + puntoMateria(g.color) + '<span class="txt"><b>' + esc(g.materia) + '</b><small>' + esc(resumen(g)) + '</small></span>' + bt + '</div></li>';
       }).join('') + '</ul></div><p class="suave notaLab">Si un laboratorio es un curso aparte (con su propia nota), toca «Separar el lab».</p>' : '') +
       // (22-oct-2026) las tutorías que da y su TCU: aparte, con su ícono (no son materias)

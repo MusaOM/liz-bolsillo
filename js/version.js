@@ -13,9 +13,10 @@
 })(typeof self !== 'undefined' ? self : this, function (app) {
   // La versión que se VE de cada Liz (subirla aquí en cada versión nueva de ESA Liz y anotarla en planes/versiones.md)
   // (21-oct-2026) PC 1.3 = su historia de estudiante y lo que sabe de los logros; bolsillo 1.1 = los LOGROS (videos e imágenes de premio)
-  const versiones = { pc: '1.3', bolsillo: '1.1' };
+  // (22-oct-2026) bolsillo 1.1.1 = arreglos: deslizar hacia abajo cierra las hojas; los nombres de "Mi horario" ya no se aprietan
+  const versiones = { pc: '1.3', bolsillo: '1.1.1' };
   const liz = versiones[app] || versiones.bolsillo;
-  const bolsillo = 28;
+  const bolsillo = 29;
   // (20-oct-2026, tanda final) El número de PRUEBA de la compu (no se muestra: lo visible sigue siendo "Liz 1.0"). Lo usan las actualizaciones de
   // la Liz de su dueño (herramientas/armar-actualizacion.js y src/main/actualizar.js): cada actualización lo sube. 28 = el regalo.
   // 29 = la primera actualización (21-oct-2026): los clics de la tarjeta de ánimo, no volver a preguntar y nada de PowerShell escondido.

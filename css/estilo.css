@@ -883,6 +883,11 @@ body.quieto .lgCasilla.nuevo .lgMarco { animation: none; box-shadow: 0 0 0 1.5px
 .item.entrega.tarde { border-left-color: var(--t-mal); background: rgba(255, 92, 116, .1); }
 .item.entrega.tarde small { color: var(--t-mal); font-weight: 900; }
 .materiasHorario .labBt { flex: none; min-height: 34px; padding: 5px 11px; font-size: 13px; }
+.materiasHorario .item { flex-wrap: wrap; }
+.materiasHorario .item .txt { flex: 1 1 170px; min-width: 0; }
+.materiasHorario .item .txt small { white-space: normal; }
+.materiasHorario .labBt { margin-left: auto; }
+#hoja { overscroll-behavior: contain; }
 .notaLab { margin: 6px 6px 0; font-size: 12.5px; }
 .seg.aparteSeg { margin-top: 8px; }
 .seg.aparteSeg button { font-size: 14px; }
