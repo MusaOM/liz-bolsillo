@@ -19,9 +19,10 @@
   // (22-oct-2026, noche) PC 1.5 / bolsillo 1.3 = la BITÁCORA DEL TCU, el reto del día completo y sincronizado (también en la compu), preguntas abiertas,
   // imágenes como en el examen (modo examen) y el puntito de la charla
   // (22-oct-2026, noche) bolsillo 1.3.1 = arreglo: el TCU pasa de Ajustes a Más opciones
-  const versiones = { pc: '1.5', bolsillo: '1.3.1' };
+  // (22-oct-2026, noche) bolsillo 1.4 = el MODO TRANSCRIPCIÓN (Más opciones, debajo del TCU) y el contexto de la tarjeta al voltearla
+  const versiones = { pc: '1.5', bolsillo: '1.4' };
   const liz = versiones[app] || versiones.bolsillo;
-  const bolsillo = 32;
+  const bolsillo = 33;
   // (20-oct-2026, tanda final) El número de PRUEBA de la compu (no se muestra: lo visible sigue siendo "Liz 1.0"). Lo usan las actualizaciones de
   // la Liz de su dueño (herramientas/armar-actualizacion.js y src/main/actualizar.js): cada actualización lo sube. 28 = el regalo.
   // 29 = la primera actualización (21-oct-2026): los clics de la tarjeta de ánimo, no volver a preguntar y nada de PowerShell escondido.
@@ -60,8 +61,10 @@
     // lo-nuevo-visto.json) y en una actualización enseña SOLO las que nunca vio; si no queda ninguna, la lista no sale. Para la próxima
     // actualización: cambiar el "id" de la lista y agregar las novedades nuevas con un id nuevo (las viejas se pueden quitar o dejar: no se repiten).
     loNuevoCelular: {
-      id: 'celular-31',
+      id: 'celular-33',
       cosas: [
+        { id: 'modo-transcripcion', t: '📝 Modo transcripción, en Más → Más opciones: importa la sesión de una clase y estúdiala por pomodoros, paso a paso. Lo intentas tú primero, después lo comparas con el modelo (y conmigo, si quieres). Todo queda solo en tu celular.' },
+        { id: 'contexto-tarjeta', t: '📄 Al voltear una tarjeta ves de dónde salió; si trae un ⚠, sale resaltado para que lo revises.' },
         { id: 'tcu-bitacora', t: '🤝 Tu bitácora del TCU, en Más → TCU: anota tus horas (con fotos de prueba), mira cuánto te falta para las 300 y guárdala en PDF. Los lunes, al salir, te pregunto si las marcamos.' },
         { id: 'reto-escribir', t: '✍️ En el reto, las preguntas abiertas ahora se contestan: escribes o dictas tu respuesta, la ves junto a la correcta y te digo qué te faltó.' },
         { id: 'reto-imagenes', t: '🔬 Las imágenes del reto, como en el práctico: sin pistas (si pides una, cuenta como «más o menos»), opciones del mismo tipo y ⏱ modo examen.' },
@@ -106,7 +109,7 @@
     privacidad: [
       ['Dónde se guardan tus cosas', [
         'En tu compu: lo que recuerdo de ti, nuestras charlas, mi diario, tus apuntes y, si me la enseñaste, la huella de tu voz.',
-        'En tu celular: tus tarjetas, tu agenda y lo que hablamos ahí, para que funcione aunque no haya internet.',
+        'En tu celular: tus tarjetas, tu agenda y lo que hablamos ahí, para que funcione aunque no haya internet. Tus sesiones del Modo transcripción (con tus respuestas y las fotos de tus dibujos) se quedan SOLO ahí: no suben a la nube.',
         'En la nube (Supabase), en tu cuenta privada: tus tarjetas, mazos y progreso, tu agenda, los archivos que subes, tu bitácora del TCU (con sus fotos), cómo te has sentido, lo que hablamos en el celular y un respaldo diario de lo de tu compu. Así tu compu y tu celular se ponen de acuerdo, y si uno se daña no pierdes nada.',
         'Las reglas de la nube solo dejan entrar a tu cuenta. Las fotos de tu cámara y de tu pantalla no las guardo en ningún lado, y mi voz se hace en tu propia compu.',
       ]],

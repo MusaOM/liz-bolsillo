@@ -3,7 +3,7 @@
 // Al tocar un aviso, se abre la pantalla que corresponde (url: ./#recordatorios, ./#repasar, ./#mazo=<id>...).
 // Al cambiar archivos de la app, el celular baja la versión nueva porque cambia VERSION. (21-oct-2026) El número sale de
 // js/version.js ("bolsillo"): herramientas/preparar-publicacion.js lo copia aquí solo (no hace falta cambiarlo a mano).
-const VERSION = 'liz-bolsillo-32';
+const VERSION = 'liz-bolsillo-33';
 const ARCHIVOS = [
   './', 'index.html', 'manifest.webmanifest', 'css/estilo.css',
   'js/config.js', 'js/nucleo.js', 'js/sincro.js', 'js/organizar.js', 'js/agenda.js', 'js/frases-liz.js', 'js/frases.js', 'js/almacen.js', 'js/fondo.js', 'js/app.js',
@@ -14,6 +14,7 @@ const ARCHIVOS = [
   'js/cuidado.js',                                                      // (22-oct-2026: cuidado y bienestar; se puede quitar)
   'js/reto.js',                                                         // (22-oct-2026: el reto del día; se puede quitar)
   'js/tcu.js',                                                          // (22-oct-2026: la bitácora del TCU; sus FOTOS no se guardan aquí)
+  'js/modo-transcripcion.js',                                           // (22-oct-2026: el modo transcripción; se guarda para sin internet, pero se CARGA solo al abrirlo)
   'vendor/supabase.js', 'fuentes/nunito-400.woff2', 'fuentes/nunito-600.woff2', 'fuentes/nunito-800.woff2', 'fuentes/nunito-900.woff2',
   'iconos/icono.svg', 'iconos/icono-180.png', 'iconos/icono-192.png', 'iconos/icono-512.png', 'iconos/icono-mascara-512.png', 'iconos/aviso-96.png',
   // (19-oct-2026) el fondo "campo oscuro" (herramientas/hacer-fondos-svg.js)

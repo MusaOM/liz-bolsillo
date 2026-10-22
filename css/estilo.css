@@ -989,3 +989,5 @@ body.quieto .lgCasilla.nuevo .lgMarco { animation: none; box-shadow: 0 0 0 1.5px
 .relojEx b { color: #ffe14d; font-size: 18px; }
 .modoExBt { margin: 10px 0 0 8px; }
 .modoExBt.on { border-color: rgba(255, 225, 77, .55); color: #ffe14d; }
+.ctxTarjeta { margin: 8px 0 2px; font-size: 12.5px; line-height: 1.4; color: var(--t-texto-suave); text-align: left; }
+.ctxTarjeta.ojo { color: var(--t-texto); background: rgba(255, 200, 87, .12); border: 1px solid rgba(255, 200, 87, .45); border-radius: 10px; padding: 6px 9px; }

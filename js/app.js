@@ -40,9 +40,9 @@
   let sincronizando = false, otraVez = false, ultimoError = '', sinSesion = false;
   const TITULOS = { hoy: 'Hoy', repasar: 'Estudiar', charla: 'Liz', agenda: 'Agenda', mazos: 'Estudiar', mas: 'Más', recordatorios: 'Agenda', archivos: 'Archivos',
     progreso: 'Mi progreso', papelera: 'Papelera', acerca: 'Acerca de Liz', archivados: 'Archivados', pomodoro: 'Estudiar con Liz', logros: 'Logros',
-    practico: 'Examen práctico', ritual: 'Antes del examen', reto: 'Reto del día', tcu: 'Mi TCU' };      // (22-oct-2026, tanda B, el reto y la bitácora del TCU)
+    practico: 'Examen práctico', ritual: 'Antes del examen', reto: 'Reto del día', tcu: 'Mi TCU', transcripcion: 'Modo transcripción' };      // (22-oct-2026, tanda B, el reto y la bitácora del TCU)
   // (21-oct-2026) Cada cosa en UN solo lugar: Recordatorios vive en Agenda (pestaña "Recordatorios"); Archivados, en Más
-  const DE_MAS = ['archivos', 'progreso', 'papelera', 'acerca', 'archivados', 'tcu'];
+  const DE_MAS = ['archivos', 'progreso', 'papelera', 'acerca', 'archivados', 'tcu', 'transcripcion'];
   const DE_AGENDA = ['recordatorios'];
   // (21-oct-2026, Liz 1.3) La pestaña "Estudiar" junta Repasar y Mazos (un selector de 2 partes arriba); recuerda dónde quedó
   const DE_ESTUDIAR = ['repasar', 'mazos'];
@@ -444,7 +444,7 @@
   }
   const PINTA = { hoy: pintarHoy, repasar: pintarRepasar, charla: pintarCharla, agenda: pintarAgenda, mazos: pintarMazos, mas: pintarMas,
     archivos: pintarArchivos, progreso: pintarProgreso, papelera: pintarPapelera, acerca: pintarAcerca, archivados: pintarArchivados, pomodoro: pintarPomodoro,
-    logros: pintarLogros, practico: pintarPractico, ritual: pintarRitual, reto: pintarReto, tcu: pintarTcu };
+    logros: pintarLogros, practico: pintarPractico, ritual: pintarRitual, reto: pintarReto, tcu: pintarTcu, transcripcion: pintarTranscripcion };
   // (prueba 17) Si una pantalla falla al dibujarse (un dato raro que llegó de la nube, por ejemplo), no queda en blanco ni "trabada":
   // sale un aviso con el motivo y un botón para volver a intentar (y las demás pestañas siguen andando).
   function pintarVista(v) {
@@ -485,6 +485,8 @@
     if (!forzar && (document.querySelector('#hoja:not([hidden])') || respondiendo || (vista === 'repasar' && sesion && sesion.escrito))) return;
     // (22-oct-2026) en el reto, mientras escribe su respuesta, la pantalla no se repinta sola (se perdería lo escrito)
     if (!forzar && vista === 'reto' && reto && reto.fase === 'pregunta' && document.getElementById('retoTexto')) return;
+    // (22-oct-2026) el modo transcripción se pinta SOLO (su archivo): nada de afuera lo repinta (se perdería lo que escribe)
+    if (vista === 'transcripcion') { pintarMenu(); return; }
     olvidarCalculos();
     if (vista === 'charla') { pintarCarita(); pintarMenu(); return; }    // (la charla no se repinta sola: se perdería lo que escribe)
     const v = $('#vista');
@@ -1100,7 +1102,7 @@
       '<div class="cara frente"><div class="m">' + esc(nombreMazo(t.mazo_id)) + (c.repetida ? ' · otra vez' : '') + '</div><div class="p">' + esc(t.pregunta) + '</div>' +
       (fig ? '<img src="' + esc(fig.src) + '" alt="" loading="lazy" onerror="this.remove()">' : '') +
       '<div class="toca">👆 Toca para ver la respuesta</div></div>' +
-      '<div class="cara atras"><div class="m">La respuesta</div><div class="r">' + esc(t.respuesta) + '</div>' +
+      '<div class="cara atras"><div class="m">La respuesta</div><div class="r">' + esc(t.respuesta) + '</div>' + contextoTarjeta(t.contexto) +
       (t.fuente ? '<div class="fuente">📖 ' + esc(t.fuente) + '</div>' : '') + (fig ? '<div class="pie">Figura: ' + esc(fig.fuente || 'OpenStax Microbiology') + ' (' + esc(fig.licencia || 'CC BY-NC-SA 4.0') + ')</div>' : '') + '</div></div></div>' +
       '<div class="marcas"><button class="chip' + (t.favorita ? ' on' : '') + '" data-a="marcarFav">⭐ Favorita</button><button class="chip' + (t.dificil ? ' on' : '') +
       '" data-a="marcarDif">🔥 Difícil</button><button class="chip" data-a="yaMeLaSe" title="Ya me la sé: no vuelve a salir">🎓 Ya me la sé</button><button class="chip" data-a="editarActual" aria-label="Editar">✏️</button></div>' +
@@ -1362,6 +1364,9 @@
       return true;
     } catch (e) { q.fallo = true; return false; }
   }
+  // (22-oct-2026, planes/transcripciones.md punto 8) El CONTEXTO de una tarjeta (de dónde viene) se ve al voltearla, chiquito; si trae ⚠ o "OJO"
+  // (algo que hay que revisar en la transcripción o la presentación), resaltado
+  const contextoTarjeta = (c) => { c = String(c || '').trim(); if (!c) return ''; const ojo = /⚠|^\s*OJO/i.test(c); return '<div class="ctxTarjeta' + (ojo ? ' ojo' : '') + '">' + (ojo ? '' : '📄 ') + esc(c) + '</div>'; };
   const creditoImg = (c) => '<p class="credito">Imagen: ' + esc(String(c.autor || '').slice(0, 90)) + ' · ' + esc(c.fuente || '') + ' · ' + esc(c.licencia || '') +
     (c.url ? ' · <a href="' + esc(c.url) + '" target="_blank" rel="noopener">original</a>' : '') + '</p>';
   function pintarReto(v) {
@@ -1394,7 +1399,7 @@
       const sug = reto.sug, b = (r, e, t) => '<button class="r-' + r + (sug === r ? ' sugerida' : '') + '" data-a="retoAuto" data-r="' + r + '"><span>' + e + '</span>' + t + '</button>';
       if (ver) {
         cuerpo += (reto.escrito ? '<div class="suya"><small>Tu respuesta</small>' + esc(reto.escrito) + '</div>' : '') +
-          '<div class="r"><small>La respuesta</small>' + esc(q.respuesta) + '</div>' + (q.fuente ? '<p class="fuente">📖 ' + esc(q.fuente) + '</p>' : '') + '</div>' +
+          '<div class="r"><small>La respuesta</small>' + esc(q.respuesta) + '</div>' + contextoTarjeta(q.explicacion) + (q.fuente ? '<p class="fuente">📖 ' + esc(q.fuente) + '</p>' : '') + '</div>' +
           (reto.comp ? '<div class="retoFb comp">' + esc(reto.comp) + '</div>' : '') +
           '<p class="suave" style="text-align:center;margin:8px 0 4px">¿Cómo te fue?</p><div class="respuestas">' + b('bien', '😄', 'La sabía') + b('medio', '🤏', 'Más o menos') + b('mal', '😕', 'No la sabía') + '</div>';
       } else {
@@ -2362,6 +2367,8 @@
       grupo('Más opciones',
         // (22-oct-2026) la bitácora del TCU: SOLO aquí, la primera de "Más opciones" (la autora: "debe estar en más opciones, no en ajustes", "sobre progreso")
         (Tc ? fila('ir', '🤝', 'verde', 'TCU', Tc.inicio(E) ? horasTxt(Tc.total(E)) + ' de ' + Tc.META + ' h' : '', aV('tcu')) : '') +
+        // (22-oct-2026, planes/modo-transcripcion.md) el MODO TRANSCRIPCIÓN, aparte: debajo de TCU (su archivo se carga solo al abrirlo)
+        fila('ir', '📝', 'celeste', 'Modo transcripción', '', aV('transcripcion')) +
         fila('ir', '📈', 'verde', 'Progreso', '', aV('progreso')) +
         fila('ir', '📚', 'celeste', 'Archivos', esperando ? esperando + ' esperando' : '', aV('archivos')) +
         fila('ir', '📦', '', 'Archivados', arch ? String(arch) : '', aV('archivados')) +
@@ -2460,6 +2467,19 @@
       (l.length ? '<h3>Tus jornadas</h3><div class="panel compacta"><ul class="lista">' + l.map(fila).join('') + '</ul></div>' : vacioMini('dormida', 'Todavía no anotas ninguna jornada. Cuando vuelvas del TCU, toca “Marcar horas de hoy”.')) +
       '<p class="suave tcuPie">Empezaste con ' + horasTxt(p.inicio.horas) + ' h' + (p.inicio.matricula ? ' · matrícula del TCU: ' + esc(N.fechaTxt(N.msDeCR(p.inicio.matricula, '12:00'))) : '') +
       ' · <button class="enlaceAgenda" data-a="tcuInicio">cambiar</button></p>';
+  }
+  // ======================================================================================================
+  // (22-oct-2026, planes/modo-transcripcion.md) EL MODO TRANSCRIPCIÓN: vive en js/modo-transcripcion.js, que se carga SOLO al abrirlo (no al abrir
+  // la app). Aquí solo se le pasan las herramientas de siempre; no toca nada más (logros, racha, reto, avisos, repaso, mazos).
+  // ======================================================================================================
+  let cargandoMT = null;
+  function pintarTranscripcion(v) {
+    const ctx = { esc, abrirHoja, cerrarHoja, confirmar, avisar, vibrar, sonar, cerebro, puedeCerebro, Almacen, K, DEMO, ir, vista: () => vista, escena };
+    if (self.ModoTranscripcion) return self.ModoTranscripcion.pintar(v, ctx);
+    v.innerHTML = '<p class="suave" style="text-align:center;margin-top:40px">Abriendo…</p>';
+    cargandoMT = cargandoMT || new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'js/modo-transcripcion.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
+    cargandoMT.then(() => { if (vista === 'transcripcion') self.ModoTranscripcion.pintar($('#vista'), ctx); })
+      .catch(() => { cargandoMT = null; v.innerHTML = '<p class="suave" style="text-align:center;margin-top:40px">No pude abrir el modo transcripción. ¿Hay internet?</p>'; });
   }
   // Comprimir una foto EN el celular: lado mayor ≤ max px; webp si el navegador sabe (si no, jpg); bajando la calidad hasta pesar < kb
   function comprimirFoto(file, max, kb) {
