@@ -142,7 +142,7 @@
   function partePrompt(E, texto, ahora) {
     if (!HABLA_TCU.test(String(texto || ''))) return '';
     const p = progreso(E, ahora);
-    if (!p.inicio && !p.jornadas) return 'SU TCU: todavía no usa la bitácora (está en Ajustes → TCU). Si quiere, ahí anota sus horas y sus fotos de prueba.';
+    if (!p.inicio && !p.jornadas) return 'SU TCU: todavía no usa la bitácora (en el celular: Más → TCU; en la compu: ⚙ Ajustes → TCU). Si quiere, ahí anota sus horas y sus fotos de prueba.';
     const u = jornadas(E)[0];
     return 'SU TCU (de la bitácora, no inventes otros datos): lleva ' + p.hechas + ' de ' + p.meta + ' horas (faltan ' + p.faltan + ').' +
       (u ? ' Última jornada: ' + u.fecha + (u.que ? ' (' + u.que.slice(0, 80) + ')' : '') + '.' : '') + ' ' + fraseProgreso(p) + ' Nunca lo presiones.';

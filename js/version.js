@@ -18,9 +18,10 @@
   // protector de sueño (y el protocolo de crisis, hecho pero apagado)
   // (22-oct-2026, noche) PC 1.5 / bolsillo 1.3 = la BITÁCORA DEL TCU, el reto del día completo y sincronizado (también en la compu), preguntas abiertas,
   // imágenes como en el examen (modo examen) y el puntito de la charla
-  const versiones = { pc: '1.5', bolsillo: '1.3' };
+  // (22-oct-2026, noche) bolsillo 1.3.1 = arreglo: el TCU pasa de Ajustes a Más opciones
+  const versiones = { pc: '1.5', bolsillo: '1.3.1' };
   const liz = versiones[app] || versiones.bolsillo;
-  const bolsillo = 31;
+  const bolsillo = 32;
   // (20-oct-2026, tanda final) El número de PRUEBA de la compu (no se muestra: lo visible sigue siendo "Liz 1.0"). Lo usan las actualizaciones de
   // la Liz de su dueño (herramientas/armar-actualizacion.js y src/main/actualizar.js): cada actualización lo sube. 28 = el regalo.
   // 29 = la primera actualización (21-oct-2026): los clics de la tarjeta de ánimo, no volver a preguntar y nada de PowerShell escondido.
@@ -61,7 +62,7 @@
     loNuevoCelular: {
       id: 'celular-31',
       cosas: [
-        { id: 'tcu-bitacora', t: '🤝 Tu bitácora del TCU, en Más → Ajustes → TCU: anota tus horas (con fotos de prueba), mira cuánto te falta para las 300 y guárdala en PDF. Los lunes, al salir, te pregunto si las marcamos.' },
+        { id: 'tcu-bitacora', t: '🤝 Tu bitácora del TCU, en Más → TCU: anota tus horas (con fotos de prueba), mira cuánto te falta para las 300 y guárdala en PDF. Los lunes, al salir, te pregunto si las marcamos.' },
         { id: 'reto-escribir', t: '✍️ En el reto, las preguntas abiertas ahora se contestan: escribes o dictas tu respuesta, la ves junto a la correcta y te digo qué te faltó.' },
         { id: 'reto-imagenes', t: '🔬 Las imágenes del reto, como en el práctico: sin pistas (si pides una, cuenta como «más o menos»), opciones del mismo tipo y ⏱ modo examen.' },
         { id: 'reto-sigue', t: '🔁 Tu reto es el mismo en la compu y aquí: si lo empiezas en un lado, lo sigues en el otro donde quedaste.' },

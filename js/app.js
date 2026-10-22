@@ -2360,6 +2360,8 @@
     const cara = '<span class="ico icoLiz">' + fotoLiz('contenta') + '</span>';
     ponerHTML(v, escena('saludo', fija('pMas', 'pMas')) +
       grupo('Más opciones',
+        // (22-oct-2026) la bitácora del TCU: SOLO aquí, la primera de "Más opciones" (la autora: "debe estar en más opciones, no en ajustes", "sobre progreso")
+        (Tc ? fila('ir', '🤝', 'verde', 'TCU', Tc.inicio(E) ? horasTxt(Tc.total(E)) + ' de ' + Tc.META + ' h' : '', aV('tcu')) : '') +
         fila('ir', '📈', 'verde', 'Progreso', '', aV('progreso')) +
         fila('ir', '📚', 'celeste', 'Archivos', esperando ? esperando + ' esperando' : '', aV('archivos')) +
         fila('ir', '📦', '', 'Archivados', arch ? String(arch) : '', aV('archivados')) +
@@ -2370,8 +2372,6 @@
         interruptor('alternarVibra', '📳', '', 'Vibración', pref.vibra) +
         interruptor('alternarSonido', '🔊', '', 'Sonido', pref.sonido) +
         interruptor('alternarQuieto', '🫧', '', 'Reducir movimiento', pref.quieto) +
-        // (22-oct-2026) la bitácora del TCU: SOLO aquí (la autora: "para no sobrecargar")
-        (Tc ? fila('ir', '🤝', 'verde', 'TCU', Tc.inicio(E) ? horasTxt(Tc.total(E)) + ' de ' + Tc.META + ' h' : '', aV('tcu')) : '') +
         (instalada ? '' : fila('comoInstalar', '📲', '', 'Instalar en el iPhone')) +
         fila('sincronizarYa', '🔄', 'celeste', 'Sincronización', esc(estadoSync().t), '', undefined, 'filaSync') +
         // (19-oct-2026) una línea discreta: qué cerebro usa el chat del celular y lo gastado este mes
@@ -2406,7 +2406,7 @@
   }
 
   // ======================================================================================================
-  // (22-oct-2026, planes/semestre-actual.md) LA BITÁCORA DEL TCU: SOLO en Más → Ajustes → TCU (nada en Hoy, Agenda ni Estudiar). Las reglas
+  // (22-oct-2026, planes/semestre-actual.md) LA BITÁCORA DEL TCU: SOLO en Más → Más opciones → TCU (nada en Hoy, Agenda ni Estudiar). Las reglas
   // en js/tcu.js (las mismas en la compu). Nada de esto se calcula al abrir la app: solo al entrar aquí (y la pregunta de los lunes).
   // Las fotos se comprimen EN el celular (webp o jpg, ~1600 px, <400 KB, + miniatura) y van a la carpeta PRIVADA liz-privado/<cuenta>/tcu/;
   // sus direcciones (firmadas, 10 min) viven solo en la memoria mientras la bitácora está abierta.
