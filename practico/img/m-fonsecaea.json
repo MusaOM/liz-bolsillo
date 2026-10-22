@@ -1,0 +1,18 @@
+{
+ "id": "m-fonsecaea",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Microscopía DIC",
+ "respuesta": "Fonsecaea pedrosoi (agar de Leonian modificado).",
+ "claves": "Causa la cromoblastomicosis, una infección crónica de la piel común en climas tropicales y subtropicales.",
+ "fuenteClaves": "OpenStax Microbiology, sección 2.3",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (2.3 Instruments of Microscopy)",
+  "autor": "OpenStax",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/2-3-instruments-of-microscopy",
+  "archivoOriginal": "OSC_Microbio_02_03_DICmicro.jpg",
+  "descripcionOriginal": "A DIC image of Fonsecaea pedrosoi grown on modified Leonian’s agar. This fungus causes chromoblastomycosis, a chronic skin infection common in tropical and subtropical climates."
+ }
+}

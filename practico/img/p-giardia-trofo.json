@@ -1,0 +1,19 @@
+{
+ "id": "p-giardia-trofo",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Heces, tinción",
+ "respuesta": "Trofozoíto de Giardia intestinalis (G. duodenalis).",
+ "claves": "Se ven bien el núcleo, los flagelos, el cuerpo parabasal (oscuro, en el centro) y los axonemas. Los trofozoítos se pegan a la mucosa con su disco ventral.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons y CDC DPDx (Laboratory Identification of Parasites), Giardiasis",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Giardia intestinalis - trophozoite.jpg",
+  "autor": "Stefan Walkowski",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Giardia_intestinalis_-_trophozoite.jpg",
+  "descripcionOriginal": "Giardia intestinalis - trophozoite. In the microscopic image, the following structures are well visible: nucleus, flagella, parabasal body (dark in the middle) and axonemes."
+ }
+}

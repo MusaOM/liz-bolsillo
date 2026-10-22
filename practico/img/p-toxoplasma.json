@@ -1,0 +1,18 @@
+{
+ "id": "p-toxoplasma",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Tejido cerebral",
+ "respuesta": "Quiste de Toxoplasma gondii en tejido cerebral (de ratón).",
+ "claves": "El quiste contiene miles de parásitos inactivos.",
+ "fuenteClaves": "OpenStax Microbiology, sección 26.4",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (26.4 Fungal and Parasitic Diseases of the Nervous System)",
+  "autor": "modification of work by USDA",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/26-4-fungal-and-parasitic-diseases-of-the-nervous-system",
+  "archivoOriginal": "OSC_Microbio_26_04_Neurotoxpl.jpg",
+  "descripcionOriginal": "This Toxoplasma gondii cyst, observed in mouse brain tissue, contains thousands of inactive parasites. (credit: modification of work by USDA)"
+ }
+}

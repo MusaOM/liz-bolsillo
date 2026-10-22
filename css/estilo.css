@@ -508,6 +508,18 @@ body.charlaChica .bienvenida .comic .txt { white-space: nowrap; overflow: hidden
 .leyAn { display: flex; flex-wrap: wrap; gap: 6px 12px; margin: 10px 2px 4px; font-size: 12px; font-weight: 800; color: var(--t-texto-suave); }
 .leyAn i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 4px; vertical-align: -1px; }
 .leyAn i.punto { width: 6px; height: 6px; border-radius: 50%; background: #fff; opacity: .8; vertical-align: 1px; }
+.tenAn { margin: 14px 2px 4px; }
+.tenAn .tit { font-size: 14px; font-weight: 800; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.tenAn .tit small { font-weight: 600; color: var(--t-texto-suave); font-size: 11.5px; }
+.tenAn .barras { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; align-items: end; }
+.tenAn .sem { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+.tenAn .sem i { display: block; width: 100%; max-width: 44px; border-radius: 8px 8px 3px 3px; background: linear-gradient(180deg, var(--t-acento-fuerte), var(--t-acento)); min-height: 4px; }
+.tenAn .sem i.vac { background: rgba(169, 139, 255, .18); }
+.tenAn .sem.ex i { background: linear-gradient(180deg, #ffb86b, #ff9461); }
+.tenAn .sem b { font-size: 13px; }
+.tenAn .sem small { font-size: 11px; color: var(--t-texto-suave); white-space: nowrap; }
+.tenAn .patron { margin: 10px 0 0; font-size: 13.5px; line-height: 1.45; }
+.tenAn .patron.suave { color: var(--t-texto-suave); }
 .topAn { display: flex; gap: 12px; align-items: center; margin: 10px 2px 2px; font-size: 14.5px; font-weight: 700; line-height: 1.4; }
 .topAn .e { font-size: 38px; }
 .acerca { position: relative; display: flex; flex-direction: column; align-items: center; text-align: center; margin: 0 -16px; padding: 0 16px; overflow: hidden; overflow: clip visible; }
@@ -887,6 +899,10 @@ body.quieto .lgCasilla.nuevo .lgMarco { animation: none; box-shadow: 0 0 0 1.5px
 .materiasHorario .item .txt { flex: 1 1 170px; min-width: 0; }
 .materiasHorario .item .txt small { white-space: normal; }
 .materiasHorario .labBt { margin-left: auto; }
+.codigoBt { display: inline-block; vertical-align: 1px; margin-left: 4px; padding: 1px 7px; border-radius: 8px; border: 1px solid var(--t-borde, rgba(160,140,255,.35));
+  background: rgba(160,140,255,.12); color: var(--t-texto-suave, #b9b2cc); font-family: inherit; font-size: 11px; font-weight: 700; line-height: 1.5; letter-spacing: .02em; }
+.codigoBt.vacio { opacity: .55; font-weight: 600; border-style: dashed; }
+.codigoMini { font-size: 11px; font-weight: 700; letter-spacing: .02em; opacity: .8; }
 #hoja { overscroll-behavior: contain; }
 .notaLab { margin: 6px 6px 0; font-size: 12.5px; }
 .seg.aparteSeg { margin-top: 8px; }
@@ -896,3 +912,35 @@ body.quieto .lgCasilla.nuevo .lgMarco { animation: none; box-shadow: 0 0 0 1.5px
   background: rgba(30, 24, 40, .85); border: 1.5px solid color-mix(in srgb, var(--mc, var(--clase)) 45%, transparent); }
 .chipMateria .puntoMateria { width: 10px; height: 10px; }
 .chipMateria.on { background: color-mix(in srgb, var(--mc, var(--clase)) 22%, rgba(30, 24, 40, .85)); border-color: var(--mc, var(--clase)); box-shadow: 0 0 12px color-mix(in srgb, var(--mc, var(--clase)) 40%, transparent); }
+.retoBt { display: flex; align-items: center; gap: 12px; width: 100%; margin: 4px 0 14px; padding: 14px 16px; border-radius: 24px; text-align: left; color: #fff;
+  background: linear-gradient(135deg, #4cc9f0, #7c5cf0); box-shadow: 0 10px 28px rgba(76, 201, 240, .35), inset 0 1px 0 rgba(255, 255, 255, .3); transition: transform .2s var(--rebote); }
+.retoBt:active { transform: scale(.97); }
+.retoBt .e { font-size: 30px; line-height: 1; }
+.retoBt .t { flex: 1; display: flex; flex-direction: column; gap: 2px; } .retoBt .t b { font-size: 19px; font-weight: 900; } .retoBt .t small { font-size: 13px; font-weight: 700; opacity: .9; }
+.retoBt .flecha { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .2); font-size: 18px; }
+.retoHecho { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 14px; padding: 10px 14px; border-radius: 18px; font-size: 14px;
+  background: rgba(76, 214, 154, .12); border: 1px solid rgba(76, 214, 154, .35); color: var(--t-texto); }
+.sesion.reto .retoCurso { margin: 10px 4px 6px; font-size: 13px; font-weight: 800; letter-spacing: .03em; color: var(--t-texto-suave); text-transform: uppercase; }
+.retoCaja { padding: 16px; border-radius: 22px; background: rgba(28, 22, 44, .78); border: 1px solid rgba(160, 140, 255, .35); }
+.retoCaja .p { margin: 0 0 10px; font-size: 17px; font-weight: 800; line-height: 1.35; }
+.retoCaja .afirma { margin: 0 0 6px; padding: 10px 12px; border-radius: 14px; background: rgba(160, 140, 255, .12); font-size: 15px; line-height: 1.35; }
+.retoCaja .r { margin-top: 10px; padding: 12px; border-radius: 14px; background: rgba(76, 214, 154, .12); font-size: 15.5px; line-height: 1.4; white-space: pre-line; }
+.retoCaja .fuente, .retoFb small { display: block; margin-top: 6px; font-size: 12px; color: var(--t-texto-suave); }
+.retoOps { display: grid; gap: 8px; margin-top: 4px; }
+.retoOp { width: 100%; padding: 12px 14px; border-radius: 16px; text-align: left; font-size: 15px; font-weight: 700; line-height: 1.3; color: var(--t-texto);
+  background: rgba(255, 255, 255, .06); border: 1px solid rgba(160, 140, 255, .35); transition: transform .15s var(--rebote); }
+.retoOp:active { transform: scale(.98); }
+.retoOp.ok { background: rgba(76, 214, 154, .22); border-color: var(--t-bien); }
+.retoOp.mal { background: rgba(255, 138, 128, .2); border-color: var(--t-mal); }
+.retoOp.apagada { opacity: .45; }
+.retoFb { margin: 12px 0 8px; padding: 12px 14px; border-radius: 16px; font-size: 15px; line-height: 1.4; border: 1px solid; }
+.retoFb.ok { background: rgba(76, 214, 154, .12); border-color: rgba(76, 214, 154, .45); } .retoFb.mal { background: rgba(255, 200, 87, .1); border-color: rgba(255, 200, 87, .4); }
+.retoFb .porque { display: block; margin-top: 8px; font-style: italic; }
+.pracImg { margin: 0 0 12px; border-radius: 16px; overflow: hidden; background: #000; text-align: center; }
+.pracImg img { display: block; width: 100%; max-height: 46vh; object-fit: contain; }
+.credito { margin: 4px 4px 8px; font-size: 11px; line-height: 1.35; color: var(--t-texto-suave); }
+.credito a { color: inherit; }
+.retoRes { padding: 12px 16px; } .retoRes p { margin: 6px 0; }
+.sinMaterial { display: flex; align-items: center; gap: 12px; width: 100%; margin: 0 0 14px; padding: 11px 14px; border-radius: 18px; text-align: left; color: var(--t-texto);
+  background: rgba(76, 201, 240, .1); border: 1px dashed rgba(76, 201, 240, .45); }
+.sinMaterial .e { font-size: 24px; } .sinMaterial .t { flex: 1; display: flex; flex-direction: column; gap: 2px; } .sinMaterial .t b { font-size: 15px; } .sinMaterial .t small { font-size: 12.5px; color: var(--t-texto-suave); }

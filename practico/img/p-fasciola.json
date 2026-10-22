@@ -1,0 +1,19 @@
+{
+ "id": "p-fasciola",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Heces",
+ "respuesta": "Huevo de Fasciola hepatica.",
+ "claves": "Ampliamente elipsoidal y operculado, de 130-150 por 60-90 µm; sale sin embrionar en las heces. Se puede confundir con el de Fasciolopsis buski.",
+ "fuenteClaves": "CDC DPDx (Laboratory Identification of Parasites), Fascioliasis",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Egg of Fasciola hepatica 08G0041 lores.jpg",
+  "autor": "desconocido",
+  "credito": "http://phil.cdc.gov/PHIL_Images/11301999/00007/08G0041_lores.jpg",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:Egg_of_Fasciola_hepatica_08G0041_lores.jpg",
+  "descripcionOriginal": "ID#: 1540 Description: Egg of Fasciola hepatica. Content Providers(s): CDC/Dr. Mae Melvin Creation Date: 1979 Copyright Restrictions: None - This image is in the public domain and thus free of any copyright restrictions. As a matter of courtesy we request that the content provider be credited and notified in any public or private usage of this image."
+ }
+}

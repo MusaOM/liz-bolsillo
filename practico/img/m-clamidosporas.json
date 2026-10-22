@@ -1,0 +1,18 @@
+{
+ "id": "m-clamidosporas",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Microscopía",
+ "respuesta": "Candida: blastosporas y clamidosporas.",
+ "claves": "Blastosporas: esporas asexuales que salen por gemación. Clamidosporas: esporas de resistencia, también asexuales (las esferas más oscuras en la punta de los filamentos).",
+ "fuenteClaves": "OpenStax Microbiology, sección 23.5",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (23.5 Fungal Infections of the Reproductive System)",
+  "autor": "modification of work by Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/23-5-fungal-infections-of-the-reproductive-system",
+  "archivoOriginal": "OSC_Microbio_23_05_Candida.jpg",
+  "descripcionOriginal": "Candida blastospores (asexual spores that result from budding) and chlamydospores (resting spores produced through asexual reproduction) are visible in this micrograph. (credit: modification of work by Centers for Disease Control and Prevention)"
+ }
+}

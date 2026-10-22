@@ -1,0 +1,19 @@
+{
+ "id": "m-malassezia",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Escama de piel",
+ "respuesta": "Malassezia furfur en una escama de piel (pitiriasis versicolor).",
+ "claves": "Células tipo levadura e hifas cortas. Cuando crece más de lo normal causa manchas café pálido que se descaman, en el tronco, el cuello o los brazos (tinea versicolor).",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL 3938)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Malassezia furfur in skin scale from a patient with tinea versicolor PHIL 3938 lores.jpg",
+  "autor": "desconocido",
+  "credito": "http://phil.cdc.gov/phil_images/20030610/22/PHIL_3938_lores.jpg",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:Malassezia_furfur_in_skin_scale_from_a_patient_with_tinea_versicolor_PHIL_3938_lores.jpg",
+  "descripcionOriginal": "ID#: 3938 Description: Note the yeast-like fungal cells and short hyphae of M. furfur in skin scale from a patient with tinea versicolor. Usually Malassezia furfur grows sparsely without causing a rash. In some individuals, it grows more actively for reasons unknown, resulting in pale brown flaky patches on the trunk, neck, or arms, a condition called tinea versicolor. Content Providers(s): CDC/Dr. Lucille K. George Creation Date: 1964 Copyright Restrictions: None - This image is in the public domain and thus free of any copyright restrictions. As a matter of courtesy we request that the content provider be credited and notified in any public or private usage of this image."
+ }
+}

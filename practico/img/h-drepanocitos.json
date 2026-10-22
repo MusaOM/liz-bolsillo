@@ -1,0 +1,19 @@
+{
+ "id": "h-drepanocitos",
+ "area": "hematologia",
+ "areaNombre": "Hematología",
+ "pista": "Frotis de sangre, Giemsa",
+ "respuesta": "Drepanocitos (anemia de células falciformes) y células en diana.",
+ "claves": "La forma de \"hoz\" característica, y \"células en diana\" con anillos concéntricos de color.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Sickle Cell Blood Smear.JPG",
+  "autor": "Keith Chambers",
+  "credito": "Scooter Project ( http://www.sicklecellanaemia.org/teaching-resources/resources/scooter44-63/scooter44.html )",
+  "licencia": "CC BY-SA 3.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Sickle_Cell_Blood_Smear.JPG",
+  "descripcionOriginal": "Blood smear illustrating sickle cell anaemia. Stained with Giemsa. Note the distinctive \"sickle\" shape, and \"target cells\" with concentric rings of red stain."
+ }
+}

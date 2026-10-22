@@ -1,0 +1,19 @@
+{
+ "id": "h-esquistocitos",
+ "area": "hematologia",
+ "areaNombre": "Hematología",
+ "pista": "Frotis de sangre",
+ "respuesta": "Esquistocitos (glóbulos rojos fragmentados).",
+ "claves": "Glóbulos rojos fragmentados. Se ven sobre todo en la hemólisis intravascular, la insuficiencia renal y la púrpura trombocitopénica trombótica (PTT).",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Schistocytes.jpg",
+  "autor": "Prof. Osaro Erhabor",
+  "credito": "Prof. Osaro Erhabor",
+  "licencia": "CC0",
+  "licenciaUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "url": "https://commons.wikimedia.org/wiki/File:Schistocytes.jpg",
+  "descripcionOriginal": "Schistocytes (fragmented red cells) are red cells fragmented. They are seen commonly in blood film of patients with intravascular haemolysis, renal failure and thrombotic thrombocytopenic purpura (TTP)."
+ }
+}

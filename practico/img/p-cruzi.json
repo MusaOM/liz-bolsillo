@@ -1,0 +1,19 @@
+{
+ "id": "p-cruzi",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Frotis de sangre",
+ "respuesta": "Tripomastigotes de Trypanosoma cruzi en sangre.",
+ "claves": "Cuatro parásitos flagelados (tripomastigotes) en la muestra de sangre (1200x): los dos de la izquierda son del tipo grande y los dos de la derecha, del pequeño.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "T. cruzi trypomastigotes in peripheral blood smear.jpg",
+  "autor": "CDC",
+  "credito": "Centers for Disease Control And Prevention Public Health Image Library",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:T._cruzi_trypomastigotes_in_peripheral_blood_smear.jpg",
+  "descripcionOriginal": "Under a magnification of 1200X, this photomicrograph of a blood sample specimen, revealed the presence of four flagellated, Trypanosoma cruzi parasites, referred to as trypomastigotes. The two parasites at left are considered the large type, while the two at right were of the small type."
+ }
+}

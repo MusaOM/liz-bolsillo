@@ -1,0 +1,19 @@
+{
+ "id": "b-endosporas",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Tinción de endosporas (Schaeffer-Fulton)",
+ "respuesta": "Endosporas de Bacillus cereus, tinción de Schaeffer-Fulton.",
+ "claves": "Los óvalos verde azulados son las endosporas; las células vegetativas se ven rojas (cultivo de una semana en agar nutritivo, 1000x).",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Bacillus cereus endospore stain.jpg",
+  "autor": "T. Nims",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Bacillus_cereus_endospore_stain.jpg",
+  "descripcionOriginal": "Schaeffer-Fulton method endospore stain of Bacillus cereus (1 week culture on nutrient agar). Blue-green ovals are endospores. Vegetative cells are red. 1000x total magnification. Bright field."
+ }
+}

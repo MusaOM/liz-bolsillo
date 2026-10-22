@@ -1,0 +1,19 @@
+{
+ "id": "p-cryptosporidium",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Heces, Ziehl-Neelsen modificado",
+ "respuesta": "Ooquistes de Cryptosporidium parvum, tinción ácido-resistente modificada.",
+ "claves": "Los ooquistes se tiñen de rojo brillante con esta técnica; en los dos de la derecha se ven los esporozoítos adentro.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL 7829)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "7829 lores.jpg",
+  "autor": "CDC",
+  "credito": "https://phil.cdc.gov/Details.aspx?pid=7829",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:7829_lores.jpg",
+  "descripcionOriginal": "This photomicrograph revealed the morphologic details of Cryptosporidium parvum oocysts, which had been stained using the modified acid-fast method. These oocysts exhibit a bright red coloration when using this staining technique, and in this case, you’ll note the sporozoites that were made visible inside the two oocysts on the right. Sporozoites are the nucleated, motile stage of development through which many protozoans pass such as C. parvum, on their way to becoming adults, and represent a very infectious form of these organisms. When mature, the sporozoites will be liberated from the oocysts."
+ }
+}

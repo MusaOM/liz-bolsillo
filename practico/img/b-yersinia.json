@@ -1,0 +1,18 @@
+{
+ "id": "b-yersinia",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Sangre, tinción de Wright",
+ "respuesta": "Yersinia pestis en un frotis de sangre con tinción de Wright (peste).",
+ "claves": "El aspecto característico de \"gancho de seguridad\": bacilos pequeños y morados con un círculo claro en el centro, entre células humanas más grandes.",
+ "fuenteClaves": "OpenStax Microbiology, sección 25.2",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (25.2 Bacterial Infections of the Circulatory and Lymphatic Systems)",
+  "autor": "modification of work by Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/25-2-bacterial-infections-of-the-circulatory-and-lymphatic-systems",
+  "archivoOriginal": "OSC_Microbio_25_02_Wright.jpg",
+  "descripcionOriginal": "This Wright’s stain of a blood sample from a patient with plague shows the characteristic “safety pin” appearance of Yersinia pestis. (credit: modification of work by Centers for Disease Control and Prevention)"
+ }
+}

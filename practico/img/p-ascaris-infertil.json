@@ -1,0 +1,19 @@
+{
+ "id": "p-ascaris-infertil",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Heces, montaje húmedo",
+ "respuesta": "Huevo infértil de Ascaris lumbricoides.",
+ "claves": "Alargado y más grande que el fértil (hasta 90 µm), de cáscara más delgada, con mamelones muy marcados en la capa externa. Los infértiles no son infectantes.",
+ "fuenteClaves": "CDC DPDx (Laboratory Identification of Parasites), Ascariasis",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Unfertilized Ascariasis Egg.jpeg",
+  "autor": "Centers for Disease Control and Prevention",
+  "credito": "Centers for Disease Control and Prevention: https://www.cdc.gov/dpdx/ascariasis/index.html",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:Unfertilized_Ascariasis_Egg.jpeg",
+  "descripcionOriginal": "Figure A: Unfertilized egg of A. lumbricoides. Note the prominent mammillations on the outer layer."
+ }
+}

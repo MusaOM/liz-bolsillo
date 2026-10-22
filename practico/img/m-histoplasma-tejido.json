@@ -1,0 +1,19 @@
+{
+ "id": "m-histoplasma-tejido",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Tejido, plata metenamina",
+ "respuesta": "Levaduras de Histoplasma capsulatum en tejido, tinción de plata metenamina.",
+ "claves": "Levaduras típicas, algunas reproduciéndose por gemación. La histoplasmosis puede quedarse en los pulmones o diseminarse.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Histoplasmosis capsulatum.jpg",
+  "autor": "Photo Credit: Content Providers(s): CDC/Dr. Libero Ajello",
+  "credito": "This media comes from the Centers for Disease Control and Prevention 's Public Health Image Library (PHIL), with identification number #4223 . Note: Not all PHIL images are public domain; be sure to check copyright status and credit authors and content providers. العربية | Deutsch | English | македонски | slovenščina | +/−",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:Histoplasmosis_capsulatum.jpg",
+  "descripcionOriginal": "Note the histopathologic changes seen in histoplasmosis due to Histoplasma capsulatum using methenamine silver stain. Note the presence of typical yeast cells, some of which are undergoing replication by “budding”. Histoplasmosis can be confined to the lungs, or become systemically disseminated, thereby, producing a fatal outcome."
+ }
+}

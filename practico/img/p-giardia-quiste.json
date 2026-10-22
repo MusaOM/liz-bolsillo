@@ -1,0 +1,19 @@
+{
+ "id": "p-giardia-quiste",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Heces, lugol",
+ "respuesta": "Quiste de Giardia teñido con lugol.",
+ "claves": "Ovalado a elipsoide, de 8-19 µm; el quiste maduro tiene 4 núcleos y el inmaduro, 2. Los quistes son la forma que transmite la giardiasis.",
+ "fuenteClaves": "CDC DPDx (Laboratory Identification of Parasites), Giardiasis",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Giardia cyst.JPG",
+  "autor": "Joel Mills",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 3.0",
+  "licenciaUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "url": "https://commons.wikimedia.org/wiki/File:Giardia_cyst.JPG",
+  "descripcionOriginal": "Giardia lamblia cyst in a fecal smear from a dog. Stained with Lugol's iodine and taken at 40x."
+ }
+}

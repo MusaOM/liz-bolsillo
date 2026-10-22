@@ -1,0 +1,19 @@
+{
+ "id": "p-trichuris",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Heces, montaje húmedo",
+ "respuesta": "Huevo de Trichuris trichiura.",
+ "claves": "En forma de barril, de cáscara gruesa, con un \"tapón\" polar en cada extremo; 50-55 por 20-25 µm. Sale sin embrionar en las heces.",
+ "fuenteClaves": "CDC DPDx (Laboratory Identification of Parasites), Trichuriasis",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Egg of Trichuris trichiura.jpg",
+  "autor": "Microrao",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Egg_of_Trichuris_trichiura.jpg",
+  "descripcionOriginal": "Egg of Trichuris trichiura"
+ }
+}

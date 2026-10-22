@@ -1,0 +1,19 @@
+{
+ "id": "m-koh-hifas",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Raspado de piel con KOH",
+ "respuesta": "Hifas septadas y ramificadas en un montaje con KOH de raspado de piel.",
+ "claves": "Ver hifas septadas (segmentadas) y ramificadas en el KOH es un hallazgo clave para diagnosticar una infección por hongos y distinguirla de otras enfermedades de la piel.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Fungal hyphae in KOH mount of Skin scrapping.jpg",
+  "autor": "Ajay Kumar Chaurasiya",
+  "credito": "Own work",
+  "licencia": "CC BY 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by/4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Fungal_hyphae_in_KOH_mount_of_Skin_scrapping.jpg",
+  "descripcionOriginal": "The observation of branching septate hyphae in a KOH mount microscopy is a crucial finding in the diagnosis of fungal infections. The characteristic segmented and branching nature of these hyphae helps in distinguishing fungal infections from other skin disorders."
+ }
+}

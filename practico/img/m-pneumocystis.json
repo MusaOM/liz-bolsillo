@@ -1,0 +1,18 @@
+{
+ "id": "m-pneumocystis",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Tejido pulmonar, azul de toluidina",
+ "respuesta": "Pneumocystis jirovecii con azul de toluidina.",
+ "claves": "Células moradas oscuras sobre fondo lila, en un frotis de tejido pulmonar humano.",
+ "fuenteClaves": "OpenStax Microbiology, sección 22.4",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (22.4 Respiratory Mycoses)",
+  "autor": "Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/22-4-respiratory-mycoses",
+  "archivoOriginal": "OSC_Microbio_22_04_jirovecii.jpg",
+  "descripcionOriginal": "A light micrograph of a smear containing Pneumocystis jirovecii (dark purple cells) obtained from human lung tissue and stained with toluidine blue. (credit: Centers for Disease Control and Prevention)"
+ }
+}

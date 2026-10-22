@@ -3,7 +3,7 @@
 // Al tocar un aviso, se abre la pantalla que corresponde (url: ./#recordatorios, ./#repasar, ./#mazo=<id>...).
 // Al cambiar archivos de la app, el celular baja la versión nueva porque cambia VERSION. (21-oct-2026) El número sale de
 // js/version.js ("bolsillo"): herramientas/preparar-publicacion.js lo copia aquí solo (no hace falta cambiarlo a mano).
-const VERSION = 'liz-bolsillo-29';
+const VERSION = 'liz-bolsillo-30';
 const ARCHIVOS = [
   './', 'index.html', 'manifest.webmanifest', 'css/estilo.css',
   'js/config.js', 'js/nucleo.js', 'js/sincro.js', 'js/organizar.js', 'js/agenda.js', 'js/frases-liz.js', 'js/frases.js', 'js/almacen.js', 'js/fondo.js', 'js/app.js',
@@ -11,6 +11,8 @@ const ARCHIVOS = [
   'js/importar.js',                                                     // (19-oct-2026: importar tarjetas ya hechas)
   'js/logros.js',                                                       // (21-oct-2026: las REGLAS de los logros; sus videos e imágenes NO se guardan aquí)
   'js/fechas-u.js',                                                     // (22-oct-2026: cuándo preguntar por las fechas de la U; se puede quitar)
+  'js/cuidado.js',                                                      // (22-oct-2026: cuidado y bienestar; se puede quitar)
+  'js/reto.js',                                                         // (22-oct-2026: el reto del día; se puede quitar)
   'vendor/supabase.js', 'fuentes/nunito-400.woff2', 'fuentes/nunito-600.woff2', 'fuentes/nunito-800.woff2', 'fuentes/nunito-900.woff2',
   'iconos/icono.svg', 'iconos/icono-180.png', 'iconos/icono-192.png', 'iconos/icono-512.png', 'iconos/icono-mascara-512.png', 'iconos/aviso-96.png',
   // (19-oct-2026) el fondo "campo oscuro" (herramientas/hacer-fondos-svg.js)
@@ -31,6 +33,8 @@ self.addEventListener('activate', (ev) => {
 self.addEventListener('fetch', (ev) => {
   const url = new URL(ev.request.url);
   if (ev.request.method !== 'GET' || url.origin !== location.origin) return;
+  // (22-oct-2026) Las imágenes del práctico (practico/) NO se guardan aquí: se bajan solo cuando una pregunta las muestra (no llenan el celular)
+  if (/\/practico\//.test(url.pathname)) return;
   ev.respondWith(caches.open(VERSION).then(async (c) => {
     const guardado = await c.match(ev.request, { ignoreSearch: true });
     const red = fetch(ev.request).then((r) => { if (r.ok) c.put(ev.request, r.clone()); return r; }).catch(() => null);

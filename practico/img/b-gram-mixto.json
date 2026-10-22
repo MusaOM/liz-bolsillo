@@ -1,0 +1,18 @@
+{
+ "id": "b-gram-mixto",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Tinción de Gram",
+ "respuesta": "Tinción de Gram: Staphylococcus aureus (cocos grampositivos, morados) y Escherichia coli (bacilos gramnegativos, rosados).",
+ "claves": "S. aureus retiene el cristal violeta aun después del decolorante. E. coli se decolora y solo se ve después de la safranina (rosada). E. coli es la bacteria de control de calidad más usada en la tinción de Gram.",
+ "fuenteClaves": "OpenStax Microbiology, sección 2.4",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (2.4 Staining Microscopic Specimens)",
+  "autor": "modification of work by Nina Parker",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/2-4-staining-microscopic-specimens",
+  "archivoOriginal": "OSC_Microbio_02_04_Gramstain.jpg",
+  "descripcionOriginal": "In this specimen, the gram-positive bacterium Staphylococcus aureus retains crystal violet dye even after the decolorizing agent is added. Gram-negative Escherichia coli, the most common Gram stain quality-control bacterium, is decolorized, and is only visible after the addition of the pink counterstain safranin. (credit: modification of work by Nina Parker)"
+ }
+}

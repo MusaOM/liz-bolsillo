@@ -1,0 +1,19 @@
+{
+ "id": "b-pseudomonas",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Agar sangre",
+ "respuesta": "Pseudomonas aeruginosa en agar sangre.",
+ "claves": "Colonias grandes, opacas, irregulares y planas (aisladas de líquido pleural).",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Pseudomonas aeruginosa Colonies on Blood Agar from Pleural Fluid.jpg",
+  "autor": "Ajay Kumar Chaurasiya",
+  "credito": "Own work",
+  "licencia": "CC BY 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by/4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Pseudomonas_aeruginosa_Colonies_on_Blood_Agar_from_Pleural_Fluid.jpg",
+  "descripcionOriginal": "The culture plate shows characteristic Pseudomonas aeruginosa colonies on blood agar, isolated from pleural fluid and the colonies appear large, opaque, irregular, and flat colonies."
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "id": "b-proteus",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Agar sangre",
+ "respuesta": "Proteus: crecimiento en enjambre (swarming) en agar sangre.",
+ "claves": "Un crecimiento que se extiende de forma difusa e irregular por toda la superficie, distinto de las colonias bien definidas y de borde liso de otras bacterias.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Swarming growth of Proteus on blood agar.jpg",
+  "autor": "Ajay Kumar Chaurasiya",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Swarming_growth_of_Proteus_on_blood_agar.jpg",
+  "descripcionOriginal": "Swarming growth of Proteus species on blood agar is a distinctive phenomenon observed in the laboratory setting. Proteus species are known for their unique motility behavior, often characterized by rapid and coordinated movement across solid surfaces. Swarming growth on blood agar is a classic example of this behavior. Swarming growth of Proteus species on blood agar appears as a distinct pattern of spreading. The colonies exhibit a diffuse, irregular, and often fuzzy or feathery appearance on the agar surface.The swarming pattern is different from the well-defined, smooth-edged colonies typically seen with other bacterial species."
+ }
+}

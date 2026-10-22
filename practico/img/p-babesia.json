@@ -1,0 +1,18 @@
+{
+ "id": "p-babesia",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Frotis de sangre",
+ "respuesta": "Babesia dentro de glóbulos rojos (babesiosis).",
+ "claves": "Los parásitos se ven dentro de los glóbulos rojos, como círculos oscuros.",
+ "fuenteClaves": "OpenStax Microbiology, sección 25.4",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (25.4 Parasitic Infections of the Circulatory and Lymphatic Systems)",
+  "autor": "modification of work by Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/25-4-parasitic-infections-of-the-circulatory-and-lymphatic-systems",
+  "archivoOriginal": "OSC_Microbio_25_04_babesia.jpg",
+  "descripcionOriginal": "In this blood smear from a patient with babesiosis, Babesia parasites can be observed in the red blood cells. (credit: modification of work by Centers for Disease Control and Prevention)"
+ }
+}

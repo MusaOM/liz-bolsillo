@@ -1,0 +1,18 @@
+{
+ "id": "b-celula-clave",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Frotis vaginal",
+ "respuesta": "Célula clave (clue cell) en un frotis vaginal.",
+ "claves": "La célula de abajo a la izquierda es una célula clave: su aspecto se debe a las bacterias pegadas a ella. La de la derecha es una célula normal.",
+ "fuenteClaves": "OpenStax Microbiology, sección 23.3",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (23.3 Bacterial Infections of the Reproductive System)",
+  "autor": "OpenStax",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/23-3-bacterial-infections-of-the-reproductive-system",
+  "archivoOriginal": "OSC_Microbio_23_03_VagSmear.jpg",
+  "descripcionOriginal": "In this vaginal smear, the cell at the lower left is a clue cell with a unique appearance caused by the presence of bacteria on the cell. The cell on the right is a normal cell."
+ }
+}

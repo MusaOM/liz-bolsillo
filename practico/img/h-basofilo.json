@@ -1,0 +1,19 @@
+{
+ "id": "h-basofilo",
+ "area": "hematologia",
+ "areaNombre": "Hematología",
+ "pista": "Frotis de sangre",
+ "respuesta": "Basófilo.",
+ "claves": "Núcleo de dos lóbulos difícil de ver por los gránulos densos y morado oscuro. Son menos del 1 % de los leucocitos: el menos común.",
+ "fuenteClaves": "OpenStax Microbiology, sección 17.3 (tabla de los elementos de la sangre)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Blood-basophil2.jpg",
+  "autor": "Echinaceapallida",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Blood-basophil2.jpg",
+  "descripcionOriginal": "Blood smear with basophil, erythrocytes, and platelets"
+ }
+}

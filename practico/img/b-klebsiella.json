@@ -1,0 +1,19 @@
+{
+ "id": "b-klebsiella",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Agar MacConkey",
+ "respuesta": "Klebsiella pneumoniae en agar MacConkey: colonias mucoides fermentadoras de lactosa.",
+ "claves": "Colonias mucoides y fermentadoras de lactosa (rosadas) en MacConkey, de un cultivo de lavado broncoalveolar.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Mucoid lactose-fermenting (MLF) colonies of Klebsiella pneumoniae on MacConkey agar.jpg",
+  "autor": "Ajay Kumar Chaurasiya",
+  "credito": "Own work",
+  "licencia": "CC0",
+  "licenciaUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "url": "https://commons.wikimedia.org/wiki/File:Mucoid_lactose-fermenting_(MLF)_colonies_of_Klebsiella_pneumoniae_on_MacConkey_agar.jpg",
+  "descripcionOriginal": "Mucoid lactose-fermenting (MLF) colonies of Klebsiella pneumoniae on MacConkey agar from BAL fluid culture"
+ }
+}

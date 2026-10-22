@@ -1,0 +1,19 @@
+{
+ "id": "m-epidermophyton",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Microscopía (cultivo)",
+ "respuesta": "Macroconidios de Epidermophyton floccosum.",
+ "claves": "Varios macroconidios del dermatofito E. floccosum, junto a sus hifas filamentosas (475x).",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL 14588)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "14588 lores.jpg",
+  "autor": "CDC/ Dr. Lucille K. Georg",
+  "credito": "https://phil.cdc.gov/details.aspx?pid=14588",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:14588_lores.jpg",
+  "descripcionOriginal": "Under a magnification of 475X, this photomicrograph reveals a number of macroconidia of the dermatophytic fungus, Epidermophyton floccosum, as well as the organism’s filamentous hyphae."
+ }
+}

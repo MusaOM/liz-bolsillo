@@ -1,0 +1,19 @@
+{
+ "id": "h-linfocito",
+ "area": "hematologia",
+ "areaNombre": "Hematología",
+ "pista": "Frotis de sangre, Wright",
+ "respuesta": "Linfocito.",
+ "claves": "Célula esférica con un solo núcleo, a menudo grande, que ocupa casi toda la célula; se tiñe morado. Son el 20-40 % de los leucocitos.",
+ "fuenteClaves": "OpenStax Microbiology, sección 17.3 (tabla de los elementos de la sangre)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Blood-lymphocyte1.jpg",
+  "autor": "Echinaceapallida",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Blood-lymphocyte1.jpg",
+  "descripcionOriginal": "Erythrocytes with a lymphocyte (Wright's Stain blood smear)"
+ }
+}

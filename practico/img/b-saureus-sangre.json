@@ -1,0 +1,19 @@
+{
+ "id": "b-saureus-sangre",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Agar sangre",
+ "respuesta": "Staphylococcus aureus en agar sangre Columbia.",
+ "claves": "Colonias con pigmento amarillo dorado y beta hemólisis (zona clara) alrededor, a las 48 h a 37 °C.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Staphylococcus aureus colonies on blood agar.jpg",
+  "autor": "HansN.",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 3.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Staphylococcus_aureus_colonies_on_blood_agar.jpg",
+  "descripcionOriginal": "Staphylococcus aureus on Columbia blood agar. Note the golden yellow pigment and beta hemolysis around colonies. Cultivation 48 hours, 37°C."
+ }
+}

@@ -1,0 +1,18 @@
+{
+ "id": "m-ascosporas",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Microscopía",
+ "respuesta": "Ascosporas dentro de un asca.",
+ "claves": "Ocho ascosporas en fila dentro del asca (un tubo): son esporas de reproducción sexual.",
+ "fuenteClaves": "OpenStax Microbiology, sección 5.3",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (5.3 Fungi)",
+  "autor": "Peter G. Werner",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/5-3-fungi",
+  "archivoOriginal": "OSC_Microbio_05_03_sexspores.jpg",
+  "descripcionOriginal": "These ascospores, lined up within an ascus, are produced sexually. (credit: Peter G. Werner)"
+ }
+}

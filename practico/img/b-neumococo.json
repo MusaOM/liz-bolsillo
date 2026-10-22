@@ -1,0 +1,19 @@
+{
+ "id": "b-neumococo",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Lavado broncoalveolar, tinción de Gram",
+ "respuesta": "Streptococcus pneumoniae: diplococos grampositivos en lavado broncoalveolar.",
+ "claves": "Diplococos grampositivos característicos de S. pneumoniae entre las células del paciente.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Pneumococcus in Gram-Stained BAL Sample.jpg",
+  "autor": "Ajay Kumar Chaurasiya",
+  "credito": "Own work",
+  "licencia": "CC0",
+  "licenciaUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "url": "https://commons.wikimedia.org/wiki/File:Pneumococcus_in_Gram-Stained_BAL_Sample.jpg",
+  "descripcionOriginal": "Gram staining of bronchoalveolar lavage (BAL) showing characteristic Gram-positive diplococci of Streptococcus pneumoniae amidst host cellular background."
+ }
+}

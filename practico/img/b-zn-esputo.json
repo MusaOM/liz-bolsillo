@@ -1,0 +1,19 @@
+{
+ "id": "b-zn-esputo",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Esputo, tinción de Ziehl-Neelsen",
+ "respuesta": "Bacilos ácido-alcohol resistentes (Mycobacterium tuberculosis) en esputo, tinción de Ziehl-Neelsen.",
+ "claves": "Con Ziehl-Neelsen, Mycobacterium tuberculosis se ve rojo y lo que lo rodea, azul.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons y OpenStax Microbiology, sección 2.4",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Mycobacterium tuberculosis in Ziehl-Neelsen stained smear of sputum.jpg",
+  "autor": "Ajay Kumar Chaurasiya",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Mycobacterium_tuberculosis_in_Ziehl-Neelsen_stained_smear_of_sputum.jpg",
+  "descripcionOriginal": "Mycobacterium tuberculosis in Ziehl-Neelsen stained smear of sputum"
+ }
+}

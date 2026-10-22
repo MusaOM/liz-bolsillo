@@ -1,0 +1,18 @@
+{
+ "id": "b-flagelos",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Tinción de flagelos",
+ "respuesta": "Tinción de flagelos de Bacillus cereus.",
+ "claves": "Las células tienen numerosos flagelos, que usan para moverse. B. cereus es una causa común de intoxicación alimentaria.",
+ "fuenteClaves": "OpenStax Microbiology, sección 2.4",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (2.4 Staining Microscopic Specimens)",
+  "autor": "modification of work by Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/2-4-staining-microscopic-specimens",
+  "archivoOriginal": "OSC_Microbio_02_04_FlagStain.jpg",
+  "descripcionOriginal": "A flagella stain of Bacillus cereus, a common cause of foodborne illness, reveals that the cells have numerous flagella, used for locomotion. (credit: modification of work by Centers for Disease Control and Prevention)"
+ }
+}

@@ -1,0 +1,18 @@
+{
+ "id": "b-cocos-racimos",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Tinción de Gram",
+ "respuesta": "Cocos grampositivos en racimos (el agrupamiento típico de Staphylococcus).",
+ "claves": "Esferas moradas (grampositivas) agrupadas en racimos, como uvas: así se agrupa Staphylococcus aureus.",
+ "fuenteClaves": "OpenStax Microbiology, sección 9.6 y 4.4",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (9.6 Media Used for Bacterial Growth)",
+  "autor": "Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/9-6-media-used-for-bacterial-growth",
+  "archivoOriginal": "OSC_Microbio_09_05_saureus.jpg",
+  "descripcionOriginal": "Gram-positive cocci in clusters. (credit: Centers for Disease Control and Prevention)"
+ }
+}

@@ -1,0 +1,18 @@
+{
+ "id": "p-cyclospora",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Luz ultravioleta",
+ "respuesta": "Cyclospora cayetanensis (autofluorescente).",
+ "claves": "Bajo luz ultravioleta, C. cayetanensis brilla sola (es autofluorescente): una esfera azul sobre fondo negro.",
+ "fuenteClaves": "OpenStax Microbiology, sección 24.5",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (24.5 Protozoan Infections of the Gastrointestinal Tract)",
+  "autor": "modification of work by Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/24-5-protozoan-infections-of-the-gastrointestinal-tract",
+  "archivoOriginal": "OSC_Microbio_24_05_Cyclospor.jpg",
+  "descripcionOriginal": "Cyclospora cayetanensis are autofluorescent under ultraviolet light. (credit: modification of work by Centers for Disease Control and Prevention)"
+ }
+}

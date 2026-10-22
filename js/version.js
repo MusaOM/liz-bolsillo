@@ -14,9 +14,11 @@
   // La versión que se VE de cada Liz (subirla aquí en cada versión nueva de ESA Liz y anotarla en planes/versiones.md)
   // (21-oct-2026) PC 1.3 = su historia de estudiante y lo que sabe de los logros; bolsillo 1.1 = los LOGROS (videos e imágenes de premio)
   // (22-oct-2026) bolsillo 1.1.1 = arreglos: deslizar hacia abajo cierra las hojas; los nombres de "Mi horario" ya no se aprietan
-  const versiones = { pc: '1.3', bolsillo: '1.1.1' };
+  // (22-oct-2026, tramo final, tanda A) PC 1.4 / bolsillo 1.2 = CUIDADO Y BIENESTAR: tendencia del diario, nunca el único apoyo, señales,
+  // protector de sueño (y el protocolo de crisis, hecho pero apagado)
+  const versiones = { pc: '1.4', bolsillo: '1.2' };
   const liz = versiones[app] || versiones.bolsillo;
-  const bolsillo = 29;
+  const bolsillo = 30;
   // (20-oct-2026, tanda final) El número de PRUEBA de la compu (no se muestra: lo visible sigue siendo "Liz 1.0"). Lo usan las actualizaciones de
   // la Liz de su dueño (herramientas/armar-actualizacion.js y src/main/actualizar.js): cada actualización lo sube. 28 = el regalo.
   // 29 = la primera actualización (21-oct-2026): los clics de la tarjeta de ánimo, no volver a preguntar y nada de PowerShell escondido.
@@ -24,7 +26,8 @@
   // 31 = Liz de PC 1.2: el registro técnico (sin lo que hablan), su propio número y reiniciarse sola al actualizarse.
   // 32 = Liz de PC 1.3: su vida de estudiante (Tu historia + sus recuerdos), sube los logros del celular y sabe cuáles ganó; su horario por materia, "Por entregar",
   //      la intensidad de los recordatorios y las fechas de la U (22-oct-2026).
-  const prueba = 32;
+  // 33 = Liz de PC 1.4: cuidado y bienestar (tanda A del tramo final).
+  const prueba = 33;
   return {
     app,            // 'pc' o 'bolsillo': cuál Liz lo está leyendo
     versiones,      // las dos (la PC usa la de bolsillo para lo que la Liz del celular dice de sí misma)
@@ -49,8 +52,14 @@
     // cambiar su "id" (así se vuelve a mostrar) y sus "cosas".
     // (21-oct-2026) Sin contar QUÉ es lo de Estudiar: es sorpresa (la primera vez que entra, Liz le muestra "algo nuevo")
     loNuevoCelular: {
-      id: 'celular-28',
+      id: 'celular-30',
       cosas: [
+        '⚡ Tu reto del día, arriba en Hoy: 10 minutos (5 los días largos) de preguntas mezcladas de tus cursos, con imágenes y casos de Banco de Sangre. Tu racha no se pierde por un día libre a la semana.',
+        '🔢 Tus materias ahora llevan su código (MC-4000…): tócalo en Mi horario para cambiarlo.',
+        '🌈 En Progreso → Cómo te has sentido, ahora ves tus últimas 4 semanas y te cuento qué patrón veo (por ejemplo, cómo te pegan las semanas de parcial).',
+        '🤍 Te cuido sin ser tu único apoyo: de vez en cuando te pregunto por tus amigos y tus compañeros, y si llevas semanas pesadas te sugiero con cariño pedir una cita.',
+        '😴 Si estudias tarde varias noches, te lo digo una vez y con datos; nada de regaños.',
+        '👆 Desliza una hoja hacia abajo para cerrarla.',
         '✨ Hay algo nuevo esperándote en Estudiar. Entra cuando quieras… (mejor con internet).',
         '🎓 Tu horario ahora entiende tus materias: teoría y laboratorio juntos (o aparte), cada una con su color, y tus tutorías y el TCU.',
         '📌 Lo que tienes que entregar sale siempre arriba de la Agenda.',
@@ -60,12 +69,15 @@
       ],
     },
     loNuevoPC: {
-      id: 'pc-32',
+      id: 'pc-33',
       cosas: [
+        '⚡ El reto del día: si me dices que vas a estudiar, te hago 5 preguntas en voz alta y tú me contestas hablando. Y si un curso no tiene tarjetas, te las armo de tus apuntes.',
+        '🔢 Conozco el código de tus cursos: "el parcial de MC-4000" ya sé que es Hematología.',
+        '🤍 Te cuido mejor: noto si duermes poco o si una semana viene pesada, te pregunto de vez en cuando por tus amigos, y en Acerca de Liz → Cómo te has sentido ves tus últimas 4 semanas.',
         '📖 Ahora te puedo contar más de mi vida de estudiante, antes de conocerte. Pregúntame cuando quieras.',
         '🎓 Conozco tu horario por materia (teoría, laboratorio, tutorías y TCU) y en el calendario está arriba lo que tienes que entregar.',
         '🔔 Te aviso con tiempo los parciales y la matrícula, y te pregunto por las fechas de la U antes de que salgan.',
-        '🔢 Soy la versión 1.3.',
+        '🔢 Soy la versión 1.4.',
       ],
     },
     // (Liz 1.0 · prueba 14) TU PRIVACIDAD (en "Acerca de Liz", en la compu y en el celular). REVISADO EN EL CÓDIGO el 21-oct-2026: qué se

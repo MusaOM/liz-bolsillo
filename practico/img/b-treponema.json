@@ -1,0 +1,18 @@
+{
+ "id": "b-treponema",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Microscopía de campo oscuro",
+ "respuesta": "Treponema pallidum en microscopía de campo oscuro.",
+ "claves": "El campo oscuro permite ver espiroquetas vivas y sin teñir: se ven brillantes sobre el fondo oscuro, como el negativo de una foto.",
+ "fuenteClaves": "OpenStax Microbiology, sección 2.3",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (2.3 Instruments of Microscopy)",
+  "autor": "Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/2-3-instruments-of-microscopy",
+  "archivoOriginal": "OSC_Microbio_02_03_Syphilis.jpg",
+  "descripcionOriginal": "Use of a darkfield microscope allows us to view living, unstained samples of the spirochete Treponema pallidum. Similar to a photographic negative, the spirochetes appear bright against a dark background. (credit: Centers for Disease Control and Prevention)"
+ }
+}

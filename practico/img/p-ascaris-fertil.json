@@ -1,0 +1,19 @@
+{
+ "id": "p-ascaris-fertil",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Heces, montaje húmedo",
+ "respuesta": "Huevo fértil de Ascaris lumbricoides.",
+ "claves": "Redondeado, de cáscara gruesa, con una capa externa mamelonada que la bilis suele teñir de café. Los fértiles miden de 45 a 75 µm.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL 410) y CDC DPDx (Laboratory Identification of Parasites), Ascariasis",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Fertilized egg of Ascaris lumbricoides PHIL 410 lores.jpg",
+  "autor": "CDC/ Dr. Mae Melvin",
+  "credito": "This media comes from the Centers for Disease Control and Prevention 's Public Health Image Library (PHIL), with identification number #410 . Note: Not all PHIL images are public domain; be sure to check copyright status and credit authors and content providers. العربية | Deutsch | English | македонски | slovenščina | +/−",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:Fertilized_egg_of_Ascaris_lumbricoides_PHIL_410_lores.jpg",
+  "descripcionOriginal": "ID#: 410 Description: This micrograph reveals a fertilized egg of the round worm Ascaris lumbricoides; Mag. 400X. Fertilized eggs are rounded, have a thick shell. While unfertilized eggs are elongated and larger, thinner shelled, covered by a more visible mammillated layer, which is sometimes covered by protuberances. Content Providers(s): CDC/Dr. Mae Melvin Creation Date: 1982 Copyright Restrictions: None - This image is in the public domain and thus free of any copyright restrictions. As a matter of courtesy we request that the content provider be credited and notified in any public or private usage of this image."
+ }
+}

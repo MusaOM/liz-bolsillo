@@ -87,7 +87,7 @@
     if (e) return { error: e };
     const datos = Object.assign({}, d.datos || {});
     if (ACTIVIDADES[d.actividad]) datos.actividad = d.actividad;        // (22-oct-2026: una tutoría o el TCU, como evento suelto)
-    return { ok: true, fila: Sincro.cambiar(E, 'eventos', { id: d.id || Nucleo.uuid(), titulo, cuando: d.cuando, materia: txt(d.materia, 60) || null,
+    return { ok: true, fila: Sincro.cambiar(E, 'eventos', { id: d.id || Nucleo.uuid(), titulo, cuando: d.cuando, materia: materiaReal(E, txt(d.materia, 60)) || null,
       repite: rep(d.repite), nota: txt(d.nota, 300) || null, creada: Date.now(), borrado_en: null, datos }, disp) };
   }
   function crearRecordatorio(E, d, disp) {
@@ -96,11 +96,13 @@
     if (e) return { error: e };
     const datos = Object.assign({}, d.datos || {});
     if (NIVELES[d.nivel]) datos.nivel = d.nivel;          // (21-oct-2026: la intensidad, si la eligió)
-    return { ok: true, fila: Sincro.cambiar(E, 'recordatorios', { id: d.id || Nucleo.uuid(), texto, cuando: d.cuando, materia: txt(d.materia, 60) || null,
+    return { ok: true, fila: Sincro.cambiar(E, 'recordatorios', { id: d.id || Nucleo.uuid(), texto, cuando: d.cuando, materia: materiaReal(E, txt(d.materia, 60)) || null,
       repite: rep(d.repite), hecho: null, creada: d.creada || Date.now(), borrado_en: null, datos }, disp) };
   }
+  // (22-oct-2026) Si la materia es solo un código ("MC-4000"), se guarda con su nombre del horario ("Hematología")
+  const materiaReal = (E, m) => (m && normCodigo(m) && nombrePorCodigo(E, m)) || m;
   function crearExamen(E, d, disp) {
-    const materia = txt(d.materia, 80), e = validar(d.cuando);
+    const materia = materiaReal(E, txt(d.materia, 80)), e = validar(d.cuando);
     if (!materia) return { error: 'falta la materia' };
     if (e) return { error: e };
     const que = QUE.includes(String(d.que || '').toLowerCase()) ? String(d.que).toLowerCase() : 'examen';
@@ -215,8 +217,27 @@
       const texto = ms !== a.ms && /:2h$/.test(a.clave) ? 'a las ' + Nucleo.horaCR(x.cuando) + ' es ' + Nucleo.nombreExamen(x) + '. Tú puedes.' : a.texto;
       if (ms >= desde && ms < hasta && ms >= (x.creada || 0) - Nucleo.MIN) out.push({ clave: a.clave, ms, texto, tabla: 'examenes', id: x.id, materia: x.materia, movido: ms !== a.ms });
     }
+    // (22-oct-2026, tanda B) el MODO PARCIAL ("hoy toca la materia del parcial", si no hizo el quiz de ese día) y el PRE-LAB de la víspera de
+    // cada laboratorio (movil/js/clinico.js; si no está, nada de esto). Los pone Liz sola: si caen en clase, van después.
+    const Cl = clinico();
+    if (Cl) {
+      for (const x of vivos(E.examenes).filter((e) => e.cuando >= desde && e.cuando - 15 * Nucleo.DIA < hasta)) for (const a of Cl.avisosQuiz(E, x)) {
+        if (a.hecho) continue;
+        const ms = mover(a, x.cuando, false, x.creada);
+        if (ms >= desde && ms < hasta && ms >= (x.creada || 0) - Nucleo.MIN && ms < x.cuando) out.push({ clave: a.clave, ms, texto: a.texto, tabla: 'examenes', id: x.id, materia: x.materia, tipo: 'quiz', movido: ms !== a.ms });
+      }
+      for (const a of Cl.avisosPrelab(E, desde, hasta)) {
+        const ev = E.eventos[a.id], ms = mover(a, a.objetivo, false, ev && ev.creada);
+        if (ms >= desde && ms < hasta && ms >= ((ev && ev.creada) || 0) - Nucleo.MIN) out.push({ clave: a.clave, ms, texto: a.texto, tabla: 'eventos', id: a.id, tipo: 'prelab', movido: ms !== a.ms });
+      }
+    }
     return out.sort((a, b) => a.ms - b.ms);
   }
+  // (22-oct-2026) La tanda B está EN PAUSA (planes/semestre-actual.md cambió el orden): sus avisos solo salen si alguien la conecta con
+  // Agenda.conClinico(require('./clinico.js')). Hoy nadie la conecta.
+  let ClRef = null;
+  const clinico = () => ClRef;
+  const conClinico = (m) => { ClRef = m || null; };
   // (22-oct-2026) los avisos de una sola vez (clave con ":", p. ej. "<id>:3d") se reconocen aunque se hayan movido por una clase (±8 h): si él
   // cambia su horario, no se repiten
   const yaSono = (E, clave, ms) => Object.values(E.avisos).some((a) => a.clave === clave && (Number(a.ocurrencia) === ms || (clave.includes(':') && Math.abs(Number(a.ocurrencia) - ms) <= 8 * Nucleo.H)));
@@ -255,7 +276,33 @@
     // (21-oct-2026) "aparte": un laboratorio que es OTRO curso (en su universidad, "Laboratorio de Hematología" es un curso distinto de "Hematología";
     // el de Inmunohematología, no). Lo elige él al anotarlo, o con "Separar el laboratorio" en Mi horario.
     return { titulo: materia, materia, cuando, repite: 'semanal', datos: { clase: true, dia, inicio: d.inicio, fin: d.fin, duracion: (fin - ini) * Nucleo.MIN,
-      aula: txt(d.aula, 60) || null, tipo, aparte: !actividad && tipo === 'lab' && !!d.aparte, color: actividad ? ACTIVIDADES[actividad].color : d.color || null, actividad } };
+      aula: txt(d.aula, 60) || null, tipo, aparte: !actividad && tipo === 'lab' && !!d.aparte, color: actividad ? ACTIVIDADES[actividad].color : d.color || null, actividad,
+      codigo: actividad ? null : normCodigo(d.codigo) || codigoDelNombre(materia) } };      // (22-oct-2026: el código del curso, opcional: "MC-4000")
+  }
+  // ---------- (22-oct-2026) EL CÓDIGO DEL CURSO (opcional): "MC-4000". Va en datos.codigo de cada clase (la sincronización no cambia: es parte
+  // de "datos"); se ve chiquito junto al nombre y Liz lo entiende ("el parcial de MC-4000" = Hematología). ----------
+  function normCodigo(s) {
+    const m = /^\s*([A-Za-z]{2,4})\s*[-–]?\s*(\d{3,4}[A-Za-z]?)\s*$/.exec(String(s || ''));
+    return m ? m[1].toUpperCase() + '-' + m[2].toUpperCase() : null;
+  }
+  const RE_CODIGO = /(^|[^A-Za-z0-9])([A-Za-z]{2,4})\s?-\s?(\d{4})(?![0-9])/;
+  const codigoDelNombre = (s) => { const m = RE_CODIGO.exec(String(s || '')); return m ? m[2].toUpperCase() + '-' + m[3] : null; };
+  // La materia (del horario) de un código: "MC-4000" → "Hematología" (o null)
+  function nombrePorCodigo(E, texto) {
+    const c = normCodigo(texto) || codigoDelNombre(texto);
+    if (!c) return null;
+    const g = horario(E).find((x) => x.codigo === c);
+    return g ? g.materia : null;
+  }
+  // Pone (o quita, con '') el código de una materia del horario en todas sus clases. Devuelve cuántas cambió.
+  function fijarCodigo(E, claveMateria, codigo, disp) {
+    const g = horario(E).find((x) => x.clave === claveMateria);
+    if (!g) return 0;
+    const c = codigo ? normCodigo(codigo) : null;
+    if (codigo && !c) return -1;
+    let n = 0;
+    for (const s of g.sesiones) { const ev = E.eventos[s.id]; if ((ev.datos.codigo || null) === c) continue; Sincro.cambiar(E, 'eventos', { id: ev.id, datos: Object.assign({}, ev.datos, { codigo: c }) }, disp); n++; }
+    return n;
   }
   function crearClase(E, d, disp, ahora) {
     const c = datosClase(d, ahora);
@@ -334,7 +381,8 @@
       if (!g.alias.includes(m.clave)) g.alias.push(m.clave);
       g.nombres[m.base] = (g.nombres[m.base] || 0) + 1;
       if (c.datos.color) g.colores.push(c.datos.color);
-      g.sesiones.push({ id: c.id, dia: c.datos.dia, inicio: c.datos.inicio, fin: c.datos.fin, tipo: m.tipo || 'teoria', aula: c.datos.aula || null, aparte: !!m.aparte });
+      g.sesiones.push({ id: c.id, dia: c.datos.dia, inicio: c.datos.inicio, fin: c.datos.fin, tipo: m.tipo || 'teoria', aula: c.datos.aula || null, aparte: !!m.aparte,
+        codigo: act ? null : 'codigo' in c.datos ? c.datos.codigo || null : codigoDelNombre(c.titulo) });      // (quitado a propósito = null)
     }
     // "Micología" y "Micología médica": si un nombre es el COMIENZO (palabras enteras) de UN solo otro nombre, es la misma materia
     // (con "Química General" y "Química Orgánica", "Química" sola no se junta con ninguna: no se sabe cuál es)
@@ -357,6 +405,13 @@
       for (const c of g.colores) cuenta[c] = (cuenta[c] || 0) + 1;
       g.color = g.actividad ? ACTIVIDADES[g.actividad].color : Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0] || null;
       g.sesiones.sort((a, b) => a.dia - b.dia || minDe(a.inicio) - minDe(b.inicio));
+      // (22-oct-2026) el código del curso: el que más tienen sus clases (o ninguno)
+      // (un laboratorio que es parte de la materia puede tener SU código oficial: codigoLab, p. ej. Inmunohematología MB-4008, su lab MB-4009)
+      const masUsado = (ss) => { const cods = {}; for (const s of ss) if (s.codigo) cods[s.codigo] = (cods[s.codigo] || 0) + 1; return Object.keys(cods).sort((a, b) => cods[b] - cods[a])[0] || null; };
+      const teo = g.sesiones.filter((s) => s.tipo !== 'lab'), labs = g.sesiones.filter((s) => s.tipo === 'lab');
+      g.codigo = masUsado(teo.length && !g.aparte ? teo : g.sesiones);
+      g.codigoLab = !g.aparte && teo.length ? masUsado(labs) : null;
+      if (g.codigoLab === g.codigo) g.codigoLab = null;
       delete g.nombres; delete g.colores;
     }
     // (dos materias distintas que quedaron con el mismo color guardado: la segunda recibe otro)
@@ -420,7 +475,8 @@
     if (act) { const a = ACTIVIDADES[act]; return { materia: txt(f.titulo || x.titulo, 80) || a.nombre, tipo: 'teoria', color: a.color, aparte: false, actividad: act, icono: a.icono }; }
     const m = materiaDeClase(f.titulo || f.materia || x.titulo, f.datos && f.datos.tipo, f.datos && f.datos.aparte);
     const g = E ? grupoDe(horario(E).filter((h) => !h.actividad), m.clave) : null;
-    return { materia: g ? g.materia : m.base, tipo: m.tipo || 'teoria', color: g ? g.color : null, aparte: !!m.aparte, actividad: null, icono: '🎓' };
+    return { materia: g ? g.materia : m.base, tipo: m.tipo || 'teoria', color: g ? g.color : null, aparte: !!m.aparte, actividad: null, icono: '🎓',
+      codigo: (f.datos && f.datos.codigo) || (g && g.codigo) || null };
   }
   // Para el cerebro (la compu y el celular): el horario por MATERIA, y lo de hoy. Una materia con teoría y laboratorio es UNA.
   const DIA_TXT = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
@@ -439,10 +495,10 @@
         for (const s of ss) (porHora[s.inicio + '-' + s.fin] = porHora[s.inicio + '-' + s.fin] || []).push(DIA_TXT[s.dia]);
         partes.push(TIPOS_CLASE[tipo] + ' ' + Object.entries(porHora).map(([h, d]) => y(d) + ' ' + h).join(', '));
       }
-      return g.materia + ' (' + partes.join('; ') + ')';
+      return g.materia + (g.codigo ? ' [' + g.codigo + (g.codigoLab ? '; su laboratorio ' + g.codigoLab : '') + ']' : '') + ' (' + partes.join('; ') + ')';
     });
     // (22-oct-2026) + cómo funcionan teoría y laboratorio en su carrera (lo mismo dice su liz.md, "Su carrera")
-    let t = l.length ? 'SU HORARIO DE CLASES (' + l.length + (l.length === 1 ? ' materia' : ' materias') + '; cada materia es UNA sola aunque tenga varios días; un laboratorio ' +
+    let t = l.length ? 'SU HORARIO DE CLASES (' + l.length + (l.length === 1 ? ' materia' : ' materias') + '; entre corchetes, el código del curso: si él dice el código —"el parcial de MC-4000"— habla de esa materia; cada materia es UNA sola aunque tenga varios días; un laboratorio ' +
       'puede ser parte del mismo curso —con parciales de teoría, de laboratorio o de los dos— o un curso aparte, «Laboratorio de X», con su propia nota): ' + materias.join(' · ') + '.' : 'SU HORARIO:';
     // (22-oct-2026) lo que NO es materia: las tutorías que él da y su TCU
     if (otras.length) t += ' ADEMÁS (no son materias): ' + otras.map((g) => (g.actividad === 'tutoria' ? 'da tutoría' + (claveTxt(g.materia) !== 'tutoria' ? ' («' + g.materia + '»)' : '') : 'TCU' + (claveTxt(g.materia) !== 'tcu' ? ' («' + g.materia + '»)' : '')) + ' ' +
@@ -639,5 +695,6 @@
   return { REPITE, QUE, crearEvento, crearRecordatorio, crearExamen, editar, borrar, marcarHecho, estaHecho, rango, delDia, proximosExamenes,
     listaRecordatorios, sonidos, yaSono, paraAvisar, oculto, esClase, DIAS_SEMANA, crearClase, editarClase, clases, borrarHorario, clasesDelDia, claseAhora,
     importante, avisosImportante, avisosExtra, nivelDe, NIVELES, porEntregar, TIPOS_CLASE, ACTIVIDADES, actividadDe, COLORES_MATERIA, materiaDeClase, horario, colorDe, nombreClase, asegurarColores, textoHorario, separarLab, PARTES, parteDe, nombreExamenCompleto,
-    anotarPomodoro, pomodoros, cuandoDeFrase, pedidoRecordatorio, RECORDATORIO_SIN_NOMBRE };
+    anotarPomodoro, pomodoros, cuandoDeFrase, pedidoRecordatorio, RECORDATORIO_SIN_NOMBRE,
+    normCodigo, codigoDelNombre, nombrePorCodigo, fijarCodigo, conClinico };
 });

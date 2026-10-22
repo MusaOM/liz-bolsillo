@@ -1,0 +1,19 @@
+{
+ "id": "m-sporothrix",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Microscopía (cultivo)",
+ "respuesta": "Conidióforos y conidios de Sporothrix schenckii.",
+ "claves": "Causa la esporotricosis, una infección de la piel que llega al tejido subcutáneo y forma úlceras grandes; puede diseminarse.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL 4208)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Conidiophores and conidia of the fungus Sporothrix schenckii PHIL 4208 lores.jpg",
+  "autor": "desconocido",
+  "credito": "http://phil.cdc.gov/phil_images/20030721/16/PHIL_4208_lores.jpg",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:Conidiophores_and_conidia_of_the_fungus_Sporothrix_schenckii_PHIL_4208_lores.jpg",
+  "descripcionOriginal": "ID#: 4208 Description: This photomicrograph reveals the conidiophores and conidia of the fungus Sporothrix schenckii. Sporotrichosis, caused by the etiologic pathogen Sporothrix schenckii, is a skin infection involving the subcutaneous layer, and manifest itself in the formation of large ulcerations, however, the disease can become systemically disseminated. Content Providers(s): CDC/Dr. Libero Ajello Creation Date: 1972 Copyright Restrictions: None - This image is in the public domain and thus free of any copyright restrictions. As a matter of courtesy we request that the content provider be credited and notified in any public or private usage of this image."
+ }
+}

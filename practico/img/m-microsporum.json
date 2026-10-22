@@ -1,0 +1,19 @@
+{
+ "id": "m-microsporum",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Microscopía",
+ "respuesta": "Macroconidio de Microsporum canis.",
+ "claves": "M. canis es la causa más común de tiña en perros y también causa la enfermedad en humanos (foto a 1000x).",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Microsporum canis 1.JPG",
+  "autor": "Joel Mills",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 3.0",
+  "licenciaUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+  "url": "https://commons.wikimedia.org/wiki/File:Microsporum_canis_1.JPG",
+  "descripcionOriginal": "Photo of a Microsporum canis macroconidia taken through a microscope at 1000x magnification. M. canis is the most common cause of ringworm in dogs and also causes the disease in humans."
+ }
+}

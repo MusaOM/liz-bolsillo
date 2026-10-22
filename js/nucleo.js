@@ -53,13 +53,22 @@
   // ---------- Progreso ----------
   const diaDe = (ms) => { const d = new Date(ms); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
   // Racha: días seguidos (hasta hoy o ayer) con al menos un repaso
+  // (22-oct-2026) RACHA SUAVE (planes/semestre-actual.md): cuenta los días seguidos que estudió, pero NO se pierde por faltar un día: se perdona
+  // UN día por semana (de lunes a domingo). El día perdonado no suma, pero no corta. Nunca se usa para presionar. La usan Hoy, Progreso y los logros.
   function racha(repasos, ahora) {
     ahora = ahora || Date.now();
     const dias = new Set((repasos || []).map((r) => diaDe(r.fecha)));
+    const semana = (ms) => { const x = new Date(ms); x.setHours(12, 0, 0, 0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return diaDe(x.getTime()); };
     let n = 0;
-    let d = new Date(ahora);
-    if (!dias.has(diaDe(d.getTime()))) d = new Date(d.getTime() - DIA);       // si hoy todavía no repasó, cuenta desde ayer
-    while (dias.has(diaDe(d.getTime()))) { n++; d = new Date(d.getTime() - DIA); }
+    let d = ahora;
+    if (!dias.has(diaDe(d))) d -= DIA;       // si hoy todavía no repasó, cuenta desde ayer
+    const perdonadas = new Set();
+    for (let i = 0; i < 1000; i++) {
+      if (dias.has(diaDe(d))) { n++; d -= DIA; continue; }
+      // un día sin estudiar: se perdona si es el único de esa semana y el día anterior sí estudió
+      if (!perdonadas.has(semana(d)) && dias.has(diaDe(d - DIA))) { perdonadas.add(semana(d)); d -= DIA; continue; }
+      break;
+    }
     return n;
   }
   // Tiempo repasando: repasos seguidos (menos de 5 min entre uno y otro) forman una sesión; cada repaso suma lo que tardó

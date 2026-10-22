@@ -1,0 +1,18 @@
+{
+ "id": "b-strepto-cadenas",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Tinción de Gram",
+ "respuesta": "Streptococcus pyogenes: cocos en cadenas.",
+ "claves": "Forma cadenas de cocos.",
+ "fuenteClaves": "OpenStax Microbiology, sección 21.2",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (21.2 Bacterial Infections of the Skin and Eyes)",
+  "autor": "modification of work by Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/21-2-bacterial-infections-of-the-skin-and-eyes",
+  "archivoOriginal": "OSC_Microbio_21_02_Spyogenes.jpg",
+  "descripcionOriginal": "Streptococcus pyogenes forms chains of cocci. (credit: modification of work by Centers for Disease Control and Prevention)"
+ }
+}

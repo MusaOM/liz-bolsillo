@@ -1,0 +1,18 @@
+{
+ "id": "b-meningococo-lcr",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "LCR, tinción de Gram",
+ "respuesta": "Neisseria meningitidis en líquido cefalorraquídeo, tinción de Gram.",
+ "claves": "Diplococos (en pares, señalados con flechas) junto a neutrófilos, que son las células teñidas más grandes.",
+ "fuenteClaves": "OpenStax Microbiology, sección 26.2",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (26.2 Bacterial Diseases of the Nervous System)",
+  "autor": "modification of work by the Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/26-2-bacterial-diseases-of-the-nervous-system",
+  "archivoOriginal": "OSC_Microbio_26_02_Meningococ.jpg",
+  "descripcionOriginal": "N. meningitidis (arrows) associated with neutrophils (the larger stained cells) in a gram-stained CSF sample. (credit: modification of work by the Centers for Disease Control and Prevention)"
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "id": "b-gonococo",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Exudado uretral, tinción de Gram",
+ "respuesta": "Neisseria gonorrhoeae: diplococos gramnegativos intracelulares en exudado uretral (uretritis gonocócica).",
+ "claves": "Diplococos gramnegativos DENTRO de los leucocitos, más organismos gramnegativos fuera de las células: en un exudado uretral, esto es diagnóstico de uretritis gonocócica.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL 3693)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Neisseria gonorrhoeae PHIL 3693 lores.jpg",
+  "autor": "Photo Credit: Content Providers(s): CDC/ Dr. Norman Jacobs",
+  "credito": "This media comes from the Centers for Disease Control and Prevention 's Public Health Image Library (PHIL), with identification number #3693 . Note: Not all PHIL images are public domain; be sure to check copyright status and credit authors and content providers. العربية | Deutsch | English | македонски | slovenščina | +/−",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:Neisseria_gonorrhoeae_PHIL_3693_lores.jpg",
+  "descripcionOriginal": "This illustration depicts a urethral exudate containing Neisseria gonorrhoeae from a patient with gonococcal urethritis. This illustration depicts a Gram-stain of a urethral exudate showing typical intracellular gram-negative diplococci, and pleomorphic extracellular gram-negative organisms, which is diagnostic for gonococcal urethritis."
+ }
+}

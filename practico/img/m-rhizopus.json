@@ -1,0 +1,19 @@
+{
+ "id": "m-rhizopus",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Microscopía",
+ "respuesta": "Esporangio y esporangióforo de Rhizopus.",
+ "claves": "Un esporangio esférico en la punta de un esporangióforo largo y sin ramificar (el moho común del pan).",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Sporangium and sporangiophore of Rhizopus – 400x.jpg",
+  "autor": "Arpitoon",
+  "credito": "Own work",
+  "licencia": "CC0",
+  "licenciaUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "url": "https://commons.wikimedia.org/wiki/File:Sporangium_and_sporangiophore_of_Rhizopus_%E2%80%93_400x.jpg",
+  "descripcionOriginal": "This microscopic image displays the spherical sporangium of Rhizopus, a common bread mold, attached to a long unbranched sporangiophore."
+ }
+}

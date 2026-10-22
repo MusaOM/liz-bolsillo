@@ -1,0 +1,19 @@
+{
+ "id": "p-leishmania",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Aspirado con aguja fina, Giemsa",
+ "respuesta": "Amastigotes de Leishmania donovani, Giemsa.",
+ "claves": "Amastigotes dentro de un macrófago y también fuera de las células.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Leishmania donovani amastigotes in Giemsa stained smear of FNAC.jpg",
+  "autor": "Ajay Kumar Chaurasiya",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Leishmania_donovani_amastigotes_in_Giemsa_stained_smear_of_FNAC.jpg",
+  "descripcionOriginal": "Leishmania donovani amastigotes are present intracellularly of macrophage as well as extracellularly in Giemsa stained smear of FNAC"
+ }
+}

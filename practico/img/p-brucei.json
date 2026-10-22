@@ -1,0 +1,18 @@
+{
+ "id": "p-brucei",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Frotis de sangre",
+ "respuesta": "Trypanosoma brucei en un frotis de sangre (enfermedad del sueño africana).",
+ "claves": "Células alargadas en forma de gusano entre los glóbulos rojos.",
+ "fuenteClaves": "OpenStax Microbiology, sección 26.4",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (26.4 Fungal and Parasitic Diseases of the Nervous System)",
+  "autor": "modification of work by the Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/26-4-fungal-and-parasitic-diseases-of-the-nervous-system",
+  "archivoOriginal": "OSC_Microbio_26_04_Trypanosom.jpg",
+  "descripcionOriginal": "Trypanosoma brucei, the causative agent of African sleeping sickness, in a human blood smear. (credit: modification of work by the Centers for Disease Control and Prevention)"
+ }
+}

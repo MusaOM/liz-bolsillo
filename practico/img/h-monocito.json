@@ -1,0 +1,19 @@
+{
+ "id": "h-monocito",
+ "area": "hematologia",
+ "areaNombre": "Hematología",
+ "pista": "Frotis de sangre, Wright",
+ "respuesta": "Monocito.",
+ "claves": "Leucocito grande con el núcleo indentado o en forma de herradura. Son el 1-6 % de los leucocitos; al salir de la sangre se llaman macrófagos y células dendríticas.",
+ "fuenteClaves": "OpenStax Microbiology, sección 17.3 (tabla de los elementos de la sangre)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Blood-monocyte.jpg",
+  "autor": "Echinaceapallida",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Blood-monocyte.jpg",
+  "descripcionOriginal": "Erythrocytes with a monocyte (Blood smear with Wright's stain)"
+ }
+}

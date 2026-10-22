@@ -19,6 +19,8 @@
   const Org = self.Organizar, F = self.Frases, Ag = self.Agenda, N = self.Nucleo;
   const Animo = self.Animo, V = self.LizVersion;          // (21-oct-2026, Liz 1.1) diario de ánimo y frases de cariño · la versión
   const Lg = self.Logros;                                 // (21-oct-2026, bolsillo 1.1) los logros de Liz: cuándo se gana cada uno (js/logros.js)
+  const Cl = self.Clinico || null;                        // (22-oct-2026, tanda B) el estudio clínico: fichas, quiz del parcial, pre-lab, CENDEISSS, ritual (js/clinico.js)
+  const Rt = self.Reto || null;                           // (22-oct-2026) EL RETO DEL DÍA: un poquito todos los días (js/reto.js)
   const { MIN, H, DIA } = N;
   const MAX_ARCHIVO = 50 * 1024 * 1024, ESPACIO_GRATIS = 1024 * 1024 * 1024;
 
@@ -37,7 +39,8 @@
   const ag = { modo: 'mes', ref: Date.now(), dia: N.inicioDiaCR(Date.now()) };
   let sincronizando = false, otraVez = false, ultimoError = '', sinSesion = false;
   const TITULOS = { hoy: 'Hoy', repasar: 'Estudiar', charla: 'Liz', agenda: 'Agenda', mazos: 'Estudiar', mas: 'Más', recordatorios: 'Agenda', archivos: 'Archivos',
-    progreso: 'Mi progreso', papelera: 'Papelera', acerca: 'Acerca de Liz', archivados: 'Archivados', pomodoro: 'Estudiar con Liz', logros: 'Logros' };
+    progreso: 'Mi progreso', papelera: 'Papelera', acerca: 'Acerca de Liz', archivados: 'Archivados', pomodoro: 'Estudiar con Liz', logros: 'Logros',
+    practico: 'Examen práctico', ritual: 'Antes del examen', reto: 'Reto del día' };      // (22-oct-2026, tanda B y el reto)
   // (21-oct-2026) Cada cosa en UN solo lugar: Recordatorios vive en Agenda (pestaña "Recordatorios"); Archivados, en Más
   const DE_MAS = ['archivos', 'progreso', 'papelera', 'acerca', 'archivados'];
   const DE_AGENDA = ['recordatorios'];
@@ -225,7 +228,11 @@
     // (prueba 17) + las FECHAS ESPECIALES: antes no se copiaban aquí, así que en el iPhone de verdad nunca salía el saludo especial (solo en ?demo)
     // (19-oct-2026) + la CARTA (el poema de su creadora, privado: solo llega aquí, por la nube privada) y el nombre de su dueño
     if (lc) perfil.lizc = { frases: lc.frasesCarino || null, dedicatoria: lc.dedicatoria || '', creadora: lc.creadora || '', apoyo: lc.apoyo || '', masculino: lc.masculino !== false,
-      fechas: Array.isArray(lc.fechas) ? lc.fechas : [], carta: lc.carta && self.LizCarta && LizCarta.valida(lc.carta) ? lc.carta : null, dueno: lc.dueno || '' };
+      fechas: Array.isArray(lc.fechas) ? lc.fechas : [], carta: lc.carta && self.LizCarta && LizCarta.valida(lc.carta) ? lc.carta : null, dueno: lc.dueno || '',
+      // (22-oct-2026, tanda A) el cuidado: el interruptor del protocolo de crisis, los recursos de apoyo y el dato de empleo (privado, de la compu)
+      cuidado: lc.cuidado && typeof lc.cuidado === 'object' ? lc.cuidado : null,
+      // (22-oct-2026, tanda B) su carrera para estudiar: las 7 áreas del CENDEISSS (y su fecha, si se sabe) y la lista del pre-lab
+      estudio: lc.estudio && typeof lc.estudio === 'object' ? lc.estudio : null };
     // (19-oct-2026) EL TRÁILER: vive PRIVADO en su cuenta (lo sube la PC); aquí solo se anota cuál es. La dirección para verlo se pide al verlo.
     const tr = data.datos && data.datos.trailer;
     perfil.trailer = tr && tr.ruta && tr.v ? { v: String(tr.v), ruta: String(tr.ruta) } : null;
@@ -419,7 +426,8 @@
     vista = v;
     if (v !== 'mazos') { mazoAbierto = null; mazoPendiente = null; }
     // (21-oct-2026) "Ver todos" los logros: desde Estudiar (o desde Más → Progreso: entonces marca Más)
-    const tab = DE_MAS.includes(v) || (v === 'logros' && lgDesde === 'progreso') ? 'mas' : DE_AGENDA.includes(v) ? 'agenda' : DE_ESTUDIAR.includes(v) || v === 'pomodoro' || v === 'logros' ? 'estudiar' : v;
+    const tab = DE_MAS.includes(v) || (v === 'logros' && lgDesde === 'progreso') ? 'mas' : DE_AGENDA.includes(v) ? 'agenda' : DE_ESTUDIAR.includes(v) || ['pomodoro', 'logros', 'practico', 'ritual', 'reto'].includes(v) ? 'estudiar' : v;
+    if (v !== 'ritual') pararRitual();          // (22-oct-2026: la respiración guiada se detiene al salir)
     for (const b of document.querySelectorAll('#menu button')) b.classList.toggle('activo', b.dataset.v === tab);
     if (v !== 'charla') arribaDeTodo();
     enderezar();
@@ -434,7 +442,7 @@
   }
   const PINTA = { hoy: pintarHoy, repasar: pintarRepasar, charla: pintarCharla, agenda: pintarAgenda, mazos: pintarMazos, mas: pintarMas,
     archivos: pintarArchivos, progreso: pintarProgreso, papelera: pintarPapelera, acerca: pintarAcerca, archivados: pintarArchivados, pomodoro: pintarPomodoro,
-    logros: pintarLogros };
+    logros: pintarLogros, practico: pintarPractico, ritual: pintarRitual, reto: pintarReto };
   // (prueba 17) Si una pantalla falla al dibujarse (un dato raro que llegó de la nube, por ejemplo), no queda en blanco ni "trabada":
   // sale un aviso con el motivo y un botón para volver a intentar (y las demás pestañas siguen andando).
   function pintarVista(v) {
@@ -504,9 +512,14 @@
   }
   // Un enlace a una pantalla (lo usan los avisos al tocarlos): #hoy, #repasar, #charla, #agenda, #recordatorios, #archivos, #mazo=<id>
   function irPorEnlace(h) {
-    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro|carta|animo)$|^mazo=([\w-]+)$/);
+    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro|carta|animo|prelab|practico|ritual|reto)$|^mazo=([\w-]+)$|^(quiz|ritual)=([\w-]+)$/);
     if (!m) return false;
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    // (22-oct-2026, tanda B) los avisos del modo parcial (#quiz=<examen>), del pre-lab (#prelab) y del ritual (#ritual=<examen>)
+    if (m[1] === 'reto') { abrirReto(); return true; }          // (22-oct-2026: el aviso del reto del día)
+    if (m[3] === 'quiz') { if (!empezarQuiz(m[4])) ir('hoy'); return true; }
+    if (m[3] === 'ritual' || m[1] === 'ritual') { abrirRitual(m[4] || null); return true; }
+    if (m[1] === 'prelab') { ir('hoy'); setTimeout(() => { const s = $('#prelabHoy'), a = $('#app'); if (s && a) a.scrollTo({ top: Math.max(0, s.getBoundingClientRect().top - a.getBoundingClientRect().top + a.scrollTop - 80) }); }, 120); return true; }
     if (m[1] === 'carta') { abrirCarta(); return true; }        // (19-oct-2026) Acerca de Liz, justo en la carta
     // (19-oct-2026) El aviso "¿Cómo te sientes hoy?": abre Hoy y la hoja de las caritas
     if (m[1] === 'animo') { ir('hoy'); setTimeout(() => { if (Animo && $('#hoja').hidden) hojaAnimo(!Animo.debePreguntar(E)); }, 450); return true; }
@@ -750,6 +763,7 @@
       const n = Ag.nombreClase(x, E);
       if (!linea) sub.push('<span class="hora">' + hora + '</span>');
       sub.push(n.actividad ? (n.actividad === 'tutoria' ? 'Tutoría (la das tú)' : 'TCU') : TIPO_TXT[n.tipo]);
+      if (n.codigo) sub.push('<span class="codigoMini">' + esc(n.codigo) + '</span>');      // (22-oct-2026: el código del curso, chiquito)
       if (conDia) sub.push(enDias(x.ms));
       if (x.aula) sub.push(esc(x.aula));
       return '<li><div class="item">' + (linea ? '<span class="hora">' + hora + '</span>' : '') + '<div class="ico materia" style="--mc:' + esc(n.color || 'var(--clase)') + '">' + n.icono + '</div>' +
@@ -796,10 +810,12 @@
       '<div class="heroe"><div class="placa"></div><div class="placa chica"></div><span class="animo">' + TEXTO_ANIMO[animo] + '</span>' +
       '<div class="marcoFoto respira"><div class="aura"></div>' + fotoLiz(animo, 'grande') + '</div>' +
       globoHoy(frasesDeHoy({ carino, mom, tocan, msg, racha })) + '</div>' +
+      tarjetaReto(ahora, racha, total) +          // (22-oct-2026) EL RETO DEL DÍA, arriba
       (tocan.length ? (sug < tocan.length
         ? '<button class="repasarYa" data-a="repasarSuave"><span class="n">' + sug + '</span><span class="t"><b>Solo ' + sug + ', con calma</b>de las ' + tocan.length + ' de hoy</span><span class="flecha">▶</span></button>'
         : '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + tocan.length + '</span><span class="t"><b>Repasar ahora</b>' +
           (tocan.length === 1 ? 'tarjeta te toca hoy' : 'tarjetas te tocan hoy') + '</span><span class="flecha">▶</span></button>') : '') +
+      hoyClinico(ahora) +          // (22-oct-2026, tanda B) el ritual antes del examen, el quiz del parcial y el pre-lab de mañana
       (ex ? '<button class="examenG" data-a="editarAgenda" data-tabla="examenes" data-id="' + esc(ex.id) + '"><span class="cuenta">' +
         (dEx <= 0 ? '<b>¡Hoy!</b>' : dEx === 1 ? '<b>1</b><small>día</small>' : '<b>' + dEx + '</b><small>días</small>') + '</span><span class="txt"><small>Próximo ' + esc(ex.que || 'examen') + '</small><b>' +
         esc(ex.materia) + '</b><span>' + esc(N.fechaTxt(ex.cuando)) + ' · ' + N.horaCR(ex.cuando) + '</span></span></button>' : '') +
@@ -866,6 +882,11 @@
     secreto: [{ t: 'Psst… te guardo un secreto: me hicieron pensando en que nunca te sintieras solo. Así que aquí estoy, siempre.', tierna: true }],
   };
   const frasesCel = () => (perfil.lizc && perfil.lizc.frases) || (DEMO ? FRASES_DEMO : { sorpresa: [], secreto: [] });
+  // (22-oct-2026, tanda A) CUIDADO Y BIENESTAR (js/cuidado.js, aparte: si no está, nada de esto corre). Lo que necesita llega privado de la compu
+  // (perfil.lizc.cuidado); el protocolo de crisis está APAGADO salvo que la compu lo mande encendido (lo decide su creadora en el perfil).
+  const Cd = self.Cuidado || null;
+  let cuidadoDemo = null;
+  const cuidadoOpc = () => { const c = (perfil.lizc && perfil.lizc.cuidado) || cuidadoDemo || {}; return { dueno: perfil.nombre || '', fem: fem(), protocolo: c.protocoloCrisis === true, apoyo: c.apoyo || null, carrera: c.carrera || null, creadora: creadoraCel() }; };
   const PREGUNTA_ANIMO = ['¿Cómo te sientes hoy?', 'Cuéntame, ¿cómo amaneciste hoy?', 'Antes de empezar: ¿cómo te sientes hoy?'];
   let animoPreguntadoEn = 0, carinoActual = null;
   function hojaAnimo(aMano) {
@@ -938,7 +959,8 @@
   // supabase/avisos.sql.) "Ahora no" = ese día no se le insiste, en ningún aparato (Animo.saltar).
   let esperasAnimo = 0;
   function revisarAnimoDia() {
-    if (!Animo || document.hidden || !$('#entrar').hidden || !Animo.debePreguntar(E) || sesion || vista === 'charla' || escribiendo()) return;
+    // (22-oct-2026) tampoco en medio del reto del día
+    if (!Animo || document.hidden || !$('#entrar').hidden || !Animo.debePreguntar(E) || sesion || vista === 'charla' || (vista === 'reto' && reto && reto.fase !== 'fin') || escribiendo()) return;
     if (Date.now() - animoPreguntadoEn < 30 * MIN) return;
     // (prueba 18) Después de actualizarse, "Lo nuevo" va PRIMERO; (19-oct-2026) y el TRÁILER, la primera vez. Si hay una hoja abierta, espera
     // a que se cierre (como mucho ~1 min; si no, la próxima revisión).
@@ -960,6 +982,17 @@
       avisoCharla = true;
       pintarMenu();
       return;
+    }
+    // (22-oct-2026, tanda A) Una cosa por su cuenta, si toca: la cita (semanas malas), el sueño (noches tarde), la tendencia de su diario
+    // (una vez por semana) o una pregunta por su gente (cada 11-15 días). Queda en "avisos": la compu no repite lo mismo.
+    if (Cd) {
+      const x = Cd.porSuCuenta(E, ahora, DISP, { creadora: creadoraCel(), apoyo: cuidadoOpc().apoyo });
+      if (x) {
+        guardarLocal(); pedirSincro();
+        agregarMsg({ quien: 'liz', texto: x.texto, animo: x.tipo === 'red' ? 'contenta' : 'tierna' });
+        avisoCharla = true; pintarMenu();
+        return;
+      }
     }
     const examenCerca = Object.values(E.examenes || {}).some((x) => x && !x.borrado_en && Math.abs(x.cuando - ahora) < 3 * H);
     const x = Animo.carinoAhora(E, frasesCel(), ahora, { examenCerca });
@@ -1006,7 +1039,11 @@
       const difs = Org.paraRepasar(E, { dificiles: true }).length, todas = Org.vivos(E.tarjetas).length;
       const op = (a, ic, color, t, n, sub2) => '<li><button class="item" data-a="' + a + '"' + (n ? '' : ' disabled style="opacity:.45"') + '><span class="ico ' + color + '">' + ic + '</span><span class="txt"><b>' + t + '</b>' +
         (sub2 ? '<small>' + sub2 + '</small>' : '') + '</span><span class="num">' + n + '</span><span class="chev">›</span></button></li>';
+      const sinMat = cursosSinMaterial();
       v.innerHTML = segEstudiar('repasar') + escena(hoy ? 'microscopio' : 'dormida', hoy ? fija('pRep', 'pRepasar', { n: hoy }) : fija('pRep', 'pRepasarNada')) +
+        // (22-oct-2026) los cursos de ahora que todavía no tienen material: las preguntas salen mejor de lo que dan SUS profes
+        (sinMat.length ? '<button class="sinMaterial toque" data-a="subirArchivo"><span class="e">📤</span><span class="t"><b>Sin material todavía: ' + esc(sinMat.join(', ')) + '</b>' +
+          '<small>Sube sus presentaciones y guías (las de Mediación Virtual) y te hago preguntas con lo que dan tus profes</small></span></button>' : '') +
         // (las 3 rondas viven SOLO aquí: antes también estaban en Hoy y en Mazos)
         (hoy ? '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + hoy + '</span><span class="t"><b>Las de hoy</b>según tu repaso espaciado</span><span class="flecha">▶</span></button>' : '') +
         '<h3>Otras rondas</h3><div class="panel"><ul class="lista">' +
@@ -1209,6 +1246,157 @@
       '<div style="display:grid;gap:10px;margin-top:8px">' + (quedan ? '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + quedan + '</span><span class="t"><b>Seguir</b>con las de hoy</span><span class="flecha">▶</span></button>' : '') +
       '<button class="bt grande" data-a="salirSesion">Volver a Hoy</button></div>';
   }
+  // ======================================================================================================
+  // (22-oct-2026, planes/semestre-actual.md, URGENTE) EL RETO DEL DÍA: 10 minutos (5 los días largos), preguntas MEZCLADAS de sus cursos de
+  // ahora, en formatos distintos, con respuesta inmediata y corta; al final, qué domina y qué repasar mañana. Las reglas: js/reto.js (las
+  // mismas en la compu). Se arma al ABRIRLO (no en Hoy: Hoy solo mira si ya lo hizo). La imagen (del banco del práctico) se baja solo
+  // cuando le toca; sin internet, esa pregunta se salta.
+  // ======================================================================================================
+  let reto = null;
+  function tarjetaReto(ahora, racha, total) {
+    if (!Rt || !total) return '';
+    if (Rt.hecho(E, ahora)) return '<div class="retoHecho"><span>✅ <b>Reto de hoy, listo</b>' + (racha >= 2 ? ' · ' + racha + ' días seguidos' : '') + '</span>' +
+      '<button class="bt chico" data-a="reto">Otra ronda</button></div>';
+    return '<button class="retoBt toque" data-a="reto"><span class="e">⚡</span><span class="t"><b>Tu reto de hoy</b><small>' + (Rt.diaLargo(E, ahora) ? '5 minutos' : '10 minutos') +
+      ' · preguntas mezcladas de tus cursos</small></span><span class="flecha">▶</span></button>';
+  }
+  // Los cursos de ahora (del horario) sin tarjetas ni apuntes subidos todavía
+  function cursosSinMaterial() {
+    if (!Rt) return [];
+    const cursos = Rt.cursosActuales(E);
+    if (!cursos.length) return [];
+    const con = new Set();
+    for (const a of Org.vivos(E.archivos)) { const c = a.materia && cursos.find((x) => Rt.mismaMateria(x.nombre, a.materia)); if (c) con.add(c.nombre); }
+    // (una tarjeta por mazo basta: el curso sale del nombre de su materia o de su mazo; así no se revisan las 500)
+    const unaPorMazo = new Map();
+    for (const t of Object.values(E.tarjetas)) if (t && !t.borrado_en && !unaPorMazo.has(t.mazo_id)) unaPorMazo.set(t.mazo_id, t);
+    for (const t of unaPorMazo.values()) { if (con.size === cursos.length) break; const c = Rt.cursoDe(E, t, cursos); if (c) con.add(c.nombre); }
+    return cursos.filter((c) => !con.has(c.nombre)).map((c) => c.nombre);
+  }
+  function abrirReto() {
+    if (!Rt) { ir('hoy'); return; }
+    const t0 = performance.now();
+    const d = Rt.armar(E, Date.now(), { conImagen: navigator.onLine || DEMO, semilla: E.usuario || '' });
+    reto = { d, i: 0, res: [], fase: 'pregunta', ms: Math.round(performance.now() - t0), elegida: null };
+    const qi = d.preguntas.find((q) => q.tipo === 'imagen');
+    if (qi) qi.p = prepararImagenReto(qi);           // (se baja por detrás mientras contesta las primeras)
+    ir('reto');
+  }
+  // La imagen: una del área (hematología o micología) del banco del práctico, con 4 opciones (su respuesta y las de otras 3 de la misma área)
+  let pracIx = null;
+  async function indicePractico() { if (pracIx) return pracIx; const r = await fetch('practico/indice.json'); if (!r.ok) throw new Error('sin índice'); pracIx = await r.json(); return pracIx; }
+  const fichaPractico = async (id) => { const r = await fetch('practico/img/' + encodeURIComponent(id) + '.json'); if (!r.ok) throw new Error('sin ficha'); return r.json(); };
+  const barajarCon = (l, r) => { const a = l.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(r() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  async function prepararImagenReto(q) {
+    try {
+      const ix = await indicePractico();
+      const l = ix.imagenes.filter((x) => x.area === q.area);
+      if (l.length < 4) throw new Error('pocas');
+      let vistas = {};
+      try { vistas = JSON.parse(localStorage.getItem('liz-practico-visto') || '{}'); } catch (e) {}
+      const r = Rt.azar('img|' + reto.d.dia + '|' + q.area);
+      const orden = barajarCon(l, r).sort((a, b) => (vistas[a.id] || 0) - (vistas[b.id] || 0));
+      const [f, ...o] = await Promise.all(orden.slice(0, 4).map((x) => fichaPractico(x.id)));
+      const ops = barajarCon([f.respuesta].concat(o.map((x) => x.respuesta)), r);
+      Object.assign(q, { id: f.id, img: 'practico/img/' + f.id + '.webp', enunciado: '¿Qué ves en esta imagen? (' + f.pista + ')', opciones: ops, correcta: ops.indexOf(f.respuesta),
+        explicacion: f.claves, fuente: f.fuenteClaves, credito: f.imagen || {}, listo: true });
+      const im = new Image(); im.src = q.img;          // (que ya esté cuando le toque)
+      return true;
+    } catch (e) { q.fallo = true; return false; }
+  }
+  const creditoImg = (c) => '<p class="credito">Imagen: ' + esc(String(c.autor || '').slice(0, 90)) + ' · ' + esc(c.fuente || '') + ' · ' + esc(c.licencia || '') +
+    (c.url ? ' · <a href="' + esc(c.url) + '" target="_blank" rel="noopener">original</a>' : '') + '</p>';
+  function pintarReto(v) {
+    if (!reto) { v.innerHTML = ''; setTimeout(abrirReto, 0); return; }
+    const d = reto.d, n = d.preguntas.length;
+    if (!n) {
+      v.innerHTML = '<button class="volverBt" data-a="ir" data-v="hoy">‹ Hoy</button>' + vacio('dormida', 'Para tu reto necesito tarjetas de tus cursos. Sube tus apuntes (Estudiar → Mazos → Subir archivo) y te las hago con lo que dan tus profes.',
+        '<button class="bt prin grande" data-a="subirArchivo">📤 Subir apuntes</button>');
+      return;
+    }
+    if (reto.fase === 'fin' || reto.i >= n) return pintarRetoFin(v);
+    const q = d.preguntas[reto.i];
+    if (q.tipo === 'imagen' && !q.listo) {
+      if (q.fallo) { reto.i++; return pintarReto(v); }        // (sin internet: esa se salta)
+      v.innerHTML = '<p class="suave" style="text-align:center;margin-top:40px">Preparando la imagen…</p>';
+      (q.p || (q.p = prepararImagenReto(q))).then(() => { if (vista === 'reto' && reto && reto.d === d) pintarSuave(true); });
+      return;
+    }
+    const fb = reto.fase === 'feedback', ver = reto.fase === 'ver';
+    const cab = '<div class="sesion reto"><div class="sesionCab"><strong>⚡ Reto de hoy</strong><span class="suave">' + (reto.i + 1) + ' de ' + n + '</span><button class="bt chico" data-a="retoSalir">Terminar</button></div>' +
+      '<div class="barraProg"><i style="width:' + Math.round((reto.i / n) * 100) + '%"></i></div><div class="retoCurso">' + esc(q.curso || '') + (d.modo === 'vispera' ? ' · repaso de la víspera' : '') + '</div>';
+    let cuerpo = '<div class="retoCaja">' + (q.img ? '<div class="pracImg"><img src="' + esc(q.img) + '" alt="Imagen para identificar" decoding="async"></div>' : '') +
+      '<p class="p">' + esc(q.enunciado) + '</p>' + (q.tipo === 'vf' ? '<p class="afirma">Respuesta: «' + esc(q.afirmacion) + '»</p><p class="suave">¿Es correcta?</p>' : '');
+    if (q.tipo === 'tarjeta') {
+      cuerpo += (ver ? '<div class="r">' + esc(q.respuesta) + '</div>' + (q.fuente ? '<p class="fuente">📖 ' + esc(q.fuente) + '</p>' : '') : '') + '</div>';
+      cuerpo += ver ? '<p class="suave" style="text-align:center;margin:8px 0 4px">¿Cómo te fue?</p><div class="respuestas"><button class="r-mal" data-a="retoAuto" data-r="mal"><span>😕</span>No la sabía</button>' +
+        '<button class="r-medio" data-a="retoAuto" data-r="medio"><span>🤏</span>A medias</button><button class="r-bien" data-a="retoAuto" data-r="bien"><span>😄</span>La sabía</button></div>'
+        : '<button class="bt prin grande" data-a="retoVer">Ver la respuesta</button>';
+    } else {
+      cuerpo += '<div class="retoOps">' + q.opciones.map((o, i) => '<button class="retoOp' + (fb ? (i === q.correcta ? ' ok' : i === reto.elegida ? ' mal' : ' apagada') : '') + '" data-a="retoOpcion" data-i="' + i + '"' + (fb ? ' disabled' : '') + '>' + esc(o) + '</button>').join('') + '</div></div>';
+      if (fb) {
+        const bien = reto.elegida === q.correcta;
+        cuerpo += '<div class="retoFb ' + (bien ? 'ok' : 'mal') + '"><b>' + (bien ? '¡Eso!' : q.tipo === 'vf' ? 'No: la respuesta es otra.' : 'Casi.') + '</b> ' +
+          esc(q.tipo === 'vf' ? 'La respuesta: ' + q.respuesta + '.' : !bien && q.tipo !== 'caso' ? 'Era: ' + q.opciones[q.correcta] + '.' : '') + ' ' + esc(q.explicacion || '') +
+          (q.fuente ? '<small>📖 ' + esc(q.fuente) + '</small>' : '') + (reto.porque ? '<span class="porque">' + esc(reto.porque) + '</span>' : '') + '</div>' +
+          (q.credito ? creditoImg(q.credito) : '') +
+          '<div class="dosBotones">' + (q.tipo === 'vf' && !reto.porque ? '<button class="bt grande" data-a="retoPorQue">🤔 ¿Por qué?</button>' : '') + '<button class="bt prin grande" data-a="retoSig">Siguiente ▶</button></div>';
+      }
+    }
+    v.innerHTML = cab + cuerpo + '</div>';
+  }
+  // Se anota lo que contestó: las de tarjetas cuentan para el repaso espaciado (como siempre); la imagen y el caso, solo para el resumen
+  function anotarRespuestaReto(q, res) {
+    if (q.tarjetaId && E.tarjetas[q.tarjetaId] && !E.tarjetas[q.tarjetaId].borrado_en) { Sincro.repasar(E, q.tarjetaId, res, DISP); guardarLocal(); pedirSincro(); }
+    if (q.tipo === 'imagen' && q.id) { try { const vv = JSON.parse(localStorage.getItem('liz-practico-visto') || '{}'); vv[q.id] = Date.now(); localStorage.setItem('liz-practico-visto', JSON.stringify(vv)); } catch (e) {} }
+    reto.res.push({ curso: q.curso, ok: res === 'bien' });
+    vibrar(res === 'bien' ? 'bien' : 'mal'); sonar(res === 'bien' ? 'bien' : 'mal');
+  }
+  function siguienteReto() {
+    reto.i++; reto.fase = 'pregunta'; reto.elegida = null; reto.porque = '';
+    if (reto.i >= reto.d.preguntas.length) terminarReto();
+    pintarSuave(true);
+    arribaDeTodo();
+  }
+  function terminarReto() {
+    if (reto.fase === 'fin') return;
+    reto.fase = 'fin';
+    const r = Rt.resumen(reto.res);
+    if (!Rt.hecho(E, Date.now())) Rt.anotar(E, DISP, Date.now(), r.bien, r.total);
+    guardarLocal(); subirYa();
+    if (r.total && r.bien / r.total >= 0.7) setTimeout(() => confeti(30), 200);
+    setTimeout(() => revisarLogros('ronda'), 1400);
+    // (una sola vez) invitarlo a subir el material de los cursos que todavía no tienen tarjetas: las preguntas salen mejor de lo que dan SUS profes
+    if (reto.d.sinMaterial.length && !Object.values(E.avisos || {}).some((a) => a && a.clave === 'invita-material')) {
+      Sincro.agregar(E, 'avisos', { clave: 'invita-material', ocurrencia: 0, dispositivo: DISP, presente: true, fecha: Date.now() });
+      setTimeout(() => {
+        agregarMsg({ quien: 'liz', texto: 'Oye, ¿me pasas las presentaciones y las guías de ' + reto.d.sinMaterial.join(', ') + ' (las de Mediación Virtual)? Las preguntas me salen mucho mejor con lo que dan tus profes. Las subes en Estudiar → Mazos → Subir archivo.', animo: 'feliz' });
+        if (vista !== 'charla') { avisoCharla = true; pintarMenu(); }
+      }, 2500);
+    }
+  }
+  function pintarRetoFin(v) {
+    const r = Rt.resumen(reto.res), rac = N.racha(Object.values(E.repasos), Date.now()), extra = Rt.pomodoroExtra(E, Date.now());
+    const sinExamenes = !reto.d.examenes.length && !Ag.proximosExamenes(E, Date.now()).length;
+    let pregunta = '';
+    try { if (sinExamenes && !localStorage.getItem('liz-pregunta-parciales')) { localStorage.setItem('liz-pregunta-parciales', '1'); pregunta = '<p class="nota">¿Ya sabes cuándo son tus parciales? Si los anotas en la Agenda, te armo el reto para que llegues bien a cada uno.</p>'; } } catch (e) {}
+    v.innerHTML = '<div class="heroeFin"><div class="aura"></div><div class="placa"></div>' + lizImg(r.total && r.bien / r.total >= 0.6 ? 'feliz' : 'animo', 'g', 'salta') +
+      '<div class="comic cola-der">' + esc(reto.d.vispera ? 'Listo por hoy. Ahora, a dormir temprano: lo que más rinde mañana es haber descansado.'
+        : r.total && r.bien === r.total ? '¡Todas! Hoy estuviste on fire.' : r.total && r.bien / r.total >= 0.6 ? '¡Bien hecho! Un ratito cada día suma muchísimo.' : 'Hiciste tu reto, y eso es lo que cuenta. Mañana seguimos.') + '</div><div class="degrade"></div></div>' +
+      '<div class="grandes"><div><b>' + r.bien + '</b><small>de ' + r.total + '</small></div><div><b>' + rac + '</b><small>' + (rac === 1 ? 'día' : 'días') + ' seguidos</small></div><div><b>' + reto.d.minutos + '</b><small>minutos</small></div></div>' +
+      '<div class="panel retoRes">' + (r.domina.length ? '<p>💪 <b>Dominas:</b> ' + esc(r.domina.join(', ')) + '</p>' : '') + (r.repasar.length ? '<p>🔁 <b>Mañana repasamos:</b> ' + esc(r.repasar.join(', ')) + '</p>' : '') +
+      '<p class="suave" style="font-size:13px">Tu racha no se pierde por un día: uno libre por semana no la corta.</p></div>' +
+      (extra && !reto.d.vispera ? '<button class="pomoBt toque" data-a="ir" data-v="pomodoro"><span class="e">🍅</span><span class="t"><b>¿Un pomodoro extra de ' + esc(extra.materia) + '?</b><small>Tu ' + esc(extra.que || 'examen') + ' es ' + esc(enDias(extra.cuando)) + '</small></span><span class="chev">›</span></button>' : '') +
+      pregunta + '<div style="display:grid;gap:10px;margin-top:10px"><button class="bt grande" data-a="retoSalir">Volver a Hoy</button></div>';
+  }
+  // (22-oct-2026, tanda B, EN PAUSA) lo del estudio clínico todavía no se muestra: estas funciones quedan quietas hasta terminarlo
+  // (planes/semestre-actual.md cambió el orden: primero la regla de la familia, los códigos de los cursos y el reto del día)
+  function hoyClinico() { return ''; }
+  function pararRitual() {}
+  function empezarQuiz() { return false; }
+  function abrirRitual() { ir('hoy'); }
+  function pintarPractico(v) { v.innerHTML = ''; ir('repasar'); }
+  function pintarRitual(v) { v.innerHTML = ''; ir('hoy'); }
   function confeti(n) {
     const col = (getComputedStyle(document.documentElement).getPropertyValue('--t-confeti') || '#a98bff,#cdb4ff,#ffd166,#4cc9f0,#f72585,#6f5cae').split(',').map((s) => s.trim());   // (el confeti de la PC)
     for (let i = 0; i < (n || 22); i++) {
@@ -1511,13 +1699,25 @@
     const top = m.cuentas[0];
     const ley = Animo.EMOCIONES.map((e) => '<span><i style="background:' + e.color + '"></i>' + esc(Animo.nombre(e.k, fem())) + '</span>').join('');
     const mejor = Object.entries(m.porEmocion).filter(([, x]) => x.dias >= 2 && x.repasos >= 5).sort((a, b) => pct(b[1]) - pct(a[1]))[0];
+    // (22-oct-2026, tanda A) LA TENDENCIA: las últimas 4 semanas de 1 a 5 (barritas quietas, nada que se mueva), las semanas con parcial marcadas,
+    // y el patrón que Liz nota con una idea concreta. Se calcula UNA vez por pintado (aquí mismo), no en cada pantalla.
+    let ten = '';
+    if (Cd && m.marcados) {
+      const t = Cd.tendencia(E, ahora, 4);
+      if (t.semanas.some((s) => s.prom !== null)) {
+        ten = '<div class="tenAn"><div class="tit">Últimas 4 semanas <small>1 = muy mal · 5 = muy bien</small></div><div class="barras">' + t.semanas.map((s, i) =>
+          '<div class="sem' + (s.examen ? ' ex' : '') + '"><i style="height:' + (s.prom === null ? 4 : Math.round(16 * s.prom)) + 'px"' + (s.prom === null ? ' class="vac"' : '') + '></i>' +
+          '<b>' + (s.prom === null ? '–' : s.prom.toFixed(1).replace('.', ',')) + '</b><small>' + (i === 3 ? 'esta' : 'hace ' + (3 - i)) + (s.examen ? ' 📝' : '') + '</small></div>').join('') + '</div>' +
+          (t.patron ? '<p class="patron">' + esc(t.patron) + (t.accion ? ' <b>' + esc(t.accion) + '</b>' : '') + '</p>' : '<p class="patron suave">Cuando haya más semanas marcadas, te cuento qué patrón veo.</p>') + '</div>';
+      }
+    }
     return '<h3>🌈 Cómo te has sentido</h3><div class="panel animoPanel">' +
       (m.marcados ? '' : '<p class="nota">Cuando me digas cómo te sientes cada día (toca 😊 en Hoy), aquí lo ves en colores.</p>') +
       '<div class="semAn">' + semana + '</div>' +
       // (prueba 15) Lo que Liz le contestó cada día al marcar (queda en su diario, junto a lo que marcó)
       (s.dias.some((d) => d.respuesta) ? '<div class="respAn">' + s.dias.filter((d) => d.respuesta).reverse().slice(0, 3).map((d) => '<div class="r"><b>' +
         (d.dia === hoyD ? 'Hoy' : DIAS[new Date(d.ms).getUTCDay()]) + ' ' + d.emociones.map((k) => Animo.POR[k].e).join('') + '</b><span>💜 ' + esc(d.respuesta) + '</span></div>').join('') + '</div>' : '') +
-      '<div class="mesAn">' + mes + '</div><div class="leyAn">' + ley + '<span><i class="punto"></i>estudiaste</span></div>' +
+      '<div class="mesAn">' + mes + '</div><div class="leyAn">' + ley + '<span><i class="punto"></i>estudiaste</span></div>' + ten +
       (top ? '<div class="topAn"><span class="e">' + Animo.POR[top[0]].e + '</span><span>Lo que más sentiste este mes: <b>' + esc(Animo.nombre(top[0], fem())) + '</b> (' + top[1] + (top[1] === 1 ? ' día' : ' días') + ').<br>' +
         'Estudiaste ' + m.diasEstudio + ' de 30 días' + (m.repasos ? ', con ' + pct(m) + ' % bien' : '') + '.' +
         (mejor ? ' Los días que te sentías ' + esc(Animo.nombre(mejor[0], fem())) + ' acertaste más (' + pct(mejor[1]) + ' %).' : '') + '</span></div>' : '') +
@@ -2235,7 +2435,9 @@
         const conLab = !g.aparte && g.sesiones.some((s) => s.tipo === 'lab'), base = g.aparte && mats.find((o) => !o.aparte && 'laboratorio ' + o.clave === g.clave);
         const bt = conLab ? '<button class="bt chico labBt" data-a="separarLab" data-clave="' + esc(g.clave) + '" data-v="1">Separar el lab</button>'
           : g.aparte ? '<button class="bt chico labBt" data-a="separarLab" data-clave="' + esc(g.clave) + '" data-v="0">' + (base ? 'Juntar con la teoría' : 'Es parte de la materia') + '</button>' : '';
-        return '<li><div class="item">' + puntoMateria(g.color) + '<span class="txt"><b>' + esc(g.materia) + '</b><small>' + esc(resumen(g)) + '</small></span>' + bt + '</div></li>';
+        // (22-oct-2026) el código del curso (opcional), chiquito junto al nombre: tocarlo lo pone o lo cambia
+        const cod = '<button class="codigoBt' + (g.codigo ? '' : ' vacio') + '" data-a="codigoMateria" data-clave="' + esc(g.clave) + '" aria-label="Código del curso">' + esc(g.codigo || '+ código') + '</button>';
+        return '<li><div class="item">' + puntoMateria(g.color) + '<span class="txt"><b>' + esc(g.materia) + ' ' + cod + '</b><small>' + esc(resumen(g)) + '</small></span>' + bt + '</div></li>';
       }).join('') + '</ul></div><p class="suave notaLab">Si un laboratorio es un curso aparte (con su propia nota), toca «Separar el lab».</p>' : '') +
       // (22-oct-2026) las tutorías que da y su TCU: aparte, con su ícono (no son materias)
       (otras.length ? '<h3 class="diaHorario">Tutorías y TCU</h3><div class="panel"><ul class="lista materiasHorario">' + otras.map((g) =>
@@ -2258,11 +2460,11 @@
     const n0 = fila ? Ag.nombreClase(fila, E) : null;
     // (un laboratorio que es curso aparte se ve como "Laboratorio de X": aquí se edita "X" con "Curso aparte" marcado)
     const st = { materia: n0 ? n0.materia.replace(n0.aparte ? /^Laboratorio de / : /^$/, '') : '', dia: fila ? c.dia : Math.min(4, (N.enCR(Date.now()).dow + 6) % 7), inicio: c.inicio || '08:00', fin: c.fin || '09:50', aula: c.aula || '',
-      tipo: n0 ? n0.tipo : 'teoria', aparte: !!(n0 && n0.aparte), color: fila ? c.color || null : null, actividad: (n0 && n0.actividad) || '' };
+      tipo: n0 ? n0.tipo : 'teoria', aparte: !!(n0 && n0.aparte), color: fila ? c.color || null : null, actividad: (n0 && n0.actividad) || '', codigo: c.codigo || '' };
     // (22-oct-2026) una tutoría o el TCU: su nombre tal cual (no es una materia)
     const claveDe = (s) => (s.actividad ? s.actividad + ' ' + Ag.materiaDeClase(s.materia || s.actividad).clave : Ag.materiaDeClase(s.materia, s.tipo, s.tipo === 'lab' && s.aparte).clave);
     const clave0 = fila ? claveDe(st) : null;
-    const leer = (h) => { for (const k of ['materia', 'inicio', 'fin', 'aula']) { const el = $('#fc-' + k, h); if (el) st[k] = el.value; } };
+    const leer = (h) => { for (const k of ['materia', 'inicio', 'fin', 'aula', 'codigo']) { const el = $('#fc-' + k, h); if (el) st[k] = el.value; } };
     // (21-oct-2026) Al AGREGAR: sus materias ya escritas, para tocarlas (no se vuelve a escribir el nombre) y VARIOS días a la vez (una clase
     // por día, con la misma hora). Al editar, una sola clase: un solo día.
     st.dias = [st.dia];
@@ -2287,6 +2489,7 @@
           '<button type="button" class="' + ((fila ? i === st.dia : st.dias.includes(i)) ? 'on' : '') + '" data-dia="' + i + '">' + d + '</button>').join('') + '</div>' +
         '<div class="dos"><div><label for="fc-inicio">Empieza</label><input type="time" id="fc-inicio" value="' + esc(st.inicio) + '"></div><div><label for="fc-fin">Termina</label><input type="time" id="fc-fin" value="' + esc(st.fin) + '"></div></div>' +
         '<label for="fc-aula">Aula (si quieres)</label><input type="text" id="fc-aula" value="' + esc(st.aula) + '" placeholder="Ej.: Aula 203" maxlength="60">' +
+        (act ? '' : '<label for="fc-codigo">Código del curso (si quieres)</label><input type="text" id="fc-codigo" value="' + esc(st.codigo) + '" placeholder="Ej.: MC-4000" maxlength="12" autocapitalize="characters">') +
         '<p class="error" id="fc-err"></p><div class="botones"><button class="bt prin grande">Guardar</button>' +
         (fila ? '<button type="button" class="bt grande peligro" id="fc-borrar">🗑️ Borrar clase</button>' : '') + '<button type="button" class="bt grande" id="fc-volver">Volver</button></div></form>');
       h.onclick = (ev) => {
@@ -2305,7 +2508,7 @@
         if (m) {
           leer(h);
           const g = mats[Number(m.dataset.mat)];
-          st.materia = g.aparte ? g.materia.replace(/^Laboratorio de /, '') : g.materia; st.color = g.color;
+          st.materia = g.aparte ? g.materia.replace(/^Laboratorio de /, '') : g.materia; st.color = g.color; st.codigo = g.codigo || '';
           if (g.aparte) { st.tipo = 'lab'; st.aparte = true; } else st.aparte = false;
           dibujar();
         }
@@ -2319,6 +2522,7 @@
         if (st.actividad && !String(st.materia || '').trim()) st.materia = Ag.ACTIVIDADES[st.actividad].nombre;      // (sin nombre: "Tutoría" / "TCU")
         if (fila && claveDe(st) !== clave0) st.color = null;     // (otra materia: su color)
         const errorTxt = (e) => { $('#fc-err', h).textContent = e.charAt(0).toUpperCase() + e.slice(1) + '.'; };
+        if (st.codigo && !Ag.normCodigo(st.codigo)) return errorTxt('el código se escribe como MC-4000 (letras, guion y números)');
         if (fila) {
           const r = Ag.editarClase(E, fila.id, st, DISP);
           if (r.error) return errorTxt(r.error);
@@ -2739,6 +2943,7 @@
         (nuevos.length ? ' MAZOS NUEVOS (los agregó él, ya los ves): ' + nuevos.slice(0, 6).map((m) => '«' + m.nombre + '» (' + m.n + ' tarjetas, ' + cuandoM(m.desde) + ')').join(', ') + (nuevos.length > 6 ? ' y ' + (nuevos.length - 6) + ' más' : '') + '.' : ''),
       mazos.length ? 'Sus mazos (' + mazos.length + '): ' + mazos.slice().sort((a, b) => b.n - a.n).slice(0, 12).map((m) => m.nombre + ' (' + m.n + ')').join(', ') + (mazos.length > 12 ? '…' : '') + '.' : 'Todavía no tiene mazos.',
       'Hoy repasó ' + hoyR.length + ' (' + hoyR.filter((r) => r.resultado === 'bien').length + ' bien). Racha: ' + N.racha(reps) + ' días.',
+      Rt ? Rt.partePrompt(E, ahora) : '',          // (22-oct-2026: el reto del día: si ya lo hizo; invitarlo una vez, sin presión)
       exs.length ? 'Próximos exámenes: ' + exs.join('; ') + '.' : 'No tiene exámenes anotados.',
       hoyAg.length ? 'Su agenda de hoy: ' + hoyAg.join('; ') + '.' : 'Nada en su agenda de hoy.',
       Ag.textoHorario(E, ahora),          // (21-oct-2026) su horario POR MATERIA (teoría y laboratorio de una materia = una sola)
@@ -2828,7 +3033,10 @@
       animoEl: Animo.deHoy(E), animoDijo: dijo, femenino: fem(), diarioAnimo: Animo.PIDE_RESUMEN.test(texto) ? Animo.resumenTexto(E, Date.now(), { fem: fem() }) : '',
       // (prueba 17) cómo se siente él, armado con LA MISMA función que la compu (animo.js → partePrompt): liz-cerebro lo usa tal cual
       // (19-oct-2026) + lo último que dijo Liz: si ya le propuso respirar, no lo repite
-      animoTexto: Animo.partePrompt(E, Date.now(), { dueno: perfil.nombre || '', fem: fem(), consulta: texto, dijo, recientes: lizDijo }) });
+      // (22-oct-2026, tanda A) + crisis (solo con el protocolo encendido), señales de alerta, perspectiva real y, si pregunta por su diario, la
+      // tendencia (js/cuidado.js): va dentro de animoTexto, así liz-cerebro no cambia. El cerebro la lee hasta ~1.800 letras: lo urgente va primero.
+      animoTexto: [Cd ? Cd.partePrompt(texto, cuidadoOpc()) : '', Animo.partePrompt(E, Date.now(), { dueno: perfil.nombre || '', fem: fem(), consulta: texto, dijo, recientes: lizDijo }),
+        Cd && Animo.PIDE_RESUMEN.test(texto) ? Cd.tendenciaTexto(E, Date.now()) : ''].filter(Boolean).join('\n') });
     pensando(false);
     if (r.sinInternet || (r.error && !r.dice)) {
       const loc = respuestaLocal();
@@ -2859,6 +3067,8 @@
     if (anotado) dice = enFuturo(dice);
     // (19-oct-2026) Si ya le propuso respirar hace poco y él no habla de eso, esa frase no se repite (animo.js)
     dice = Animo.sinRespirarOtraVez(dice, lizDijo, texto, Date.now());
+    // (22-oct-2026, tanda A) PROTOCOLO DE CRISIS (si está encendido): si habló de una crisis y la respuesta no trae ninguna vía humana, se le agrega
+    if (Cd) { const f = Cd.filtrarRespuesta(dice, texto, cuidadoOpc()); if (f.cambiada) { dice = f.dice; animo = 'tierna'; } }
     if (r.pegar) extra = { html: '<button class="bt chico prin" data-a="pegarTexto">📋 Pegar el texto</button>' };
     agregarMsg({ quien: 'liz', texto: dice, extra, animo: r.limite ? 'dormida' : animo });
     if (r.pegar) setTimeout(() => hojaPegar(), 900);
@@ -3049,6 +3259,37 @@
   // ---------- Botones (data-a) ----------
   const A = {
     ir: (d) => ir(d.v),
+    // (22-oct-2026) EL RETO DEL DÍA
+    reto: () => abrirReto(),
+    retoSalir: () => { if (reto && reto.fase !== 'fin' && reto.res.length) terminarReto(); reto = null; ir('hoy'); },
+    retoVer: () => { if (!reto) return; reto.fase = 'ver'; pintarSuave(true); },
+    retoAuto: (d) => { if (!reto || reto.fase !== 'ver') return; const q = reto.d.preguntas[reto.i]; anotarRespuestaReto(q, d.r); if (d.r === 'bien') gestoLiz('celebrar'); siguienteReto(); },
+    retoOpcion: (d) => {
+      if (!reto || reto.fase !== 'pregunta') return;
+      const q = reto.d.preguntas[reto.i];
+      reto.elegida = Number(d.i);
+      reto.fase = 'feedback';
+      const bien = reto.elegida === q.correcta;
+      anotarRespuestaReto(q, bien ? 'bien' : 'mal');
+      if (bien) confeti(10);
+      pintarSuave(true);
+    },
+    retoSig: () => { if (reto) siguienteReto(); },
+    // "¿Por qué?" (en verdadero/falso): Liz lo explica con la tarjeta (su respuesta y el fragmento de donde salió); sin internet, el fragmento
+    retoPorQue: async () => {
+      if (!reto) return;
+      const q = reto.d.preguntas[reto.i], t = E.tarjetas[q.tarjetaId];
+      reto.porque = 'Pensando…';
+      pintarSuave(true);
+      let txt = q.explicacion || '';
+      if (t && puedeCerebro()) {
+        const r = await cerebro('explicar', { tarjeta: { pregunta: t.pregunta, respuesta: t.respuesta, contexto: t.contexto || '', fuente: t.fuente || '' }, texto: '¿Por qué esa es la respuesta? Dímelo en dos frases.', hilo: [], yaRespondio: true });
+        if (r && r.dice) txt = r.dice;
+      }
+      if (!reto) return;
+      reto.porque = txt || 'Así lo dicen tus apuntes: ' + q.respuesta;
+      pintarSuave(true);
+    },
     repasarHoy: () => empezar(Org.paraRepasar(E, { soloHoy: true }), 'Las de hoy'),
     // (21-oct-2026) un día pesado: solo unas poquitas (las primeras: las que más tocan)
     repasarSuave: () => empezar(Org.paraRepasar(E, { soloHoy: true }).slice(0, Animo.tarjetasSugeridas(Animo.deHoy(E), 999)), 'Con calma'),
@@ -3145,6 +3386,17 @@
     // Mi horario (prueba 14)
     miHorario: () => hojaHorario(),
     // (21-oct-2026) "Separar el lab" (es otro curso) / "Juntar con X"
+    // (22-oct-2026) el código del curso de una materia (en todas sus clases)
+    codigoMateria: async (d) => {
+      const g = Ag.horario(E).find((x) => x.clave === d.clave);
+      if (!g) return;
+      const t = await pedirTexto('Código de ' + g.materia, g.codigo || '', 'Ej.: MC-4000 (vacío = quitarlo)');
+      if (t === null) return hojaHorario();
+      const n = Ag.fijarCodigo(E, g.clave, t.trim(), DISP);
+      if (n < 0) { avisar('El código se escribe como MC-4000 (letras, guion y números).'); return hojaHorario(); }
+      if (n) { cambio(); avisar('Listo: ' + g.materia + ' es ' + Ag.normCodigo(t) + '.'); }
+      hojaHorario();
+    },
     separarLab: (d) => { const n = Ag.separarLab(E, d.clave, d.v === '1', DISP); if (n) { cambio(); avisar(d.v === '1' ? 'Listo: el laboratorio ahora es un curso aparte.' : 'Listo: el laboratorio es parte de la materia.'); } hojaHorario(); },
     nuevaClase: () => formClase(null),
     editarClase: (d) => { const f = E.eventos[d.id]; if (f && Ag.esClase(f)) formClase(f); },
@@ -3484,6 +3736,8 @@
         (est.on ? '<li><div class="item"><span class="ico">🕖</span><span class="txt"><b>¿A qué hora?</b></span><select id="aHoraEst" class="selChico">' + horasEst + '</select></div></li>' : '') : '') +
       // (19-oct-2026) "Preguntarme cómo me siento" (el aviso de las 10 a. m. si hoy no me lo ha dicho)
       (activo ? '<li><button class="item" id="aAnimo"><span class="ico">😊</span><span class="txt"><b>Preguntarme cómo me siento</b></span><span class="interruptor' + (animoAvisoPref() ? ' on' : '') + '"></span></button></li>' : '') +
+      // (22-oct-2026, tanda B) el pre-lab de la víspera (lo saben la compu y el servidor: queda en "avisos" como pref:prelab)
+      (Cl ? '<li><button class="item" id="aPrelab"><span class="ico">🧪</span><span class="txt"><b>Pre-lab la noche antes</b><small>A las 7:30 p. m., antes de cada laboratorio</small></span><span class="interruptor' + (Cl.prefPrelab(E) ? ' on' : '') + '"></span></button></li>' : '') +
       '</ul></div>' + (activo && est.on ? '<p class="suave ayudaAvisos">📚 Te recuerdo estudiar una vez al día si te quedan tarjetas de hoy (nunca mientras estás en clase). Automático = 6 p. m. (o al salir de clase).</p>' : '') +
       (activo && animoAvisoPref() ? '<p class="suave ayudaAvisos">😊 Si a las 10 a. m. todavía no me has dicho cómo te sientes, te pregunto (una vez al día; nunca digo lo que respondes).</p>' : '') +
       ayuda + '<p class="error" id="aErr"></p>' +
@@ -3495,6 +3749,7 @@
       const sel = $('#aHoraEst', h);
       if (sel) sel.onchange = async () => { const p = estudioPref(); p.hora = sel.value; await guardarEstudio(p, h); avisar(p.hora ? 'Te recuerdo estudiar a las ' + (p.hora > 12 ? p.hora - 12 : p.hora) + ':00.' : 'Te lo recuerdo cuando estés libre.'); };
     }
+    if (Cl && $('#aPrelab', h)) $('#aPrelab', h).onclick = () => { const si = !Cl.prefPrelab(E); Cl.anotarPrefPrelab(E, si, DISP); guardarLocal(); subirYa(); avisar(si ? '🧪 Te recuerdo el pre-lab la noche antes de cada laboratorio.' : 'Listo, sin el aviso del pre-lab.'); hojaAvisos(); };
     if (activo) estadoServidorAvisos().then((t) => { const el = $('#aServidor', h); if (el) el.textContent = t; });
     // (prueba 17) "Probar aviso" por el camino DE VERDAD (el servidor → Apple → este iPhone), no uno hecho aquí mismo: así, si llega, llegan
     // todos; y si no, dice POR QUÉ (antes mostraba un aviso local que salía siempre, aunque los de verdad no funcionaran).
@@ -3896,6 +4151,12 @@
     sabida: (n) => { const t = Org.vivos(E.tarjetas).find((x) => Org.lim(x.pregunta).includes(Org.lim(n))); if (t) { Org.marcarSabida(E, t.id, true, DISP); cambio(); } return !!t; },
     // (21-oct-2026) LOS LOGROS, para las pruebas y las fotos. logrosDemo: SOLO en ?demo (la lista y las direcciones locales las trae la
     // herramienta de pruebas; nunca se publican)
+    // (22-oct-2026, tanda A) el cuidado, para las pruebas (?demo: los datos que mandaría la compu; y lo que armaría para el cerebro)
+    cuidadoDemo: (d) => { if (!DEMO) return false; cuidadoDemo = d || null; return true; },
+    // (22-oct-2026) el reto del día, para herramientas/probar-reto-movil.js
+    reto: { abrir: () => abrirReto(), estado: () => reto, hecho: () => !!(Rt && Rt.hecho(E, Date.now())), datos: () => E },
+    cuidado: { opc: () => cuidadoOpc(), prompt: (t) => (Cd ? Cd.partePrompt(t, cuidadoOpc()) : ''), filtrar: (d, t) => (Cd ? Cd.filtrarRespuesta(d, t, cuidadoOpc()) : { dice: d, cambiada: false }),
+      porSuCuenta: () => revisarCarino(), tendencia: () => (Cd ? Cd.tendencia(E, Date.now(), 4) : null) },
     logrosDemo: (lista, trailer, urls) => { if (!DEMO) return false; perfil.logros = { v: 'demo', carpeta: 'demo/logros/', lista: lista || [], trailer: trailer || null }; lgDemoUrls = urls || {}; pintarSuave(true); return true; },
     logros: { revisar: (m, mas) => revisarLogros(m || 'prueba', mas), estado: () => Lg.estado(E), cola: () => lgCola.slice(), abrir: (id) => abrirLogro(id),
       sinRed: (b) => { lgSinRed = !!b; }, entrarEstudiar: () => revisarEntradaEstudiar(), volver: (desde) => { lgVolverDesde = desde; volvioLogros(); },

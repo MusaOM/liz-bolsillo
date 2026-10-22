@@ -1,0 +1,19 @@
+{
+ "id": "m-histoplasma-conidios",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Microscopía (cultivo)",
+ "respuesta": "Macroconidios tuberculados de Histoplasma capsulatum.",
+ "claves": "Dos macroconidios tuberculados. H. capsulatum crece en suelo contaminado con excremento de murciélagos o aves; las esporas se respiran al remover la tierra; la histoplasmosis no se pasa de persona a persona.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL 4023)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Tuberculate macroconida of the Jamaican isolate of Histoplasma capsulatum PHIL 4023 lores.jpg",
+  "autor": "desconocido",
+  "credito": "http://phil.cdc.gov/phil_images/20030624/4/PHIL_4023_lores.jpg",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:Tuberculate_macroconida_of_the_Jamaican_isolate_of_Histoplasma_capsulatum_PHIL_4023_lores.jpg",
+  "descripcionOriginal": "ID#: 4023 Description: This photomicrograph shows two tuberculate macroconida of the Jamaican isolate of Histoplasma capsulatum. Histoplasma capsulatum grows in soil, and material contaminated with bat or bird droppings. Spores become airborne when contaminated soil is disturbed, and breathing the spores causes histoplasmosis, a disease not transmitted from person to person. Content Providers(s): CDC/Dr. Libero Ajello Creation Date: 1968 Copyright Restrictions: None - This image is in the public domain and thus free of any copyright restrictions. As a matter of courtesy we request that the content provider be credited and notified in any public or private usage of this image."
+ }
+}

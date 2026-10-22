@@ -1,0 +1,19 @@
+{
+ "id": "p-hymenolepis",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Heces",
+ "respuesta": "Huevo de Hymenolepis nana.",
+ "claves": "Ovalado o casi esférico, de 40-60 por 30-50 µm (más chico que el de H. diminuta). En la membrana interna tiene dos polos de donde salen 4 a 8 filamentos polares, entre las dos membranas.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL 4836)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "4836 lores.jpg",
+  "autor": "CDC",
+  "credito": "https://phil.cdc.gov/Details.aspx?pid=4836",
+  "licencia": "CC0",
+  "licenciaUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "url": "https://commons.wikimedia.org/wiki/File:4836_lores.jpg",
+  "descripcionOriginal": "This photomicrograph reveals ultrastructural details exhibited by a single Hymenolepis nana tapeworm ovum. H. nana eggs are oval, or subspherical in shape, and are 40µm-60µm X 30µm-50µm in size, which are smaller than those of H. diminuta. On the inner shell membrane, are two poles, from which 4-8 polar filaments spread out between its inner and outer shell membranes."
+ }
+}

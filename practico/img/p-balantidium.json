@@ -1,0 +1,18 @@
+{
+ "id": "p-balantidium",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Microscopía",
+ "respuesta": "Trofozoíto de Balantidium coli.",
+ "claves": "Una célula ovalada cubierta de cilios cortos. B. coli es el único ciliado capaz de parasitar a los humanos.",
+ "fuenteClaves": "OpenStax Microbiology, sección 5.1",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (5.1 Unicellular Eukaryotic Parasites)",
+  "autor": "modification of work by Kouassi RYW, McGraw SW, Yao PK, Abou-Bacar A, Brunet J, Pesson B, Bonfoh B, N’goran EK & Candolfi E",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/5-1-unicellular-eukaryotic-parasites",
+  "archivoOriginal": "OSC_Microbio_05_01_balan.jpg",
+  "descripcionOriginal": "This specimen of the ciliate Balantidium coli is a trophozoite form isolated from the gut of a primate. B. coli is the only ciliate capable of parasitizing humans. (credit: modification of work by Kouassi RYW, McGraw SW, Yao PK, Abou-Bacar A, Brunet J, Pesson B, Bonfoh B, N’goran EK & Candolfi E)"
+ }
+}

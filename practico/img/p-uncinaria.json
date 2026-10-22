@@ -1,0 +1,19 @@
+{
+ "id": "p-uncinaria",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Heces, montaje húmedo",
+ "respuesta": "Huevo de uncinaria (Ancylostoma duodenale o Necator americanus).",
+ "claves": "Un huevo embrionado; por el huevo NO se puede distinguir si es de Ancylostoma duodenale o de Necator americanus.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Necator americanus, Ancylostoma duodenale egg.jpg",
+  "autor": "CDC, Courtesy: Public Health Image Library",
+  "credito": "http://www.publicdomainfiles.com/show_file.php?id=13534156213852",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:Necator_americanus,_Ancylostoma_duodenale_egg.jpg",
+  "descripcionOriginal": "This embryonated egg is indistinguishable between the Ancylostoma duodenale or Necator americanus hookworm."
+ }
+}

@@ -1,0 +1,19 @@
+{
+ "id": "p-histolytica",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Heces, tinción tricrómica",
+ "respuesta": "Trofozoíto de Entamoeba histolytica con eritrocitos fagocitados.",
+ "claves": "Dentro del trofozoíto se ven glóbulos rojos fagocitados, como inclusiones oscuras y redondas.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Micrograph of Entamoeba histolytica.jpg",
+  "autor": "CDC/ Dr. Mae Melvin; Dr. Greene",
+  "credito": "CDC/ Dr. Mae Melvin; Dr. Greene (1966). Entamoeba histolytica . Public Health Image Library (PHIL) at Centers for Disease Control and Prevention (CDC) at the U.S. Department of Health & Human Services . - \"Copyright Restrictions: None - This image is in the public domain and thus free of any copyright restrictions.\"",
+  "licencia": "CC0",
+  "licenciaUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "url": "https://commons.wikimedia.org/wiki/File:Micrograph_of_Entamoeba_histolytica.jpg",
+  "descripcionOriginal": "This photomicrograph of a trichrome-stained specimen revealed the presence of an Entamoeba histolytica trophozoite, within which a number of phagocytized erythrocytes could be seen as dark, round inclusions."
+ }
+}

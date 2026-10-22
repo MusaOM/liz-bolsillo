@@ -1,0 +1,18 @@
+{
+ "id": "b-cdifficile",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Microscopía",
+ "respuesta": "Clostridioides difficile.",
+ "claves": "Bacilo grampositivo. Causa colitis grave y diarrea, a menudo después de que los antibióticos eliminan la microbiota normal del intestino.",
+ "fuenteClaves": "OpenStax Microbiology, sección 4.4",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (4.4 Gram-Positive Bacteria)",
+  "autor": "modification of work by Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/4-4-gram-positive-bacteria",
+  "archivoOriginal": "OSC_Microbio_04_04_Clostridia.jpg",
+  "descripcionOriginal": "Clostridioides difficile, a gram-positive, rod-shaped bacterium, causes severe colitis and diarrhea, often after the normal gut microbiota is eradicated by antibiotics. (credit: modification of work by Centers for Disease Control and Prevention)"
+ }
+}

@@ -1,0 +1,18 @@
+{
+ "id": "m-trichophyton-cultivo",
+ "area": "micologia",
+ "areaNombre": "Micología",
+ "pista": "Cultivo",
+ "respuesta": "Trichophyton rubrum en agar Sabouraud dextrosa.",
+ "claves": "Para diagnosticar las tiñas, los dermatofitos se cultivan en agar Sabouraud. T. rubrum es una de las causas más comunes de tiña en varias partes del cuerpo.",
+ "fuenteClaves": "OpenStax Microbiology, sección 21.4",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (21.4 Mycoses of the Skin)",
+  "autor": "Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/21-4-mycoses-of-the-skin",
+  "archivoOriginal": "OSC_Microbio_21_04_dermatophy.jpg",
+  "descripcionOriginal": "To diagnose tineas, the dermatophytes may be grown on a Sabouraud dextrose CC agar plate. This culture contains a strain of Trichophyton rubrum, one of the most common causes of tineas on various parts of the body. (credit: Centers for Disease Control and Prevention)"
+ }
+}

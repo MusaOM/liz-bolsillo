@@ -1,0 +1,18 @@
+{
+ "id": "b-neisseria-chocolate",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Cultivo",
+ "respuesta": "Colonias de Neisseria meningitidis en agar chocolate.",
+ "claves": "Colonias redondas en forma de domo sobre el fondo café del agar chocolate.",
+ "fuenteClaves": "OpenStax Microbiology, sección 4.2",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (4.2 Proteobacteria)",
+  "autor": "Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/4-2-proteobacteria",
+  "archivoOriginal": "OSC_Microbio_04_02_Neisseria.jpg",
+  "descripcionOriginal": "Neisseria meningitidis growing in colonies on a chocolate agar plate. (credit: Centers for Disease Control and Prevention)"
+ }
+}

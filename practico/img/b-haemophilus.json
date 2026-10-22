@@ -1,0 +1,18 @@
+{
+ "id": "b-haemophilus",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Cultivo",
+ "respuesta": "Cultivo de Haemophilus influenzae en agar chocolate.",
+ "claves": "Crece en agar chocolate: un disco café con estrías blancas de crecimiento.",
+ "fuenteClaves": "OpenStax Microbiology, sección 22.2",
+ "imagen": {
+  "fuente": "OpenStax Microbiology (22.2 Bacterial Infections of the Respiratory Tract)",
+  "autor": "modification of work by Centers for Disease Control and Prevention",
+  "licencia": "CC BY-NC-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-nc-sa/4.0/",
+  "url": "https://openstax.org/books/microbiology/pages/22-2-bacterial-infections-of-the-respiratory-tract",
+  "archivoOriginal": "OSC_Microbio_22_02_HemoInflu.jpg",
+  "descripcionOriginal": "Culture of Haemophilus influenzae on a chocolate agar plate. (credit: modification of work by Centers for Disease Control and Prevention)"
+ }
+}

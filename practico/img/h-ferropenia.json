@@ -1,0 +1,19 @@
+{
+ "id": "h-ferropenia",
+ "area": "hematologia",
+ "areaNombre": "Hematología",
+ "pista": "Frotis de sangre periférica",
+ "respuesta": "Anemia microcítica e hipocrómica (por falta de hierro).",
+ "claves": "Un caso muy avanzado de la anemia microcítica e hipocrómica típica de la deficiencia de hierro: el VCM era de 55 fL (referencia 80-94 fL).",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Iron-deficiency Anemia, Peripheral Blood Smear (4422704616).jpg",
+  "autor": "Ed Uthman from Houston, TX, USA",
+  "credito": "Iron-deficiency Anemia, Peripheral Blood Smear Uploaded by CFCF",
+  "licencia": "CC BY 2.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by/2.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Iron-deficiency_Anemia,_Peripheral_Blood_Smear_(4422704616).jpg",
+  "descripcionOriginal": "This is a trashy smear, but it does show an extremely advanced case of the microcytic/hypochromic anemia characteristic of iron deficiency. The mean corpuscular volume (MCV) was 55 fL (reference range: 80 - 94 fL). Pathological and histological images courtesy of Ed Uthman at flickr."
+ }
+}

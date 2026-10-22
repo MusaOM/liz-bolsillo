@@ -1,0 +1,19 @@
+{
+ "id": "b-ecoli-gram",
+ "area": "bacteriologia",
+ "areaNombre": "Bacteriología",
+ "pista": "Tinción de Gram",
+ "respuesta": "Escherichia coli: bacilos gramnegativos.",
+ "claves": "Bacilos rosados: E. coli se decolora en la tinción de Gram y toma la safranina (1000x, inmersión en aceite).",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons y OpenStax Microbiology, sección 2.4",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Gram negative stain e coli.jpg",
+  "autor": "Owashxd",
+  "credito": "Own work",
+  "licencia": "CC0",
+  "licenciaUrl": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+  "url": "https://commons.wikimedia.org/wiki/File:Gram_negative_stain_e_coli.jpg",
+  "descripcionOriginal": "Gram negative staining of Escherichia coll (1000x oil immersion)."
+ }
+}

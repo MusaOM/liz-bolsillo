@@ -1,0 +1,19 @@
+{
+ "id": "p-trichomonas",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Secreción vaginal, montaje húmedo",
+ "respuesta": "Trichomonas vaginalis en un montaje húmedo de secreción vaginal.",
+ "claves": "Muchos protozoos T. vaginalis en la secreción vaginal: lleva al diagnóstico de tricomoniasis, una infección de transmisión sexual muy común.",
+ "fuenteClaves": "la descripción del archivo en Wikimedia Commons (CDC PHIL 14500)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "14500 lores.jpg",
+  "autor": "CDC/ Joe Miller",
+  "credito": "https://phil.cdc.gov/Details.aspx?pid=14500",
+  "licencia": "Public domain",
+  "licenciaUrl": null,
+  "url": "https://commons.wikimedia.org/wiki/File:14500_lores.jpg",
+  "descripcionOriginal": "This photomicrograph of a wet-mounted vaginal discharge specimen, revealed numbers of Trichomonas vaginalis protozoan parasites, leading to a diagnosis of trichomoniasis, which is a very common sexually transmitted disease (STD) caused by the protozoan, T. vaginalis. Although symptoms of the disease vary, most women and men, who harbor the parasite, are unaware that they are infected."
+ }
+}

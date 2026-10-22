@@ -1,0 +1,19 @@
+{
+ "id": "h-eosinofilo",
+ "area": "hematologia",
+ "areaNombre": "Hematología",
+ "pista": "Frotis de sangre",
+ "respuesta": "Eosinófilo.",
+ "claves": "Núcleo casi siempre de dos lóbulos y gránulos rojo anaranjado brillante. Son el 1-3 % de los leucocitos; ayudan contra los parásitos y en las alergias.",
+ "fuenteClaves": "OpenStax Microbiology, sección 17.3 (tabla de los elementos de la sangre)",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Blood-eosinophil2.jpg",
+  "autor": "Echinaceapallida",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 4.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Blood-eosinophil2.jpg",
+  "descripcionOriginal": "Blood smear with eosinophil, erythrocytes, and platelets"
+ }
+}

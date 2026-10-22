@@ -1,0 +1,19 @@
+{
+ "id": "p-enterobius",
+ "area": "parasitologia",
+ "areaNombre": "Parasitología",
+ "pista": "Cinta adhesiva perianal",
+ "respuesta": "Huevo de Enterobius vermicularis (oxiuro).",
+ "claves": "Mide 50-60 por 20-30 µm y suele estar parcialmente embrionado. La hembra pone los huevos en los pliegues perianales: se buscan con la cinta adhesiva y se ven al microscopio.",
+ "fuenteClaves": "CDC DPDx (Laboratory Identification of Parasites), Enterobiasis",
+ "imagen": {
+  "fuente": "Wikimedia Commons",
+  "titulo": "Enterobius vermicularis cort.jpg",
+  "autor": "J3D3",
+  "credito": "Own work",
+  "licencia": "CC BY-SA 3.0",
+  "licenciaUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+  "url": "https://commons.wikimedia.org/wiki/File:Enterobius_vermicularis_cort.jpg",
+  "descripcionOriginal": "Egg of Enterobius vermicularis, natural color"
+ }
+}
