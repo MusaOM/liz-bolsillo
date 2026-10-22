@@ -12,7 +12,58 @@
   else raiz.Agenda = fabrica(raiz.Nucleo, raiz.Sincro);
 })(typeof self !== 'undefined' ? self : this, function (Nucleo, Sincro) {
   const REPITE = ['diario', 'semanal', 'mensual'];
-  const QUE = ['examen', 'parcial', 'entrega', 'quiz'];
+  const QUE = ['examen', 'parcial', 'entrega', 'quiz', 'presentacion'];
+  // (21-oct-2026) ¿Un RECORDATORIO es importante? (habla de un parcial, quiz, examen, presentación, entrega…): entonces, además de a su hora,
+  // Liz avisa 3 días antes (18:00) y el día antes (19:00), como con un examen. Lo mismo en el servidor (supabase/avisos.sql → liz_importante).
+  // (+ trámites que se le olvidan: matrícula, pagos, becas, inscripciones, retiros, citas de la U)
+  const IMPORTANTE = /(parcial|examen|quiz|presentaci[oó]n|exposici[oó]n|entrega|entregar|defensa|evaluaci[oó]n|prueba|r[uú]brica|proyecto|informe|reporte|matr[ií]cula|matricular|pago|pagar|beca|inscripci[oó]n|inscribir|retiro|tr[aá]mite|prematr[ií]cula|cita)/i;
+  const importante = (texto) => IMPORTANTE.test(String(texto || ''));
+  // (21-oct-2026) LA INTENSIDAD de un recordatorio (datos.nivel; si no la eligió, se deduce del texto). La autora: "las matrículas se recuerdan
+  // 1 día antes y el mismo día temprano, incluso varias veces al día hasta que marque listo; los aranceles, con menos intensidad".
+  //   insistente: el día antes (19:00), ese día temprano (7:00), a la hora y después cada 3 h (hasta las 9 p. m.) mientras no lo marque hecho
+  //   importante: 3 días antes (18:00), el día antes (19:00) y a la hora          suave: el día antes (19:00) y a la hora
+  //   normal: a la hora (como siempre). Lo mismo en el servidor (supabase/avisos.sql → liz_nivel). Uno que se repite: siempre normal.
+  const NIVELES = { normal: 'Normal', suave: 'Suave', importante: 'Importante', insistente: 'Insistente' };
+  const INSISTE = /(matr[ií]cula|matricular|prematr[ií]cula|inclusi[oó]n|cita de matr|retiro de matr|inscripci[oó]n|inscribir)/i;
+  const SUAVE = /(arancel|cuota|pagar|pago|recargo)/i;
+  function nivelDe(r) {
+    if (!r || r.repite) return 'normal';
+    const n = r.datos && NIVELES[r.datos.nivel] ? r.datos.nivel : null;
+    if (n) return n;
+    const t = String(r.texto || '');
+    return SUAVE.test(t) ? 'suave' : INSISTE.test(t) ? 'insistente' : importante(t) ? 'importante' : 'normal';
+  }
+  // Los avisos de MÁS (los de antes y los de después de la hora), según su intensidad
+  function avisosExtra(r) {
+    const nivel = nivelDe(r), c = Nucleo.enCR(r.cuando), out = [];
+    const a = (suf, ms, texto) => out.push({ clave: r.id + ':' + suf, ms, texto });
+    if (nivel === 'importante') a('3d', Nucleo.deCR(c.y, c.m, c.d - 3, 18, 0), 'en 3 días: ' + r.texto + ' (' + Nucleo.fechaTxt(r.cuando) + '). ¿Lo vamos preparando?');
+    if (nivel !== 'normal') a('1d', Nucleo.deCR(c.y, c.m, c.d - 1, 19, 0), 'mañana: ' + r.texto + (nivel === 'suave' ? '.' : '. ¿Ya está listo?'));
+    if (nivel === 'insistente') {
+      const temprano = Nucleo.deCR(c.y, c.m, c.d, 7, 0);
+      if (r.cuando - temprano >= 30 * Nucleo.MIN) a('7h', temprano, 'hoy: ' + r.texto + ' (a las ' + Nucleo.horaCR(r.cuando) + '). ¡Que no se te pase!');
+      const tope = Nucleo.deCR(c.y, c.m, c.d, 21, 0);
+      for (let k = 1; k <= 5 && r.cuando + k * 3 * Nucleo.H <= tope; k++) a('r' + k, r.cuando + k * 3 * Nucleo.H, 'todavía no lo marcas listo: ' + r.texto + '. ¿Ya lo hiciste?');
+    }
+    return out;
+  }
+  const avisosImportante = avisosExtra;      // (nombre de antes)
+  // (21-oct-2026) POR ENTREGAR (arriba de la Agenda del celular y del calendario de la compu): las entregas anotadas y los recordatorios o
+  // eventos que dicen "entregar", de los próximos 45 días, y los que se le pasaron sin marcar (hasta 7 días). Lo más urgente primero.
+  function porEntregar(E, ahora) {
+    ahora = ahora || Date.now();
+    const l = [];
+    for (const x of proximosExamenes(E, ahora - 12 * Nucleo.H)) if (x.que === 'entrega' && x.cuando < ahora + 45 * Nucleo.DIA)
+      l.push({ tabla: 'examenes', id: x.id, ms: x.cuando, titulo: (x.materia || 'Entrega') + (x.nota ? ': ' + x.nota : ''), sub: 'Entrega' });
+    const vistos = new Set();
+    for (const x of rango(E, ahora - 7 * Nucleo.DIA, ahora + 45 * Nucleo.DIA)) {
+      if (x.tabla === 'examenes' || x.tipo === 'clase' || x.hecho || vistos.has(x.id) || !/entreg/i.test(x.titulo || '')) continue;
+      if (x.ms < ahora && (x.tabla !== 'recordatorios' || x.repite)) continue;          // (un evento que ya pasó, o uno que se repite: no queda "atrasado")
+      vistos.add(x.id);
+      l.push({ tabla: x.tabla, id: x.id, ms: x.ms, titulo: x.titulo, sub: x.materia || '' });
+    }
+    return l.sort((a, b) => a.ms - b.ms).slice(0, 6);
+  }
   const vivos = (o) => Object.values(o || {}).filter((x) => x && !x.borrado_en);
   // (Liz 1.0 · prueba 14) Dos cosas especiales que van en las MISMAS tablas (así se sincronizan sin tocar la sincronización):
   //  · el FIN DE UN BLOQUE del pomodoro del celular = un recordatorio OCULTO (datos.pomodoro): solo sirve para que el servidor mande el
@@ -34,24 +85,36 @@
     const titulo = txt(d.titulo, 120), e = validar(d.cuando);
     if (!titulo) return { error: 'falta el título' };
     if (e) return { error: e };
+    const datos = Object.assign({}, d.datos || {});
+    if (ACTIVIDADES[d.actividad]) datos.actividad = d.actividad;        // (22-oct-2026: una tutoría o el TCU, como evento suelto)
     return { ok: true, fila: Sincro.cambiar(E, 'eventos', { id: d.id || Nucleo.uuid(), titulo, cuando: d.cuando, materia: txt(d.materia, 60) || null,
-      repite: rep(d.repite), nota: txt(d.nota, 300) || null, creada: Date.now(), borrado_en: null, datos: d.datos || {} }, disp) };
+      repite: rep(d.repite), nota: txt(d.nota, 300) || null, creada: Date.now(), borrado_en: null, datos }, disp) };
   }
   function crearRecordatorio(E, d, disp) {
     const texto = txt(d.texto, 160), e = validar(d.cuando);
     if (!texto) return { error: 'falta qué te recuerdo' };
     if (e) return { error: e };
+    const datos = Object.assign({}, d.datos || {});
+    if (NIVELES[d.nivel]) datos.nivel = d.nivel;          // (21-oct-2026: la intensidad, si la eligió)
     return { ok: true, fila: Sincro.cambiar(E, 'recordatorios', { id: d.id || Nucleo.uuid(), texto, cuando: d.cuando, materia: txt(d.materia, 60) || null,
-      repite: rep(d.repite), hecho: null, creada: d.creada || Date.now(), borrado_en: null, datos: d.datos || {} }, disp) };
+      repite: rep(d.repite), hecho: null, creada: d.creada || Date.now(), borrado_en: null, datos }, disp) };
   }
   function crearExamen(E, d, disp) {
     const materia = txt(d.materia, 80), e = validar(d.cuando);
     if (!materia) return { error: 'falta la materia' };
     if (e) return { error: e };
     const que = QUE.includes(String(d.que || '').toLowerCase()) ? String(d.que).toLowerCase() : 'examen';
+    const datos = Object.assign({}, d.datos || {});
+    if (PARTES[d.parte]) datos.parte = d.parte;
     return { ok: true, fila: Sincro.cambiar(E, 'examenes', { id: d.id || Nucleo.uuid(), que, materia, cuando: d.cuando, nota: txt(d.nota, 300) || null,
-      creada: d.creada || Date.now(), borrado_en: null, datos: d.datos || {} }, disp) };
+      creada: d.creada || Date.now(), borrado_en: null, datos }, disp) };
   }
+  // (21-oct-2026) De qué PARTE del curso es un examen: en los cursos de salud con teoría y laboratorio, los parciales pueden ser de teoría,
+  // de laboratorio o de los dos juntos. Va en datos.parte ('teoria' | 'lab' | 'ambos'; sin parte = como antes).
+  const PARTES = { teoria: 'teoría', lab: 'laboratorio', ambos: 'teoría y laboratorio' };
+  const parteDe = (x) => (x && x.datos && PARTES[x.datos.parte] ? x.datos.parte : null);
+  // "el parcial de Hematología (laboratorio)"
+  const nombreExamenCompleto = (x) => Nucleo.nombreExamen(x) + (parteDe(x) && parteDe(x) !== 'ambos' ? ' (' + PARTES[parteDe(x)] + ')' : parteDe(x) === 'ambos' ? ' (teoría y laboratorio)' : '');
   // Cambiar lo que sea (los mismos campos de crear)
   function editar(E, tabla, id, c, disp) {
     const x = E[tabla] && E[tabla][id];
@@ -64,6 +127,9 @@
     if (c.repite !== undefined && tabla !== 'examenes') f.repite = rep(c.repite);
     if (c.que !== undefined && tabla === 'examenes') f.que = QUE.includes(c.que) ? c.que : x.que;
     if (c.nota !== undefined) f.nota = txt(c.nota, 300) || null;
+    if (c.parte !== undefined && tabla === 'examenes') { f.datos = Object.assign({}, x.datos || {}); if (PARTES[c.parte]) f.datos.parte = c.parte; else delete f.datos.parte; }
+    if (c.actividad !== undefined && tabla === 'eventos' && !esClase(x)) { f.datos = Object.assign({}, x.datos || {}); if (ACTIVIDADES[c.actividad]) f.datos.actividad = c.actividad; else delete f.datos.actividad; }
+    if (c.nivel !== undefined && tabla === 'recordatorios') { f.datos = Object.assign({}, x.datos || {}); if (NIVELES[c.nivel]) f.datos.nivel = c.nivel; else delete f.datos.nivel; }
     return { ok: true, fila: Sincro.cambiar(E, tabla, f, disp) };
   }
   const borrar = (E, tabla, id, disp) => (E[tabla] && E[tabla][id] ? { ok: true, fila: Sincro.cambiar(E, tabla, { id, borrado_en: Date.now() }, disp) } : { error: 'no lo encontré' });
@@ -87,7 +153,7 @@
     for (const r of recs(E)) for (const ms of Nucleo.ocurrencias(r, desde, hasta, 60))
       out.push({ tabla: 'recordatorios', id: r.id, ms, titulo: r.texto, tipo: 'recordatorio', materia: r.materia, repite: r.repite, hecho: estaHecho(r, ms), fila: r });
     for (const x of vivos(E.examenes)) if (x.cuando >= desde && x.cuando < hasta)
-      out.push({ tabla: 'examenes', id: x.id, ms: x.cuando, titulo: Nucleo.nombreExamen(x).replace(/^(el|la) /, ''), tipo: x.que || 'examen', materia: x.materia, fila: x });
+      out.push({ tabla: 'examenes', id: x.id, ms: x.cuando, titulo: nombreExamenCompleto(x).replace(/^(el|la) /, ''), tipo: x.que || 'examen', materia: x.materia, fila: x });
     return out.sort((a, b) => a.ms - b.ms);
   }
   const delDia = (E, ms) => { const d0 = Nucleo.inicioDiaCR(ms); return rango(E, d0, d0 + Nucleo.DIA); };
@@ -105,17 +171,55 @@
 
   // ---------- Avisos ----------
   // Todo lo que suena: recordatorios, eventos y los 4 avisos de cada examen, como [{ clave, ms, texto, tabla, id, materia }]
+  // (22-oct-2026) EN CLASE: lo que él programó a una hora suena a esa hora (aunque esté en clase). Los avisos que pone Liz sola (3 días antes,
+  // el día antes, "hoy a las 7", "cada 3 h", "en 2 horas es el examen") NO caen en medio de una clase (ni tutoría ni TCU): se mueven
+  //  - ANTES de la clase (10 min antes) si es fuerte (examen, importante, insistente) y lo que avisa llega pronto (antes de 3 h después de la clase)
+  //  - si no, DESPUÉS (5 min después de que termina). Clases seguidas cuentan como una. Igual en el servidor (avisos.sql → liz_fuera_de_clase).
+  const ANTES_CLASE = 10 * Nucleo.MIN, DESPUES_CLASE = 5 * Nucleo.MIN, PRONTO = 3 * Nucleo.H;
+  function correr(E, ms, antes) {
+    let t = ms;
+    for (let i = 0; i < 6; i++) { const k = claseAhora(E, t); if (!k) return t; t = antes ? k.ms - ANTES_CLASE : k.fin + DESPUES_CLASE; }
+    return null;
+  }
+  function fueraDeClase(E, ms, objetivo, fuerte, creada) {
+    const c = claseAhora(E, ms);
+    if (!c) return ms;
+    if (fuerte && objetivo > ms && objetivo <= c.fin + PRONTO) {
+      const t = correr(E, ms, true);
+      if (t !== null && t >= (creada || 0) - Nucleo.MIN) return t;
+    }
+    const t = correr(E, ms, false);
+    return t === null ? ms : t;
+  }
   function sonidos(E, desde, hasta) {
     const out = [];
-    for (const r of recs(E)) for (const ms of Nucleo.ocurrencias(r, desde, hasta, 30))
-      if (!estaHecho(r, ms) && ms >= (r.creada || 0) - Nucleo.MIN) out.push({ clave: r.id, ms, texto: r.texto, tabla: 'recordatorios', id: r.id, materia: r.materia });
+    // (los que pone Liz: se mueven si caen en clase; solo se revisan los que están cerca, para no recorrer todo el horario de más)
+    const mover = (a, objetivo, fuerte, creada) => (a.ms >= desde - Nucleo.DIA && a.ms < hasta + Nucleo.DIA ? fueraDeClase(E, a.ms, objetivo, fuerte, creada) : a.ms);
+    for (const r of recs(E)) {
+      for (const ms of Nucleo.ocurrencias(r, desde, hasta, 30))
+        if (!estaHecho(r, ms) && ms >= (r.creada || 0) - Nucleo.MIN) out.push({ clave: r.id, ms, texto: r.texto, tabla: 'recordatorios', id: r.id, materia: r.materia });
+      // (21-oct-2026) según su INTENSIDAD (nivelDe): los de antes y, si es insistente, los de después mientras no lo marque hecho
+      if (!r.repite && !estaHecho(r, r.cuando)) {
+        const fuerte = ['importante', 'insistente'].includes(nivelDe(r));
+        for (const a of avisosExtra(r)) {
+          const ms = mover(a, r.cuando, fuerte, r.creada);
+          if (ms >= desde && ms < hasta && ms >= (r.creada || 0) - Nucleo.MIN) out.push({ clave: a.clave, ms, texto: a.texto, tabla: 'recordatorios', id: r.id, materia: r.materia, movido: ms !== a.ms });
+        }
+      }
+    }
     for (const ev of vivos(E.eventos).filter((e) => !esClase(e))) for (const ms of Nucleo.ocurrencias(ev, desde, hasta, 30))
       if (ms >= (ev.creada || 0) - Nucleo.MIN) out.push({ clave: ev.id, ms, texto: ev.titulo + (ev.materia ? ' (' + ev.materia + ')' : ''), tabla: 'eventos', id: ev.id, materia: ev.materia });
-    for (const x of vivos(E.examenes)) for (const a of Nucleo.avisosExamen(x))
-      if (a.ms >= desde && a.ms < hasta && a.ms >= (x.creada || 0) - Nucleo.MIN) out.push({ clave: a.clave, ms: a.ms, texto: a.texto, tabla: 'examenes', id: x.id, materia: x.materia });
+    for (const x of vivos(E.examenes)) for (const a of Nucleo.avisosExamen(x)) {
+      const ms = /:0$/.test(a.clave) ? a.ms : mover(a, x.cuando, true, x.creada);
+      // ("en 2 horas es…" movido ya no son 2 horas: dice la hora)
+      const texto = ms !== a.ms && /:2h$/.test(a.clave) ? 'a las ' + Nucleo.horaCR(x.cuando) + ' es ' + Nucleo.nombreExamen(x) + '. Tú puedes.' : a.texto;
+      if (ms >= desde && ms < hasta && ms >= (x.creada || 0) - Nucleo.MIN) out.push({ clave: a.clave, ms, texto, tabla: 'examenes', id: x.id, materia: x.materia, movido: ms !== a.ms });
+    }
     return out.sort((a, b) => a.ms - b.ms);
   }
-  const yaSono = (E, clave, ms) => Object.values(E.avisos).some((a) => a.clave === clave && Number(a.ocurrencia) === ms);
+  // (22-oct-2026) los avisos de una sola vez (clave con ":", p. ej. "<id>:3d") se reconocen aunque se hayan movido por una clase (±8 h): si él
+  // cambia su horario, no se repiten
+  const yaSono = (E, clave, ms) => Object.values(E.avisos).some((a) => a.clave === clave && (Number(a.ocurrencia) === ms || (clave.includes(':') && Math.abs(Number(a.ocurrencia) - ms) <= 8 * Nucleo.H)));
   // Lo que la PC tiene que avisar AHORA (lo que tocó en las últimas 12 h y nadie avisó). Lo de hace más de 12 h se anota sin sonar.
   function paraAvisar(E, ahora, disp, presente) {
     ahora = ahora || Date.now();
@@ -134,6 +238,8 @@
   // ESTA semana a esa hora (las semanas siguientes se calculan solas). Cambiar de semestre = "Borrar todo el horario" y anotar el nuevo.
   const DIAS_SEMANA = ['lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
   const minDe = (h) => { const m = /^(\d{1,2}):(\d{2})$/.exec(String(h || '')); return m && +m[1] < 24 && +m[2] < 60 ? +m[1] * 60 + +m[2] : null; };
+  // (21-oct-2026) Cada clase tiene su TIPO (teoría o laboratorio) y el COLOR de su materia. Una materia es UNA sola aunque tenga varios días
+  // o teoría y laboratorio: "Bacteriología" lunes y miércoles + "Lab. de Bacteriología" jueves = la materia Bacteriología (materiaDeClase).
   function datosClase(d, ahora) {
     const materia = txt(d.materia, 80), dia = Number(d.dia), ini = minDe(d.inicio), fin = minDe(d.fin);
     if (!materia) return { error: 'falta la materia' };
@@ -142,20 +248,215 @@
     if (fin <= ini) return { error: 'la clase tiene que terminar después de empezar' };
     const d0 = Nucleo.inicioDiaCR(ahora || Date.now()), lunes = d0 - ((Nucleo.enCR(d0).dow + 6) % 7) * Nucleo.DIA;
     const cuando = lunes + dia * Nucleo.DIA + ini * Nucleo.MIN;
-    return { titulo: materia, materia, cuando, repite: 'semanal', datos: { clase: true, dia, inicio: d.inicio, fin: d.fin, duracion: (fin - ini) * Nucleo.MIN, aula: txt(d.aula, 60) || null } };
+    // (si el NOMBRE dice "Lab…" o "Teoría…", manda el nombre: "Teoría" viene marcado por defecto y escribir "Lab X" no lo cambiaba)
+    // (22-oct-2026) una TUTORÍA que él da o su TCU: van en el horario, pero NO son materias (su ícono y su color fijos: ACTIVIDADES)
+    const actividad = ACTIVIDADES[d.actividad] ? d.actividad : null;
+    const tipo = actividad ? 'teoria' : materiaDeClase(materia).tipo || (TIPOS_CLASE[d.tipo] ? d.tipo : 'teoria');
+    // (21-oct-2026) "aparte": un laboratorio que es OTRO curso (en su universidad, "Laboratorio de Hematología" es un curso distinto de "Hematología";
+    // el de Inmunohematología, no). Lo elige él al anotarlo, o con "Separar el laboratorio" en Mi horario.
+    return { titulo: materia, materia, cuando, repite: 'semanal', datos: { clase: true, dia, inicio: d.inicio, fin: d.fin, duracion: (fin - ini) * Nucleo.MIN,
+      aula: txt(d.aula, 60) || null, tipo, aparte: !actividad && tipo === 'lab' && !!d.aparte, color: actividad ? ACTIVIDADES[actividad].color : d.color || null, actividad } };
   }
   function crearClase(E, d, disp, ahora) {
     const c = datosClase(d, ahora);
     if (c.error) return c;
+    c.datos.color = c.datos.color || colorNuevo(E, c.materia, null, c.datos.aparte);
     return { ok: true, fila: Sincro.cambiar(E, 'eventos', Object.assign({ id: d.id || Nucleo.uuid(), nota: null, creada: Date.now(), borrado_en: null }, c), disp) };
   }
   function editarClase(E, id, d, disp, ahora) {
     if (!esClase(E.eventos[id])) return { error: 'no encontré esa clase' };
     const c = datosClase(d, ahora);
     if (c.error) return c;
+    c.datos.color = c.datos.color || colorNuevo(E, c.materia, id, c.datos.aparte);        // (si cambió de materia, el color de la nueva)
     return { ok: true, fila: Sincro.cambiar(E, 'eventos', Object.assign({ id }, c), disp) };
   }
   const clases = (E) => vivos(E.eventos).filter(esClase).sort((a, b) => a.datos.dia - b.datos.dia || minDe(a.datos.inicio) - minDe(b.datos.inicio));
+
+  // ---------- (21-oct-2026) LAS MATERIAS DEL HORARIO ----------
+  const TIPOS_CLASE = { teoria: 'teoría', lab: 'laboratorio' };
+  // (22-oct-2026) Lo que va en el horario pero NO es una materia: las tutorías que él DA y su TCU (Trabajo Comunal Universitario). Cada
+  // una con su ícono y su color fijo (ninguno es de los de las materias). También sirven para un evento suelto de la agenda (datos.actividad).
+  const ACTIVIDADES = { tutoria: { nombre: 'Tutoría', plural: 'Tutorías', icono: '🧑‍🏫', color: '#e879f9' }, tcu: { nombre: 'TCU', plural: 'TCU', icono: '🤝', color: '#bef264' } };
+  const actividadDe = (x) => { const f = (x && x.fila) || x; return f && f.datos && ACTIVIDADES[f.datos.actividad] ? f.datos.actividad : null; };
+  const MARCA_LAB = /(^|[^a-záéíóúñ])(lab(oratorio)?s?\.?|pr[aá]ctic[ao]s?)(?![a-záéíóúñ])/i;
+  const MARCA_TEO = /(^|[^a-záéíóúñ])(teor[ií]a|te[oó]ric[ao]s?|magistral)(?![a-záéíóúñ])/i;
+  const PAL = 'lab(?:oratorio)?s?\\.?|pr[aá]ctic[ao]s?|teor[ií]a|te[oó]ric[ao]s?|magistral';
+  const claveTxt = (s) => String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9ñ ]+/g, ' ').replace(/\s+/g, ' ').trim();
+  // "Lab. de Bacteriología", "Bacteriología (lab)", "Bacteriología - Teoría", "Teoría Micología" → { base: 'Bacteriología'|'Micología', tipo }
+  // aparte = un laboratorio que es su propio curso: su materia es "Laboratorio de X" (otra materia, otro color)
+  function materiaDeClase(nombre, tipoGuardado, aparte) {
+    if (aparte) { const m = materiaDeClase(nombre, 'lab'); return { base: 'Laboratorio de ' + m.base, tipo: 'lab', clave: 'laboratorio ' + m.clave, aparte: true }; }
+    const t = txt(nombre, 80);
+    let tipo = TIPOS_CLASE[tipoGuardado] ? tipoGuardado : null;
+    if (!tipo) tipo = MARCA_LAB.test(t) ? 'lab' : MARCA_TEO.test(t) ? 'teoria' : null;
+    const base = t.replace(/^\s*[A-Za-z]{1,4}\s?-?\s?\d{3,4}[A-Za-z]?\s*[-–:·]?\s*/, '').replace(/\s*\(\s*[A-Za-z]{1,4}\s?-?\s?\d{3,4}[A-Za-z]?\s*\)\s*$/, '')    // (códigos de curso: "MB-0300")
+      .replace(new RegExp('\\(\\s*(' + PAL + ')\\s*\\)', 'ig'), ' ')
+      .replace(new RegExp('^\\s*(' + PAL + ')\\s+(de\\s+|del\\s+)?', 'i'), '')
+      .replace(new RegExp('[\\s\\-–:·,/]+(' + PAL + ')\\s*$', 'i'), '')
+      .replace(/\s+/g, ' ').replace(/^[\s\-–:·,]+|[\s\-–:·,]+$/g, '').trim();
+    return { base: base.length >= 2 ? base.charAt(0).toUpperCase() + base.slice(1) : t, tipo, clave: claveTxt(base.length >= 2 ? base : t) };
+  }
+  // Colores de las materias (se ven bien en el fondo oscuro; ninguno es el rosado de las fechas especiales)
+  // (sin el fucsia de las tutorías ni el lima del TCU)
+  const COLORES_MATERIA = ['#2dd4bf', '#7cc4ff', '#ffb86b', '#c3a6ff', '#f9e076', '#86efac', '#ff8a80', '#67e8f9', '#fda4af'];
+  const hashTxt = (s) => [...String(s)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) >>> 0, 7);
+  // ¿La misma materia? Igual, una abreviatura de UNA palabra ("bacterio" = "bacteriologia"; pero "quimica" no es "quimica organica"), o un
+  // error de tipeo chiquito en un nombre largo ("inmuhematologia" = "inmunohematologia": visto en un horario de verdad, 21-oct-2026)
+  function distancia(a, b) {
+    if (Math.abs(a.length - b.length) > 2) return 9;
+    let ant = Array.from({ length: b.length + 1 }, (_, j) => j);
+    for (let i = 1; i <= a.length; i++) {
+      const cur = [i];
+      for (let j = 1; j <= b.length; j++) cur[j] = Math.min(ant[j] + 1, cur[j - 1] + 1, ant[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1));
+      ant = cur;
+    }
+    return ant[b.length];
+  }
+  const misma = (a, b) => a === b || (!/ /.test(a) && !/ /.test(b) && Math.min(a.length, b.length) >= 6 && (a.startsWith(b) || b.startsWith(a))) ||
+    (Math.min(a.length, b.length) >= 8 && a.slice(0, 3) === b.slice(0, 3) && distancia(a, b) <= 2);
+  // Las tildes que casi siempre faltan al escribir rápido (solo para MOSTRAR el nombre; para comparar se ignoran): "Inmunohematologia" →
+  // "Inmunohematología", "medica" → "médica"
+  const TILDES = { medica: 'médica', medico: 'médico', clinica: 'clínica', clinico: 'clínico', quimica: 'química', basica: 'básica', basico: 'básico',
+    fisica: 'física', genetica: 'genética', practica: 'práctica', metodos: 'métodos', investigacion: 'investigación', analisis: 'análisis', bioquimica: 'bioquímica' };
+  const acentuar = (s) => String(s).replace(/[A-Za-zÁÉÍÓÚáéíóúÑñ]+/g, (w) => {
+    const l = w.toLowerCase(), t = TILDES[l] || (/logia$/.test(l) ? l.replace(/logia$/, 'logía') : l);
+    return t === l ? w : (w[0] === w[0].toUpperCase() ? t.charAt(0).toUpperCase() + t.slice(1) : t);
+  });
+  const grupoDe = (l, clave) => l.find((g) => g.alias.some((x) => misma(x, clave))) || null;
+  // Las materias del horario, juntas: [{ materia, clave, color, sesiones: [{ id, dia, inicio, fin, tipo, aula }] }] (en el orden de la semana)
+  function horario(E) {
+    let grupos = [];
+    for (const c of clases(E)) {
+      const act = actividadDe(c);
+      const m = act ? { base: txt(c.titulo, 80) || ACTIVIDADES[act].nombre, tipo: 'teoria', clave: act + ' ' + claveTxt(c.titulo || act) } : materiaDeClase(c.titulo || c.materia, c.datos.tipo, c.datos.aparte);
+      let g = grupos.find((x) => x.actividad === act && !!x.aparte === !!m.aparte && x.alias.some((a) => misma(a, m.clave)));
+      if (!g) { g = { materia: m.base, clave: m.clave, aparte: !!m.aparte, actividad: act, alias: [], nombres: {}, colores: [], sesiones: [] }; grupos.push(g); }
+      if (!g.alias.includes(m.clave)) g.alias.push(m.clave);
+      g.nombres[m.base] = (g.nombres[m.base] || 0) + 1;
+      if (c.datos.color) g.colores.push(c.datos.color);
+      g.sesiones.push({ id: c.id, dia: c.datos.dia, inicio: c.datos.inicio, fin: c.datos.fin, tipo: m.tipo || 'teoria', aula: c.datos.aula || null, aparte: !!m.aparte });
+    }
+    // "Micología" y "Micología médica": si un nombre es el COMIENZO (palabras enteras) de UN solo otro nombre, es la misma materia
+    // (con "Química General" y "Química Orgánica", "Química" sola no se junta con ninguna: no se sabe cuál es)
+    const palabras = (k) => k.split(' ');
+    const empiezaCon = (largo, corto) => { const a = palabras(largo), b = palabras(corto); return a.length > b.length && b.every((w, i) => a[i] === w); };
+    for (const g of grupos.slice()) {
+      if (g.actividad) continue;
+      const mas = grupos.filter((o) => o !== g && !o.actividad && !!o.aparte === !!g.aparte && o.alias.some((x) => g.alias.some((y) => empiezaCon(x, y))));
+      if (mas.length !== 1) continue;
+      const o = mas[0];
+      o.alias.push(...g.alias); o.sesiones.push(...g.sesiones); o.colores.push(...g.colores);
+      for (const [n, k] of Object.entries(g.nombres)) o.nombres[n] = (o.nombres[n] || 0) + k;
+      grupos = grupos.filter((x) => x !== g);
+    }
+    // El nombre: el que más usó (si empatan, el más largo: "Micología medica", "Inmunohematologia"), con las tildes de siempre; el color: el que ya tenía guardado
+    for (const g of grupos) {
+      g.materia = acentuar(Object.entries(g.nombres).sort((a, b) => b[1] - a[1] || b[0].length - a[0].length)[0][0]);
+      g.clave = g.actividad ? g.alias[0] : g.aparte ? 'laboratorio ' + materiaDeClase(g.materia.replace(/^Laboratorio de /, ''), 'lab').clave : materiaDeClase(g.materia).clave;
+      const cuenta = {};
+      for (const c of g.colores) cuenta[c] = (cuenta[c] || 0) + 1;
+      g.color = g.actividad ? ACTIVIDADES[g.actividad].color : Object.keys(cuenta).sort((a, b) => cuenta[b] - cuenta[a])[0] || null;
+      g.sesiones.sort((a, b) => a.dia - b.dia || minDe(a.inicio) - minDe(b.inicio));
+      delete g.nombres; delete g.colores;
+    }
+    // (dos materias distintas que quedaron con el mismo color guardado: la segunda recibe otro)
+    const vistos = new Set();
+    for (const g of grupos) { if (g.actividad) continue; if (g.color && vistos.has(g.color)) g.color = null; if (g.color) vistos.add(g.color); }      // (las tutorías y el TCU: su color fijo)
+    // Las que no tienen color guardado (clases de antes): uno libre, siempre el mismo para la misma materia
+    const usados = new Set(grupos.map((g) => g.color).filter(Boolean));
+    for (const g of grupos.slice().sort((a, b) => (a.clave < b.clave ? -1 : 1))) {
+      if (g.color) continue;
+      let i = hashTxt(g.clave) % COLORES_MATERIA.length;
+      for (let k = 0; k < COLORES_MATERIA.length && usados.has(COLORES_MATERIA[i]); k++) i = (i + 1) % COLORES_MATERIA.length;
+      g.color = COLORES_MATERIA[i];
+      usados.add(g.color);
+    }
+    return grupos;
+  }
+  // El color de una materia nueva (o el de la que ya existe con ese nombre)
+  function colorNuevo(E, nombre, sinId, aparte) {
+    const clave = materiaDeClase(nombre, null, aparte).clave;
+    const l = horario({ eventos: Object.fromEntries(Object.entries(E.eventos || {}).filter(([id]) => id !== sinId)) });
+    const ya = grupoDe(l, clave) || l.find((g) => g.alias.some((x) => x.split(' ').length > clave.split(' ').length && x.startsWith(clave + ' ')));
+    if (ya) return ya.color;
+    const usados = new Set(l.map((g) => g.color));
+    let i = hashTxt(clave) % COLORES_MATERIA.length;
+    for (let k = 0; k < COLORES_MATERIA.length && usados.has(COLORES_MATERIA[i]); k++) i = (i + 1) % COLORES_MATERIA.length;
+    return COLORES_MATERIA[i];
+  }
+  // Guarda en cada clase el color (y el tipo) de su materia, si le falta: así la compu y el celular las ven igual. Devuelve cuántas cambió.
+  function asegurarColores(E, disp) {
+    let n = 0;
+    for (const g of horario(E)) for (const s of g.sesiones) {
+      const c = E.eventos[s.id];
+      if (c.datos.color === g.color && c.datos.tipo === s.tipo) continue;
+      Sincro.cambiar(E, 'eventos', { id: c.id, datos: Object.assign({}, c.datos, { color: g.color, tipo: s.tipo }) }, disp);
+      n++;
+    }
+    return n;
+  }
+  // (21-oct-2026) "Separar el laboratorio" (es otro curso) o "Juntarlo" con su materia, para lo que ya está anotado: cambia sus clases de
+  // laboratorio (y el color: el lab aparte recibe uno propio; al juntarlo, el de la materia). claveMateria = la clave de la materia (horario).
+  function separarLab(E, claveMateria, aparte, disp) {
+    const l = horario(E);
+    const g = l.find((x) => x.clave === claveMateria);
+    if (!g) return 0;
+    let n = 0;
+    if (aparte) {
+      for (const s of g.sesiones.filter((x) => x.tipo === 'lab' && !x.aparte)) { const c = E.eventos[s.id]; Sincro.cambiar(E, 'eventos', { id: c.id, datos: Object.assign({}, c.datos, { aparte: true, color: null }) }, disp); n++; }
+    } else {
+      const base = l.find((x) => !x.aparte && x.clave === claveMateria.replace(/^laboratorio /, ''));
+      for (const s of g.sesiones.filter((x) => x.aparte)) { const c = E.eventos[s.id]; Sincro.cambiar(E, 'eventos', { id: c.id, datos: Object.assign({}, c.datos, { aparte: false, color: base ? base.color : null }) }, disp); n++; }
+    }
+    asegurarColores(E, disp);
+    return n;
+  }
+  // El color y el nombre "de materia" de algo de la agenda (una clase, o un examen/evento de esa materia)
+  function colorDe(E, nombre) { if (!nombre) return null; const g = grupoDe(horario(E), materiaDeClase(nombre).clave); return g ? g.color : null; }
+  // El nombre de la MATERIA de una clase (el completo, el mismo para teoría y laboratorio) y su tipo
+  // (22-oct-2026) + actividad: una tutoría o el TCU (su nombre tal cual, su color y su ícono fijos)
+  function nombreClase(x, E) {
+    const f = x.fila || x, act = actividadDe(f);
+    if (act) { const a = ACTIVIDADES[act]; return { materia: txt(f.titulo || x.titulo, 80) || a.nombre, tipo: 'teoria', color: a.color, aparte: false, actividad: act, icono: a.icono }; }
+    const m = materiaDeClase(f.titulo || f.materia || x.titulo, f.datos && f.datos.tipo, f.datos && f.datos.aparte);
+    const g = E ? grupoDe(horario(E).filter((h) => !h.actividad), m.clave) : null;
+    return { materia: g ? g.materia : m.base, tipo: m.tipo || 'teoria', color: g ? g.color : null, aparte: !!m.aparte, actividad: null, icono: '🎓' };
+  }
+  // Para el cerebro (la compu y el celular): el horario por MATERIA, y lo de hoy. Una materia con teoría y laboratorio es UNA.
+  const DIA_TXT = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom'];
+  const y = (l) => (l.length > 1 ? l.slice(0, -1).join(', ') + ' y ' + l[l.length - 1] : l[0] || '');
+  function textoHorario(E, ahora) {
+    const todo = horario(E);
+    if (!todo.length) return '';
+    ahora = ahora || Date.now();
+    const l = todo.filter((g) => !g.actividad), otras = todo.filter((g) => g.actividad);
+    const materias = l.map((g) => {
+      const partes = [];
+      for (const tipo of ['teoria', 'lab']) {
+        const ss = g.sesiones.filter((s) => s.tipo === tipo);
+        if (!ss.length) continue;
+        const porHora = {};
+        for (const s of ss) (porHora[s.inicio + '-' + s.fin] = porHora[s.inicio + '-' + s.fin] || []).push(DIA_TXT[s.dia]);
+        partes.push(TIPOS_CLASE[tipo] + ' ' + Object.entries(porHora).map(([h, d]) => y(d) + ' ' + h).join(', '));
+      }
+      return g.materia + ' (' + partes.join('; ') + ')';
+    });
+    // (22-oct-2026) + cómo funcionan teoría y laboratorio en su carrera (lo mismo dice su liz.md, "Su carrera")
+    let t = l.length ? 'SU HORARIO DE CLASES (' + l.length + (l.length === 1 ? ' materia' : ' materias') + '; cada materia es UNA sola aunque tenga varios días; un laboratorio ' +
+      'puede ser parte del mismo curso —con parciales de teoría, de laboratorio o de los dos— o un curso aparte, «Laboratorio de X», con su propia nota): ' + materias.join(' · ') + '.' : 'SU HORARIO:';
+    // (22-oct-2026) lo que NO es materia: las tutorías que él da y su TCU
+    if (otras.length) t += ' ADEMÁS (no son materias): ' + otras.map((g) => (g.actividad === 'tutoria' ? 'da tutoría' + (claveTxt(g.materia) !== 'tutoria' ? ' («' + g.materia + '»)' : '') : 'TCU' + (claveTxt(g.materia) !== 'tcu' ? ' («' + g.materia + '»)' : '')) + ' ' +
+      g.sesiones.map((s) => DIA_TXT[s.dia] + ' ' + s.inicio + '-' + s.fin).join(', ')).join(' · ') + '.';
+    const hoy = clasesDelDia(E, ahora).map((x) => Object.assign(nombreClase(x, E), { ms: x.ms, fin: x.fin }));
+    const ya = hoy.find((x) => ahora >= x.ms && ahora < x.fin);
+    if (ya) t += ' AHORA está en ' + (ya.actividad === 'tutoria' ? 'su tutoría («' + ya.materia + '», la da él)' : ya.actividad === 'tcu' ? 'su TCU' : 'clase de ' + ya.materia + (ya.tipo === 'lab' ? ' (laboratorio)' : '')) + ' hasta las ' + Nucleo.horaCR(ya.fin) + '.';
+    else if (hoy.length) {
+      const pasadas = hoy.filter((x) => x.fin <= ahora), luego = hoy.filter((x) => x.ms > ahora);
+      t += ' HOY: ' + hoy.map((x) => x.materia + (x.tipo === 'lab' ? ' (lab)' : '') + ' ' + Nucleo.horaCR(x.ms) + '-' + Nucleo.horaCR(x.fin)).join(', ') + '.' +
+        (pasadas.length && !luego.length ? ' Ya terminó sus clases de hoy.' : luego.length ? ' La próxima: ' + luego[0].materia + ' a las ' + Nucleo.horaCR(luego[0].ms) + '.' : '');
+    } else t += ' Hoy no tiene clases.';
+    return t;
+  }
   function borrarHorario(E, disp) { const l = clases(E); const t = Date.now(); for (const c of l) Sincro.cambiar(E, 'eventos', { id: c.id, borrado_en: t }, disp); return { ok: true, n: l.length }; }
   // ¿Está en clase a esta hora? (la clase de ahora, o null) · las clases de un día (con su inicio y fin en ms)
   function clasesDelDia(E, ms) { const d0 = Nucleo.inicioDiaCR(ms); return rango(E, d0, d0 + Nucleo.DIA).filter((x) => x.tipo === 'clase'); }
@@ -337,5 +638,6 @@
 
   return { REPITE, QUE, crearEvento, crearRecordatorio, crearExamen, editar, borrar, marcarHecho, estaHecho, rango, delDia, proximosExamenes,
     listaRecordatorios, sonidos, yaSono, paraAvisar, oculto, esClase, DIAS_SEMANA, crearClase, editarClase, clases, borrarHorario, clasesDelDia, claseAhora,
+    importante, avisosImportante, avisosExtra, nivelDe, NIVELES, porEntregar, TIPOS_CLASE, ACTIVIDADES, actividadDe, COLORES_MATERIA, materiaDeClase, horario, colorDe, nombreClase, asegurarColores, textoHorario, separarLab, PARTES, parteDe, nombreExamenCompleto,
     anotarPomodoro, pomodoros, cuandoDeFrase, pedidoRecordatorio, RECORDATORIO_SIN_NOMBRE };
 });

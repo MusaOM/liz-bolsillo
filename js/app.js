@@ -18,6 +18,7 @@
   const K = DEMO ? 'demo-' : '';
   const Org = self.Organizar, F = self.Frases, Ag = self.Agenda, N = self.Nucleo;
   const Animo = self.Animo, V = self.LizVersion;          // (21-oct-2026, Liz 1.1) diario de ánimo y frases de cariño · la versión
+  const Lg = self.Logros;                                 // (21-oct-2026, bolsillo 1.1) los logros de Liz: cuándo se gana cada uno (js/logros.js)
   const { MIN, H, DIA } = N;
   const MAX_ARCHIVO = 50 * 1024 * 1024, ESPACIO_GRATIS = 1024 * 1024 * 1024;
 
@@ -36,7 +37,7 @@
   const ag = { modo: 'mes', ref: Date.now(), dia: N.inicioDiaCR(Date.now()) };
   let sincronizando = false, otraVez = false, ultimoError = '', sinSesion = false;
   const TITULOS = { hoy: 'Hoy', repasar: 'Estudiar', charla: 'Liz', agenda: 'Agenda', mazos: 'Estudiar', mas: 'Más', recordatorios: 'Agenda', archivos: 'Archivos',
-    progreso: 'Mi progreso', papelera: 'Papelera', acerca: 'Acerca de Liz', archivados: 'Archivados', pomodoro: 'Estudiar con Liz' };
+    progreso: 'Mi progreso', papelera: 'Papelera', acerca: 'Acerca de Liz', archivados: 'Archivados', pomodoro: 'Estudiar con Liz', logros: 'Logros' };
   // (21-oct-2026) Cada cosa en UN solo lugar: Recordatorios vive en Agenda (pestaña "Recordatorios"); Archivados, en Más
   const DE_MAS = ['archivos', 'progreso', 'papelera', 'acerca', 'archivados'];
   const DE_AGENDA = ['recordatorios'];
@@ -115,7 +116,12 @@
       if (motivo === 'abrir') setTimeout(revisarExamenPasado, 1200);
       if (motivo === 'abrir') setTimeout(revisarAnimoDia, 1800);            // (21-oct-2026: ya se sabe si lo marcó en la compu)
       if (motivo === 'abrir') setTimeout(revisarCartaAniversario, 2600);    // (19-oct-2026: el aniversario, con la carta ya al día)
+      if (motivo === 'abrir') setTimeout(revisarPreguntaAgenda, 15000);     // (21-oct-2026: "¿tienes algún parcial pronto?", de vez en cuando)
       if (r.cambiosDe.animo && $('#hoja:not([hidden]) .caritas') && Animo.deHoy(E).length) cerrarHoja(null);   // (lo marcó en la compu)
+      // (21-oct-2026) Cada clase guarda el color (y el tipo) de su materia, una sola vez: así la compu y el celular la ven igual
+      if (Ag.asegurarColores(E, DISP)) { guardarLocal(); pedirSincro(); }
+      // (21-oct-2026) Los LOGROS: lo que llegó de la compu también cuenta. Al abrir o al volver, primero se mide cuánto estuvo sin venir.
+      if (motivo === 'abrir' && lgVolverDesde != null) setTimeout(volvioLogros, 700); else setTimeout(() => revisarLogros('sincro'), 900);
     } catch (e) {
       ultimoError = String(e && e.message || e);
       console.warn('Sincronizar:', e);
@@ -223,8 +229,14 @@
     // (19-oct-2026) EL TRÁILER: vive PRIVADO en su cuenta (lo sube la PC); aquí solo se anota cuál es. La dirección para verlo se pide al verlo.
     const tr = data.datos && data.datos.trailer;
     perfil.trailer = tr && tr.ruta && tr.v ? { v: String(tr.v), ruta: String(tr.ruta) } : null;
+    // (21-oct-2026) LOS LOGROS: la lista (con sus textos) llega PRIVADA desde la compu; sus videos e imágenes NO se bajan: se ven solo con
+    // internet, con enlaces firmados de corta duración (ver "LOS LOGROS DE LIZ", más abajo)
+    const lo = data.datos && data.datos.logros;
+    const antes = perfil.logros && perfil.logros.v;
+    perfil.logros = lo && Array.isArray(lo.lista) && lo.carpeta ? { v: String(lo.v || ''), carpeta: String(lo.carpeta), lista: lo.lista, trailer: lo.trailer || null } : null;
     Almacen.guardar(K + 'perfil', perfil);
     setTimeout(revisarTrailer, 1200);
+    if (perfil.logros && perfil.logros.v !== antes) { pintarSuave(); setTimeout(revisarEntradaEstudiar, 1500); }
   }
   const aDataURL = (blob) => new Promise((ok, mal) => { const f = new FileReader(); f.onload = () => ok(f.result); f.onerror = mal; f.readAsDataURL(blob); });
   // (19-oct-2026, "el celular se siente pegado") Las fotos de Liz se GUARDAN en el celular como texto (data:…;base64, decenas o cientos de
@@ -258,7 +270,7 @@
   // ---------- (Liz 1.0 · prueba 17, al final) VERSIÓN NUEVA: la app cambia SOLA ----------
   // Los archivos se sirven primero desde lo guardado (así abre sin internet). Antes, al publicar una versión nueva, la primera vez que se
   // abría la app se veía la VIEJA (el service worker nuevo se instalaba por detrás) y la nueva recién en la 2ª o 3ª apertura: en la prueba
-  // 17 el iPhone de Catalina siguió con la versión de antes. Ahora, cuando el service worker nuevo toma el control, la app se recarga sola:
+  // 17 el iPhone de prueba siguió con la versión de antes. Ahora, cuando el service worker nuevo toma el control, la app se recarga sola:
   // al instante si está en la pantalla de carga o recién abierta en Hoy (≤20 s y sin escribir: una hoja que se abrió sola, como "¿Cómo
   // amaneciste hoy?", vuelve a salir después); si no, la próxima vez que vuelva a la app. Nunca dos veces seguidas (no se queda recargando).
   const t0App = Date.now();
@@ -354,6 +366,16 @@
     setInterval(() => sincronizar('auto'), 5 * MIN);
     setInterval(() => { if (vista === 'hoy' || vista === 'agenda' || vista === 'recordatorios') pintarSuave(); }, 60000);
     setInterval(revisarAvisosAbierta, 5000);                 // (19-oct-2026: con la app abierta, Liz avisa a la hora exacta; casi no gasta)
+    // (21-oct-2026, bolsillo 1.1) Los LOGROS al abrir: ¿la abrió de madrugada? ¿cuántos días estuvo sin venir? (se mide al sincronizar, con
+    // lo que hizo en la compu; sin internet, a los 20 s con lo de aquí). Y mientras la usa, cada minuto se anota "sigue aquí".
+    notarMedianoche();
+    esperarVuelta();
+    setTimeout(() => revisarLogros('abrir'), 5000);
+    setInterval(() => {
+      if (document.hidden) return;
+      anotarVisita();
+      if (N.enCR(Date.now()).h < 5 && !medianocheLg()) { notarMedianoche(); revisarLogros('medianoche'); }
+    }, MIN);
   }
 
   // ---------- Entrar: su correo y su contraseña, UNA vez (la cuenta se crea en Supabase; no se manda ningún correo) ----------
@@ -396,19 +418,23 @@
     if (!PINTA[v]) v = 'hoy';
     vista = v;
     if (v !== 'mazos') { mazoAbierto = null; mazoPendiente = null; }
-    const tab = DE_MAS.includes(v) ? 'mas' : DE_AGENDA.includes(v) ? 'agenda' : DE_ESTUDIAR.includes(v) || v === 'pomodoro' ? 'estudiar' : v;
+    // (21-oct-2026) "Ver todos" los logros: desde Estudiar (o desde Más → Progreso: entonces marca Más)
+    const tab = DE_MAS.includes(v) || (v === 'logros' && lgDesde === 'progreso') ? 'mas' : DE_AGENDA.includes(v) ? 'agenda' : DE_ESTUDIAR.includes(v) || v === 'pomodoro' || v === 'logros' ? 'estudiar' : v;
     for (const b of document.querySelectorAll('#menu button')) b.classList.toggle('activo', b.dataset.v === tab);
     if (v !== 'charla') arribaDeTodo();
     enderezar();
     pintar();
     if (bajarARec) { bajarARecordatorios(); setTimeout(bajarARecordatorios, 80); }      // (y otra vez cuando ya está dibujada del todo)
+    // (21-oct-2026) Al entrar a Estudiar: la primera vez, el tráiler de los logros; y siempre, ¿se ganó algo?
+    if (DE_ESTUDIAR.includes(v)) { setTimeout(revisarEntradaEstudiar, 700); setTimeout(() => revisarLogros('estudiar'), 900); }
   }
   function bajarARecordatorios() {
     const s = $('#secRecordatorios'), a = $('#app');
     if (s && a) a.scrollTo({ top: Math.max(0, s.getBoundingClientRect().top - a.getBoundingClientRect().top + a.scrollTop - 70), behavior: 'auto' });
   }
   const PINTA = { hoy: pintarHoy, repasar: pintarRepasar, charla: pintarCharla, agenda: pintarAgenda, mazos: pintarMazos, mas: pintarMas,
-    archivos: pintarArchivos, progreso: pintarProgreso, papelera: pintarPapelera, acerca: pintarAcerca, archivados: pintarArchivados, pomodoro: pintarPomodoro };
+    archivos: pintarArchivos, progreso: pintarProgreso, papelera: pintarPapelera, acerca: pintarAcerca, archivados: pintarArchivados, pomodoro: pintarPomodoro,
+    logros: pintarLogros };
   // (prueba 17) Si una pantalla falla al dibujarse (un dato raro que llegó de la nube, por ejemplo), no queda en blanco ni "trabada":
   // sale un aviso con el motivo y un botón para volver a intentar (y las demás pestañas siguen andando).
   function pintarVista(v) {
@@ -564,10 +590,13 @@
   function momentoLiz(ahora, pendientes) {
     const esp = fechasDelDia(ahora)[0];
     if (esp) return { t: llenarFecha(esp.saludo, esp, ahora), tipo: 'especial' };
-    const cl = Ag.clasesDelDia(E, ahora);
+    // (21-oct-2026) con el nombre de la MATERIA ("Bacteriología", aunque la anotó como "Lab. de Bacteriología") y "(laboratorio)" si lo es
+    const nom = (x) => { const n = Ag.nombreClase(x, E); return Object.assign({}, x, { titulo: n.materia + (n.tipo === 'lab' ? ' (laboratorio)' : '') }); };
+    // (22-oct-2026) solo las CLASES (no sus tutorías ni el TCU: "¿qué tal la clase de…?" no aplica)
+    const cl = Ag.clasesDelDia(E, ahora).filter((x) => !Ag.actividadDe(x)).map(nom);
     if (!cl.length) return null;
     const k = N.diaCR(ahora);
-    const ya = Ag.claseAhora(E, ahora);
+    const ya1 = Ag.claseAhora(E, ahora), ya0 = ya1 && !Ag.actividadDe(ya1) ? ya1 : null, ya = ya0 ? nom(ya0) : null;
     if (ya) return { t: unaDe(['Estás en clase de ' + ya.titulo + ' hasta las ' + N.horaCR(ya.fin) + '. Aquí te espero 🤫', 'Shh, clase de ' + ya.titulo + '. Pon atención, que luego me cuentas 🔬'], k + ya.id), tipo: 'clase' };
     const luego = cl.filter((c) => c.ms > ahora), ultima = cl.filter((c) => c.fin <= ahora).sort((a, b) => b.fin - a.fin)[0];
     if (!luego.length && ultima && ahora - ultima.fin < 4 * H)
@@ -709,17 +738,22 @@
   const ICONO = { evento: '📅', recordatorio: '⏰', examen: '📝', parcial: '📝', entrega: '📦', quiz: '📝', clase: '🎓', especial: ICONO_ESPECIAL };
   const COLOR = { evento: 'celeste', recordatorio: 'oro', examen: 'rosa', parcial: 'rosa', entrega: 'rosa', quiz: 'rosa', clase: 'verde', especial: 'rosa' };
   const tipoDe = (x) => (x.tabla === 'examenes' ? 'examen' : x.tipo);
+  // (22-oct-2026) el ícono de una tutoría o del TCU anotado como evento suelto ('' si no es)
+  const actividadIcono = (x) => { const a = Ag.ACTIVIDADES[Ag.actividadDe(x)]; return a ? a.icono : ''; };
   function filaAgenda(x, conDia, linea, conBorrar) {
     const sub = [];
     // (prueba 14) Una fecha especial: solo se ve (no se edita aquí). Una clase: con su hora de fin y su aula; tocarla abre "Mi horario"
     if (x.tabla === 'especial') return '<li><div class="item especialFila"><div class="ico rosa">' + ICONO_ESPECIAL + '</div><span class="txt"><b>' + esc(x.titulo) + '</b><small>Fecha especial</small></span></div></li>';
     const hora = N.horaCR(x.ms) + (x.fin ? '–' + N.horaCR(x.fin) : '');
     if (x.tipo === 'clase') {
+      // (21-oct-2026) con el nombre de su MATERIA (el mismo para teoría y laboratorio), su tipo y el color de la materia
+      const n = Ag.nombreClase(x, E);
       if (!linea) sub.push('<span class="hora">' + hora + '</span>');
+      sub.push(n.actividad ? (n.actividad === 'tutoria' ? 'Tutoría (la das tú)' : 'TCU') : TIPO_TXT[n.tipo]);
       if (conDia) sub.push(enDias(x.ms));
       if (x.aula) sub.push(esc(x.aula));
-      return '<li><div class="item">' + (linea ? '<span class="hora">' + hora + '</span>' : '') + '<div class="ico verde">🎓</div>' +
-        '<button class="txt" style="text-align:left" data-a="editarClase" data-id="' + esc(x.id) + '"><b>Clase: ' + esc(x.titulo) + '</b><small>' + (sub.join(' · ') || '&nbsp;') + '</small></button></div></li>';
+      return '<li><div class="item">' + (linea ? '<span class="hora">' + hora + '</span>' : '') + '<div class="ico materia" style="--mc:' + esc(n.color || 'var(--clase)') + '">' + n.icono + '</div>' +
+        '<button class="txt" style="text-align:left" data-a="editarClase" data-id="' + esc(x.id) + '"><b>' + esc(n.materia) + '</b><small>' + (sub.join(' · ') || '&nbsp;') + '</small></button></div></li>';
     }
     if (!linea) sub.push('<span class="hora">' + N.horaCR(x.ms) + '</span>');
     if (conDia) sub.push(enDias(x.ms));
@@ -730,6 +764,7 @@
     return '<li><div class="item' + (x.hecho ? ' hecho' : '') + '">' + (linea ? '<span class="hora">' + N.horaCR(x.ms) + '</span>' : '') +
       // (prueba 17) En uno que se REPITE, solo se marca hecho el de hoy o uno pasado: el ✓ de un día que viene marcaba en realidad el de hoy
       (x.tabla === 'recordatorios' && !(x.repite && x.ms >= N.inicioDiaCR(Date.now()) + DIA) ? '<button class="check' + (x.hecho ? ' on' : '') + '" data-a="hecho" data-id="' + esc(x.id) + '" aria-label="Hecho">✓</button>'
+        : actividadIcono(x) ? '<div class="ico materia" style="--mc:' + esc(Ag.ACTIVIDADES[Ag.actividadDe(x)].color) + '">' + actividadIcono(x) + '</div>'
         : '<div class="ico ' + (COLOR[x.tipo] || 'celeste') + '">' + (ICONO[x.tipo] || '📅') + '</div>') +
       '<button class="txt" style="text-align:left" data-a="editarAgenda" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '"><b>' + esc(titulo) + '</b><small>' + (sub.join(' · ') || '&nbsp;') + '</small></button>' +
       (conBorrar ? '<button class="borrarFila" data-a="borrarRec" data-id="' + esc(x.id) + '" aria-label="Borrar" data-tip="Borrar">🗑️</button>' : '') + '</div></li>';
@@ -875,6 +910,7 @@
     pintarSuave();
     pintarCarita();
     if (lista.includes('feliz') && !Animo.pesado(lista)) setTimeout(() => gestoLiz('celebrar'), 300);
+    setTimeout(() => revisarLogros('animo'), 1500);       // (21-oct-2026: los logros del ánimo y del día gris)
   }
   // Una vez al día, al abrir (si ya lo marcó en la compu, no pregunta). Sin insistir: si cierra la hoja, no vuelve a salir hasta la próxima vez que abra.
   // (Liz 1.0 · prueba 14) "LO NUEVO EN ESTA VERSIÓN": una sola vez después de actualizarse (version.js → loNuevo.id). En una instalación nueva
@@ -895,7 +931,7 @@
       V.loNuevoCelular.cosas.map((n) => '<li>' + esc(n) + '</li>').join('') + '</ul></div><div class="botones"><button class="bt prin grande" data-cerrar>¡Genial!</button></div>' +
       '<button class="enlaceAgenda" data-a="verPrivacidad">🔒 Leer cómo cuido tu privacidad ›</button>');
   }
-  // (19-oct-2026) "¿CÓMO TE SIENTES HOY?" — Catalina: "si está en la app y no lo ha puesto, que le salga para ponerlo". Antes salía UNA vez por
+  // (19-oct-2026) "¿CÓMO TE SIENTES HOY?" — la autora: "si está en la app y no lo ha puesto, que le salga para ponerlo". Antes salía UNA vez por
   // arranque de la app, y el iPhone deja la app viva por detrás: podía pasar el día entero sin preguntarle. Ahora se revisa al abrir, al VOLVER
   // a la app y cada 10 min con la app a la vista: si hoy no lo marcó (en ningún aparato) ni dijo "Ahora no", sale (de 6 a. m. a 11 p. m.). Si
   // cerró la hoja sin elegir, otra vez en 30 min. Nunca mientras repasa, charla o escribe. (Y si no entra a la app: el aviso de las 10 a. m.,
@@ -975,7 +1011,9 @@
         (hoy ? '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + hoy + '</span><span class="t"><b>Las de hoy</b>según tu repaso espaciado</span><span class="flecha">▶</span></button>' : '') +
         '<h3>Otras rondas</h3><div class="panel"><ul class="lista">' +
         op('repasarFav', '⭐', 'oro', 'Mis favoritas', favs) + op('repasarDif', '🔥', 'rosa', 'Las difíciles', difs) +
-        op('repasarTodas', '🔀', '', 'Repaso libre', todas) + '</ul></div>';
+        op('repasarTodas', '🔀', '', 'Repaso libre', todas) + '</ul></div>' +
+        seccionLogros();          // (21-oct-2026) los logros: una fila de 4 y "Ver todos ›"
+      cargarMinis(v);
       return;
     }
     if (sesion.fin) return pintarFin(v);
@@ -1086,6 +1124,7 @@
     const e = sesion && sesion.escrito, c = sesion.cola[sesion.i], t = E.tarjetas[c.id];
     if (!e || !t || e.explicando || !texto.trim()) return;
     e.explicando = true;
+    if (Lg) { Lg.anotarExplica(E, DISP); guardarLocal(); pedirSincro(); }      // (21-oct-2026: para el logro "La profe")
     $('#abajoSesion').innerHTML = botonesSesion();
     decirEnSesion(PENSANDO);
     const r = await cerebro('explicar', { tarjeta: { pregunta: t.pregunta, respuesta: t.respuesta, contexto: t.contexto || '', fuente: t.fuente || '' }, texto, hilo: e.hilo, yaRespondio: true });
@@ -1158,6 +1197,8 @@
     if (!sesion.txtFin) {
       sesion.txtFin = F.frase(perfecto ? 'finPerfecto' : 'fin', { bien: sesion.bien, total: sesion.primeras, nombre: perfil.nombre });
       if (sesion.bien / sesion.primeras >= 0.7) { setTimeout(() => confeti(40), 200); sonar('fin'); }
+      lgRonda = true;                                           // (21-oct-2026) terminó una ronda: ¿se ganó un logro?
+      setTimeout(() => revisarLogros('ronda'), 1400);
     }
     const quedan = tocanHoy().length;
     const bueno = sesion.bien / sesion.primeras >= 0.6;
@@ -1181,6 +1222,24 @@
       document.body.appendChild(c);
       setTimeout(() => c.remove(), 1400);
     }
+  }
+
+  // ---------- (21-oct-2026) POR ENTREGAR: lo que tiene que ENTREGAR va SIEMPRE arriba de la Agenda (la autora: "es lo más importante, se le
+  // puede pasar"): las entregas anotadas (examen tipo "entrega") y los recordatorios o eventos que dicen "entregar", de los próximos 45 días,
+  // y los que se le pasaron sin marcar (hasta 7 días). Lo más urgente primero; tocar uno lo abre. Si no hay nada, no se muestra. ----------
+  function seccionEntregas(ahora) {
+    const l = Ag.porEntregar(E, ahora);         // (agenda.js: la misma lista en la compu)
+    if (!l.length) return '';
+    const cuanto = (ms) => {
+      if (ms < ahora) return { t: '¡Se pasó! ' + N.fechaTxt(ms), c: 'tarde' };
+      const d = Math.round((N.inicioDiaCR(ms) - N.inicioDiaCR(ahora)) / DIA);
+      return { t: d === 0 ? 'HOY, ' + N.horaCR(ms) : d === 1 ? 'Mañana, ' + N.horaCR(ms) : 'En ' + d + ' días · ' + N.fechaTxt(ms), c: d <= 1 ? 'ya' : d <= 3 ? 'pronto' : '' };
+    };
+    return '<div class="entregas"><h3>📌 Por entregar</h3><div class="panel"><ul class="lista">' + l.map((x) => {
+      const q = cuanto(x.ms);
+      return '<li><button class="item entrega ' + q.c + '" data-a="editarAgenda" data-tabla="' + x.tabla + '" data-id="' + esc(x.id) + '"><span class="txt"><b>' + esc(x.titulo) + '</b>' +
+        '<small>' + esc([x.sub, q.t].filter(Boolean).join(' · ')) + '</small></span><span class="chev">›</span></button></li>';
+    }).join('') + '</ul></div></div>';
   }
 
   // ---------- AGENDA (calendario: mes / semana) ----------
@@ -1211,8 +1270,11 @@
         const MAXS = 4;
         return '<button class="dia' + (k === hoy ? ' hoy' : '') + (k === sel ? ' sel' : '') + '" data-a="elegirDia" data-ms="' + ms + '"><div class="f"><small>' +
           esc(new Date(ms).toLocaleDateString('es', { weekday: 'short', timeZone: N.ZONA }).replace('.', '')) + '</small><b>' + N.enCR(ms).d + '</b></div><div class="cosas">' +
-          (cosas.length ? cosas.slice(0, MAXS).map((x) => '<div class="' + (x.tipo === 'clase' ? 'esClase' : x.tipo === 'especial' ? 'esEspecial' : '') + '"><i class="tipoPunto t-' + tipoDe(x) + '"></i>' +
-            (x.tipo === 'especial' ? '' : '<span class="hora">' + N.horaCR(x.ms) + (x.fin ? '–' + N.horaCR(x.fin) : '') + '</span> ') + esc(x.titulo) + '</div>').join('') +
+          // (21-oct-2026) cada clase con el COLOR de su materia y su nombre de materia (+ "lab" si es laboratorio)
+          (cosas.length ? cosas.slice(0, MAXS).map((x) => { const n = x.tipo === 'clase' ? Ag.nombreClase(x, E) : null;
+            return '<div class="' + (n ? 'esClase' : x.tipo === 'especial' ? 'esEspecial' : '') + '"' + (n && n.color ? ' style="--mc:' + esc(n.color) + '"' : '') + '><i class="tipoPunto t-' + tipoDe(x) + '"></i>' +
+            (x.tipo === 'especial' ? '' : '<span class="hora">' + N.horaCR(x.ms) + (x.fin ? '–' + N.horaCR(x.fin) : '') + '</span> ') +
+            esc(n ? (n.actividad ? n.icono + ' ' : '') + n.materia + (n.tipo === 'lab' && !n.actividad ? ' · lab' : '') : (actividadIcono(x) ? actividadIcono(x) + ' ' : '') + x.titulo) + '</div>'; }).join('') +
             (cosas.length > MAXS ? '<div class="nada">y ' + (cosas.length - MAXS) + ' más</div>' : '') : '<div class="nada">—</div>') + '</div></button>';
       }).join('') + '</div>';
     }
@@ -1226,7 +1288,7 @@
     const hoy0 = N.inicioDiaCR(Date.now());
     const atrasados = Ag.rango(E, hoy0 - 60 * DIA, hoy0).filter((x) => x.tabla === 'recordatorios' && !x.hecho && !x.repite && x.ms < ini);
     const filaRec = (x, conDia) => filaAgenda(x, conDia, false, true);
-    ponerHTML(v, escena('saludo', fija('pAg', 'pAgenda')) + '<div class="segFila">' + segAgenda(ag.modo) + '<button class="horarioBt toque" data-a="miHorario">🎓 Mi horario</button></div>' +
+    ponerHTML(v, escena('saludo', fija('pAg', 'pAgenda')) + seccionEntregas(Date.now()) + '<div class="segFila">' + segAgenda(ag.modo) + '<button class="horarioBt toque" data-a="miHorario">🎓 Mi horario</button></div>' +
       '<div class="mesCab"><button data-a="agendaMover" data-d="-1" aria-label="Antes">‹</button><strong>' + esc(cab) + '</strong><button data-a="agendaMover" data-d="1" aria-label="Después">›</button></div>' +
       '<div class="leyenda"><span><i class="tipoPunto t-examen"></i>Examen</span><span><i class="tipoPunto t-evento"></i>Evento</span><span><i class="tipoPunto t-recordatorio"></i>Recordatorio</span>' +
         (hayClases && ag.modo === 'semana' ? '<span><i class="tipoPunto t-clase"></i>Clase</span>' : '') + (fechasEsp().length ? '<span><i class="tipoPunto t-especial"></i>Especial</span>' : '') + '</div>' +
@@ -1246,9 +1308,9 @@
     const s = pomoEstado();
     return '<div class="seg estudiar"><button class="' + (on === 'repasar' ? 'on' : '') + '" data-a="modoEstudio" data-m="repasar">Repasar' +
       (n ? ' <span class="punto-n">' + n + '</span>' : '') + '</button><button class="' + (on === 'mazos' ? 'on' : '') + '" data-a="modoEstudio" data-m="mazos">Mazos</button></div>' +
-      // (prueba 14) El pomodoro: "Estudiar con Liz" (si hay uno en marcha, cuánto le queda)
-      '<button class="pomoBt toque" data-a="ir" data-v="pomodoro"><span class="e">🍅</span><span class="t"><b>Estudiar con Liz</b><small>' +
-      esc(s ? pomoTxt(s) : 'Pomodoro: ' + pomoTiempos().estudio + ' min de estudio + ' + pomoTiempos().descanso + ' de descanso') + '</small></span><span class="chev">›</span></button>';
+      // (prueba 14) El pomodoro: "Estudiar con Liz" (si hay uno en marcha, cuánto le queda). (21-oct-2026) Solo en Repasar, no en Mazos
+      (on === 'repasar' ? '<button class="pomoBt toque" data-a="ir" data-v="pomodoro"><span class="e">🍅</span><span class="t"><b>Estudiar con Liz</b><small>' +
+      esc(s ? pomoTxt(s) : 'Pomodoro: ' + pomoTiempos().estudio + ' min de estudio + ' + pomoTiempos().descanso + ' de descanso') + '</small></span><span class="chev">›</span></button>' : '');
   }
   // (Liz 1.0 · prueba 14) Solo "Mes · Semana": la pestaña Recordatorios se quitó (los recordatorios se ven en su sección, debajo del
   // calendario, y se crean con ＋). ANTES, desde Recordatorios, tocar "Mes" o "Semana" no hacía nada: cambiaba el modo pero la pantalla
@@ -1416,6 +1478,7 @@
     v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' + escena(racha >= 2 ? 'feliz' : 'animo', reps.length ? fija('pProg', 'pProgreso') : fija('pProg', 'pProgresoNada')) +
       '<div class="grandes"><div><b>' + racha + '</b><small>🔥 días seguidos</small></div><div><b>' + pct + '%</b><small>la sabía (30 días)</small></div>' +
       '<div><b>' + r30.length + '</b><small>repasos (30 días)</small></div></div>' +
+      filaLogrosProgreso() +          // (21-oct-2026) "Logros ›"
       seccionAnimo() +
       '<h3>⏱️ Tiempo repasando</h3><div class="panel"><div class="barras">' +
       (Object.keys(siempre).length ? Object.entries(siempre).sort((a, b) => b[1] - a[1]).map(([m, ms]) => '<div class="b"><div class="fila entre"><span>' + esc(m) +
@@ -1426,7 +1489,7 @@
       (cuesta.length ? '<ul class="lista">' + cuesta.map((x) => filaTarjeta(x.t)).join('') + '</ul><div style="padding:6px 10px 10px"><button class="bt grande" data-a="repasarCuestan">Repasar estas ' + cuesta.length + '</button></div>'
         : '<p class="nota">Todavía nada. Cuando falles alguna, aparece aquí.</p>') + '</div>' +
       '<h3>📦 Cómo van tus tarjetas</h3><div class="panel"><div class="cajas">' + cajas.map((c) => '<div style="height:' + Math.max(4, Math.round((c / maxC) * 100)) + '%"></div>').join('') +
-      // (19-oct-2026) "🎓 ya me las sé" (antes decía "sabidas": Catalina, "esa palabra no existe"), igual que el botón "🎓 Ya me la sé"
+      // (19-oct-2026) "🎓 ya me las sé" (antes decía "sabidas": la autora, "esa palabra no existe"), igual que el botón "🎓 Ya me la sé"
       '</div><div class="cajasN">' + cajas.map((c, i) => '<span>' + c + (i < 5 ? '<br>caja ' + (i + 1) : ' 🎓<br>ya me<br>las sé') + '</span>').join('') + '</div>' +
       '<p class="nota">Caja 1: aprendiendo · caja 5: ¡dominadas! Cada vez que la sabes, sube una caja y vuelve más tarde. 🎓: las que marcaste "Ya me la sé".' +
       (archivadas ? ' Además tienes ' + archivadas + ' en 📦 Archivados.' : '') + '</p></div>';
@@ -1489,11 +1552,11 @@
     $('#fotoSecreto', v).onclick = tocarSecreto;
   }
   // ---------- (19-oct-2026) EL TRÁILER DE LIZ ("La primera vez te cuento mi historia") ----------
-  // Lo hace Catalina; la PC lo sube PRIVADO a su cuenta (src/main/movil.js, assets/trailer/trailer-liz.mp4) y aquí se ve en pantalla completa
+  // Lo hace la autora; la PC lo sube PRIVADO a su cuenta (src/main/movil.js, assets/trailer/trailer-liz.mp4) y aquí se ve en pantalla completa
   // (#cine) UNA SOLA VEZ: la primera vez que llega (o si llega uno NUEVO: otra versión), sale solo, antes de "¿Cómo te sientes hoy?", con Liz
   // diciendo que tiene algo para él y SOLO "▶ Ver" (con sonido: el iPhone solo deja sonar un video si él lo toca). Queda visto al TERMINAR el
   // video o al CERRARLO (✕, o al salir del reproductor del iPhone) y no vuelve a salir nunca: no queda en ningún lado para verlo otra vez
-  // (Catalina, 19-oct-2026: antes también estaba en Acerca de Liz y tenía "Ahora no"). La dirección del video es firmada (1 hora): nunca es pública.
+  // (la autora, 19-oct-2026: antes también estaba en Acerca de Liz y tenía "Ahora no"). La dirección del video es firmada (1 hora): nunca es pública.
   const VISTO_TRAILER = 'liz-trailer-visto';
   let trailerPend = false, esperasTrailer = 0, cineUrl = null;
   const trailerVisto = () => { try { return !!perfil.trailer && localStorage.getItem(VISTO_TRAILER) === perfil.trailer.v; } catch (e) { return false; } };
@@ -1546,6 +1609,351 @@
     if (v) { try { v.pause(); v.removeAttribute('src'); v.load(); } catch (e) {} }
     c.classList.remove('ver', 'play');
     setTimeout(() => { c.hidden = true; c.innerHTML = ''; }, 320);
+  }
+
+  // ---------- (21-oct-2026, Liz de bolsillo 1.1) LOS LOGROS DE LIZ: videos e imágenes de premio (Estudiar → Repasar → Logros) ----------
+  // QUÉ logros hay y sus textos llegan PRIVADOS desde la compu (perfil.logros); CUÁNDO se gana cada uno lo decide js/logros.js. Cada logro se
+  // gana UNA vez (fila "logro:<id>" en avisos: no se repite ni al reinstalar) y su hoja de "Logro desbloqueado" sale UNA vez (después él la
+  // abre cuando quiera, desde Logros). Los videos, las imágenes y las miniaturas se ven SOLO con internet, directo de la nube privada
+  // (enlaces firmados de 10 min, en memoria): nada se guarda en el celular. Todo empieza la primera vez que entra a Estudiar: el tráiler de
+  // los logros y, al terminarlo, la bata (el primero). Varios a la vez: uno por uno (si son más de 2, primero "Tienes N logros nuevos").
+  const lgLista = () => (perfil.logros && Array.isArray(perfil.logros.lista) ? perfil.logros.lista : []);
+  const hayLogros = () => !!(Lg && lgLista().length);
+  const lgDe = (id) => lgLista().find((l) => l.id === id) || null;
+  const leerLS = (k, def) => { try { const v = localStorage.getItem(k); return v == null ? def : v; } catch (e) { return def; } };
+  const ponerLS = (k, v) => { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); } catch (e) {} };
+  let lgCola = (() => { try { return JSON.parse(leerLS('liz-logros-cola', '[]')) || []; } catch (e) { return []; } })();     // (ganados que todavía no se mostraron)
+  const lgGuardarCola = () => ponerLS('liz-logros-cola', JSON.stringify(lgCola));
+  let lgDesde = 'estudiar', lgRonda = false, lgSerie = false, lgTrasInicio = false, tLgMostrar = 0, lgFallosTrailer = 0;
+  let lgSinRed = false;                         // (las pruebas simulan "sin internet")
+  const lgEnLinea = () => !lgSinRed && (DEMO || navigator.onLine);
+  let lgDemoUrls = null;                        // (?demo, solo para las pruebas y las fotos: direcciones locales que trae la herramienta)
+  const lgUrls = new Map();                     // archivo → { url, hasta } (solo en memoria, nunca guardado)
+  async function urlsLogros(nombres) {
+    const out = {};
+    if (!lgEnLinea() || !perfil.logros) return out;
+    if (lgDemoUrls) { for (const n of nombres) if (lgDemoUrls[n]) out[n] = lgDemoUrls[n]; return out; }
+    if (!sb) return out;
+    const ahora = Date.now(), faltan = [];
+    for (const n of nombres) { const c = lgUrls.get(n); if (c && c.hasta > ahora + 60000) out[n] = c.url; else faltan.push(n); }
+    if (faltan.length) {
+      try {
+        const base = perfil.logros.carpeta;
+        const r = await sb.storage.from('liz-privado').createSignedUrls(faltan.map((n) => base + n), 600);
+        for (const x of (r && r.data) || []) {
+          const n = x && x.path ? String(x.path).slice(base.length) : null;
+          const u = x && (x.signedUrl || x.signedURL);
+          if (n && u && !x.error) { lgUrls.set(n, { url: u, hasta: ahora + 600000 }); out[n] = u; }
+        }
+      } catch (e) {}
+    }
+    return out;
+  }
+  // Los íconos (de línea fina, como el fondo): PRÁCTICAS un matraz, RECUERDOS una placa de Petri, CONTIGO dos tubos; con su estrellita.
+  // Bloqueado: gris; ganado: lila (el respaldo si la miniatura no carga)
+  const ICONOS_LG = {
+    practicas: '<path d="M19 7h10M21 7v10.5L10.5 37.5A3 3 0 0 0 13.2 42h21.6a3 3 0 0 0 2.7-4.5L27 17.5V7"/><path d="M14.4 31h19.2"/><circle cx="20" cy="36" r="1.3"/><circle cx="26.5" cy="34" r="1"/>',
+    recuerdos: '<ellipse cx="22" cy="30" rx="15" ry="6.5"/><path d="M7 30v3.5c0 3.6 6.7 6.5 15 6.5s15-2.9 15-6.5V30"/><circle cx="17" cy="29.5" r="1.6"/><circle cx="24.5" cy="31.5" r="1.2"/><circle cx="27" cy="27.8" r="1"/>',
+    contigo: '<path d="M12.5 11h8M14 11v21a3 3 0 0 0 6 0V11"/><path d="M27.5 11h8M29 11v21a3 3 0 0 0 6 0V11"/><path d="M14 25h6M29 22h6"/>',
+  };
+  const ESTRELLA_LG = { practicas: [37.5, 9.5], recuerdos: [36.5, 13], contigo: [24.5, 5.5] };
+  // Bloqueado: el MISMO ícono para todos (una estrellita con dos chispitas): así no se adivina qué tipo de recuerdo viene (es sorpresa)
+  const ICONO_SORPRESA = '<svg class="lgIco" viewBox="0 0 48 48" aria-hidden="true"><path class="estrella" d="M24 9l3.4 10.6L38 23l-10.6 3.4L24 37l-3.4-10.6L10 23l10.6-3.4z"/>' +
+    '<path class="estrella" d="M37 8l1.1 2.9L41 12l-2.9 1.1L37 16l-1.1-2.9L33 12l2.9-1.1zM12 32l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1L9 35l2.1-.9z"/></svg>';
+  function iconoLogro(l, ganado) {
+    if (!ganado) return ICONO_SORPRESA;
+    const g = ICONOS_LG[l.grupo] ? l.grupo : 'recuerdos', [x, y] = ESTRELLA_LG[g];
+    const estrella = '<path class="estrella" d="M' + x + ' ' + (y - 4.2) + 'l1.15 3.05 3.05 1.15-3.05 1.15L' + x + ' ' + (y + 4.2) + 'l-1.15-3.05-3.05-1.15 3.05-1.15z"/>';
+    return '<svg class="lgIco' + (ganado ? ' on' : '') + '" viewBox="0 0 48 48" aria-hidden="true">' + ICONOS_LG[g] + estrella + '</svg>';
+  }
+  // Una casilla: ganada = su miniatura (con internet), el nombre y ▶ (video) o ✦ (imagen); nueva sin ver = brilla. Bloqueada = el ícono
+  // gris y la pista (la secreta: "✦ Secreto"; sin pista: "✦")
+  function casillaLogro(l, st) {
+    const g = !!st.ganados[l.id], nuevo = g && !st.vistos[l.id];
+    const nombre = g ? l.titulo : l.secreto ? '✦ Secreto' : l.pista || '✦';
+    return '<button class="lgCasilla toque' + (g ? ' ganado' : ' bloq') + (nuevo ? ' nuevo' : '') + '" data-a="abrirLogro" data-id="' + esc(l.id) + '" aria-label="' + esc(nombre) + '">' +
+      '<span class="lgMarco">' + iconoLogro(l, g) + (g && l.mini ? '<img class="lgMini" data-mini="' + esc(l.mini) + '" alt="" hidden>' : '') +
+      (st.favoritos && st.favoritos[l.id] ? '<i class="lgEsFav" aria-label="Favorito">★</i>' : '') +
+      (g ? '<i class="lgTipo">' + (l.video ? '▶' : '✦') + '</i>' : '') + '</span><span class="lgNombre">' + esc(nombre) + '</span></button>';
+  }
+  // Las miniaturas (solo de los ganados y solo con internet) se piden después de dibujar; si no cargan, queda el ícono
+  async function cargarMinis(raiz) {
+    const imgs = [...(raiz || document).querySelectorAll('img.lgMini[data-mini]')];
+    if (!imgs.length || !lgEnLinea()) return;
+    const urls = await urlsLogros([...new Set(imgs.map((i) => i.dataset.mini))]);
+    for (const i of imgs) {
+      const u = urls[i.dataset.mini];
+      if (!u || !i.isConnected) continue;
+      i.onload = () => { i.hidden = false; if (i.parentNode) i.parentNode.classList.add('conMini'); };
+      i.onerror = () => i.remove();
+      i.src = u;
+    }
+  }
+  // En Repasar, debajo de "Otras rondas": "Logros" (sin contadores), una sola fila de 4 y una línea de Liz
+  function seccionLogros() {
+    if (!hayLogros() || !Lg.empezados(lgLista(), E)) return '';       // (antes del tráiler de los logros no se ven: son sorpresa)
+    const lista = lgLista(), st = Lg.estado(E);
+    const fila = Lg.filaRepasar(lista, E, extraLogros('ver'));
+    const n = lista.filter((l) => st.ganados[l.id]).length, nuevos = lista.filter((l) => st.ganados[l.id] && !st.vistos[l.id]).length;
+    const frase = !n ? 'Cada logro es un pedacito de mi vida de estudiante. Te los voy dando mientras estudias.'
+      : nuevos ? (nuevos === 1 ? 'Tienes uno nuevo sin ver. Tócalo 💜' : 'Tienes algunos nuevos sin ver. Los que brillan 💜')      // (sin números: aquí no hay contadores)
+        : n === lista.length ? '¡Los tienes todos! Qué bonito cultivo.'
+          : unaDe(['Vas muy bien. El siguiente ya casi sale de la incubadora.', 'Cada uno es un recuerdo mío. Me encanta compartirlos contigo.', 'Sigue así: tengo más guardados para ti.'], N.diaCR(Date.now()));
+    return '<div class="lgCab"><h3>Logros</h3><button class="lgTodos" data-a="verLogros">Ver todos ›</button></div>' +
+      '<div class="lgFila">' + fila.map((l) => casillaLogro(l, st)).join('') + '</div>' +
+      '<div class="lgFrase">' + fotoLiz(nuevos ? 'feliz' : null, 'mini') + '<span>' + esc(frase) + '</span></div>';
+  }
+  // En Más → Progreso: una fila "Logros ›" (sin contadores; "nuevo" si hay uno que no ha abierto)
+  function filaLogrosProgreso() {
+    if (!hayLogros() || !Lg.empezados(lgLista(), E)) return '';
+    const st = Lg.estado(E), nuevo = lgLista().some((l) => st.ganados[l.id] && !st.vistos[l.id]);
+    return '<div class="panel compacta lgEnProgreso"><ul class="lista"><li><button class="item" data-a="verLogros" data-desde="progreso"><span class="ico lila">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l2 5.6 5.6 2-5.6 2-2 5.6-2-5.6-5.6-2 5.6-2z"/></svg></span><span class="txt"><b>Logros</b></span>' +
+      (nuevo ? '<span class="dato lgNuevoDato">nuevo</span>' : '') + '<span class="chev">›</span></button></li></ul></div>';
+  }
+  // "Ver todos": UNA sola cuadrícula de 4 por fila (sin grupos: la autora, "debe ser sorpresa"), primero los ganados (el más nuevo primero)
+  // y después los que faltan; al final "Ver el tráiler"
+  function pintarLogros(v) {
+    const vuelta = lgDesde === 'progreso' ? ['progreso', 'Mi progreso'] : ['repasar', 'Estudiar'];
+    const atras = '<button class="volverBt" data-a="ir" data-v="' + vuelta[0] + '">‹ ' + vuelta[1] + '</button>';
+    if (!hayLogros()) { v.innerHTML = atras + vacio('dormida', 'Todavía no hay logros por aquí. Muy pronto.'); return; }
+    const lista = lgLista(), st = Lg.estado(E);
+    const orden = lista.filter((l) => st.ganados[l.id]).sort((a, b) => st.ganados[b.id] - st.ganados[a.id]).concat(lista.filter((l) => !st.ganados[l.id]));
+    // (21-oct-2026) Sus FAVORITOS (★ en la hoja de cada logro) arriba, en su propia sección (el último que marcó, primero)
+    const favs = lista.filter((l) => st.favoritos[l.id]).sort((a, b) => st.favoritos[b.id] - st.favoritos[a.id]);
+    v.innerHTML = atras + escena('feliz', 'Aquí guardo mis recuerdos de estudiante. Cada logro tuyo abre uno.') +
+      (favs.length ? '<h3>★ Favoritos</h3><div class="lgRejilla favs">' + favs.map((l) => casillaLogro(l, st)).join('') + '</div><h3>Todos</h3>' : '') +
+      '<div class="lgRejilla todos">' + orden.map((l) => casillaLogro(l, st)).join('') + '</div>' +
+      (perfil.logros.trailer && Lg.empezados(lista, E) ? '<button class="bt grande lgTrailerBt" data-a="verTrailerLogros">🎬 Ver el tráiler</button>' : '');
+    cargarMinis(v);
+  }
+  // ---- La hoja de un logro ----
+  let lgActual = null;
+  function abrirLogro(id, opc) {
+    opc = opc || {};
+    const l = lgDe(id);
+    if (!l || !hayLogros()) return;
+    if (opc.nuevo) { lgCola = lgCola.filter((x) => x !== id); lgGuardarCola(); }
+    const st = Lg.estado(E);
+    if (!st.ganados[id]) return hojaLogroBloqueado(l);
+    const video = !!l.video, red = lgEnLinea(), por = Lg.porTexto(l);
+    const media = !red ? '<div class="lgSinRed">' + iconoLogro(l, true) + '<p>Para ver este logro necesitas internet.</p></div>'
+      : video ? '<div class="lgVideo" id="lgMedia"><video id="lgVid" playsinline preload="metadata" disablepictureinpicture controlslist="nodownload noplaybackrate"></video>' +
+        '<button class="lgPlay" id="lgPlay" aria-label="Ver el video" disabled><span>▶</span></button></div>'
+        : '<button class="lgImg" id="lgMedia" aria-label="Ver la imagen en grande" disabled><img id="lgImgEl" alt="" hidden><span class="lgEspera"></span></button>';
+    const h = abrirHoja('<div class="lgHoja' + (l.suave ? ' suave' : '') + (opc.nuevo ? ' nuevo' : '') + '">' +
+      '<div class="lgCabHoja"><div class="lgEtiq">' + (opc.nuevo ? 'Logro desbloqueado' : 'Tu logro') + '</div>' +
+      '<button class="lgFavBt' + (st.favoritos[id] ? ' on' : '') + '" id="lgFav" aria-pressed="' + !!st.favoritos[id] + '">' + (st.favoritos[id] ? '★ Favorito' : '☆ Favorito') + '</button></div>' +
+      '<h2 class="lgTitulo">' + esc(l.titulo) + '</h2>' + (por ? '<div class="lgPor">Por: ' + esc(por) + '</div>' : '') + media +
+      (l.relato ? '<blockquote class="lgRelato"><p>' + esc(l.relato) + '</p><cite>— Liz</cite></blockquote>' : '') +
+      (l.frase ? '<div class="lgDice">' + fotoLiz(l.suave ? 'tierna' : 'feliz') + '<span class="comic cola-izq">' + esc(l.frase) + '</span></div>' : '') +
+      '<div class="botones dos"><button class="bt grande" data-cerrar>Verlo luego</button>' +
+      (red ? '<button class="bt prin grande" id="lgVer" disabled>' + (video ? '▶ Ver' : 'Ver la imagen') + '</button>' : '<button class="bt prin grande" data-cerrar>Entendido</button>') + '</div></div>');
+    h.classList.add('conLogro');
+    lgActual = id;
+    // ★ Favorito: se guarda (y se sincroniza) al instante; "Ver todos" lo muestra arriba, en Favoritos
+    $('#lgFav', h).onclick = () => {
+      const on = !Lg.estado(E).favoritos[id];
+      if (!Lg.marcarFavorito(E, id, on, DISP)) return;
+      guardarLocal(); pedirSincro(); vibrar('bien');
+      const b = $('#lgFav', h);
+      b.classList.toggle('on', on); b.setAttribute('aria-pressed', on); b.textContent = on ? '★ Favorito' : '☆ Favorito';
+    };
+    const visto = () => { if (Lg.marcarVisto(E, id, DISP)) { guardarLocal(); pedirSincro(); } };
+    alCerrar = () => {
+      h.classList.remove('conLogro');
+      const vv = $('#lgVid');
+      if (vv) { try { vv.pause(); vv.removeAttribute('src'); vv.load(); } catch (e) {} }
+      lgActual = null;
+      pintarSuave();
+      if (lgTrasInicio && opc.inicio) { lgTrasInicio = false; setTimeout(() => revisarLogros('inicio'), 900); }
+      if (lgCola.length) setTimeout(mostrarLogros, 700); else lgSerie = false;
+    };
+    // La fiesta (no en los "suaves", como el día gris: ni confeti ni sonido de fiesta)
+    if (opc.nuevo && !l.suave) { setTimeout(() => confeti(46), 250); setTimeout(() => gestoLiz('celebrar', '.lgDice .lizFoto'), 500); sonar('fin'); vibrar('bien'); }
+    if (!red) return;
+    const pedir = [video ? l.video : l.imagen].concat(video && l.portada ? [l.portada] : l.mini ? [l.mini] : []);
+    urlsLogros(pedir).then((u) => {
+      if (lgActual !== id) return;
+      const src = u[video ? l.video : l.imagen];
+      if (!src) { const m = $('#lgMedia'); if (m) m.outerHTML = '<div class="lgSinRed">' + iconoLogro(l, true) + '<p>No lo pude traer ahora. Prueba en un ratito (necesita internet).</p></div>'; return; }
+      const ver = $('#lgVer');
+      if (video) {
+        const vid = $('#lgVid'), pl = $('#lgPlay');
+        const poster = u[l.portada] || u[l.mini];          // (la portada 16:9; si no hay, la miniatura)
+        if (poster) vid.poster = poster;
+        vid.src = src;
+        // (el play() va DENTRO del toque: así suena en el iPhone; en línea, sin pantalla completa)
+        const play = () => { pl.hidden = true; vid.controls = true; const p = vid.play(); if (p && p.catch) p.catch(() => {}); visto(); };
+        pl.disabled = false; pl.onclick = play;
+        if (ver) { ver.disabled = false; ver.onclick = play; }
+      } else {
+        const img = $('#lgImgEl'), bt = $('#lgMedia');
+        img.onload = () => { img.hidden = false; bt.classList.add('listo'); bt.disabled = false; if (ver) ver.disabled = false; };
+        img.onerror = () => { bt.outerHTML = '<div class="lgSinRed">' + iconoLogro(l, true) + '<p>No la pude traer ahora. Prueba en un ratito.</p></div>'; };
+        img.src = src;
+        const grande = () => { visorLogro(src, l.titulo); visto(); };
+        bt.onclick = grande;
+        if (ver) ver.onclick = grande;
+      }
+    });
+  }
+  // La imagen en pantalla completa (tocar = cerrar). No se guarda: es la misma dirección firmada.
+  function visorLogro(src, titulo) {
+    const d = document.createElement('div');
+    d.className = 'lgVisor';
+    d.innerHTML = '<img src="' + esc(src) + '" alt="' + esc(titulo || '') + '"><button class="cineCerrar" aria-label="Cerrar">✕</button>';
+    d.onclick = () => { d.classList.remove('ver'); setTimeout(() => d.remove(), 260); };
+    document.body.appendChild(d);
+    requestAnimationFrame(() => d.classList.add('ver'));
+  }
+  function hojaLogroBloqueado(l) {
+    const sinPista = !l.secreto && !l.pista;
+    abrirHoja('<div class="lgHoja bloq"><div class="lgEtiq">' + (l.secreto ? '✦ Secreto' : 'Por ganar') + '</div><div class="lgIcoGrande">' + iconoLogro(l, false) + '</div>' +
+      '<h2 class="lgTitulo">' + esc(l.secreto ? '✦ Secreto' : l.pista || '✦') + '</h2>' +
+      '<div class="lgDice">' + fotoLiz(l.secreto ? 'pensativa' : 'contenta') + '<span class="comic cola-izq">' + esc(l.secreto ? 'Ese no te lo cuento… todavía. Es un secreto de laboratorio 🤫'
+        : sinPista ? 'Ese llega solito, cuando tenga que llegar.' : 'Vas bien. Cuando lo logres, yo te lo enseño.') + '</span></div>' +
+      '<div class="botones"><button class="bt grande" data-cerrar>Entendido</button></div></div>');
+  }
+  // Varios nuevos a la vez (más de 2): primero esta hoja; después, uno por uno
+  function hojaVariosLogros() {
+    const st = Lg.estado(E);
+    const ids = lgCola.filter((id) => lgDe(id) && st.ganados[id]);
+    lgSerie = true;
+    const h = abrirHoja('<div class="lgHoja varios"><div class="lgEtiq">Logros desbloqueados</div><h2 class="lgTitulo">Tienes ' + ids.length + ' logros nuevos</h2>' +
+      '<div class="lgRejilla">' + ids.map((id) => casillaLogro(lgDe(id), st)).join('') + '</div>' +
+      '<div class="lgDice">' + fotoLiz('feliz') + '<span class="comic cola-izq">¡Mira todo lo que te ganaste! Te los enseño uno por uno.</span></div>' +
+      '<div class="botones"><button class="bt prin grande" id="lgUnoPorUno">Verlos uno por uno ›</button><button class="bt grande" id="lgLuego">Luego</button></div></div>');
+    cargarMinis(h);
+    if (!ids.some((id) => lgDe(id).suave)) { setTimeout(() => confeti(50), 250); sonar('fin'); vibrar('bien'); }
+    alCerrar = (v) => { if (v === 'serie') setTimeout(() => abrirLogro(lgCola[0], { nuevo: true }), 350); else if (v && v.id) setTimeout(() => abrirLogro(v.id, { nuevo: true }), 350); else { lgCola = []; lgGuardarCola(); lgSerie = false; pintarSuave(); } };
+    $('#lgUnoPorUno', h).onclick = () => cerrarHoja('serie');
+    $('#lgLuego', h).onclick = () => cerrarHoja(null);           // ("Luego": quedan brillando en Logros, sin volver a salir solos)
+    h.onclick = (ev) => { const b = ev.target.closest('.lgCasilla'); if (b) { ev.stopPropagation(); cerrarHoja({ id: b.dataset.id }); } };
+  }
+  // ¿Se puede mostrar ahora? (nunca en medio de un repaso, escribiendo, con el tráiler o con otra hoja abierta)
+  const puedeMostrarLogro = () => !(sesion && !sesion.fin) && !escribiendo() && $('#cine').hidden && !document.querySelector('#hoja:not([hidden])') &&
+    !document.hidden && $('#entrar').hidden && !document.body.classList.contains('cargando') && !pensandoCharla && !document.querySelector('.lgVisor');
+  function mostrarLogros() {
+    clearTimeout(tLgMostrar);
+    const st = Lg ? Lg.estado(E) : { ganados: {} };
+    lgCola = lgCola.filter((id) => lgDe(id) && st.ganados[id]);
+    lgGuardarCola();
+    if (!lgCola.length) { lgSerie = false; return; }
+    if (!puedeMostrarLogro()) { tLgMostrar = setTimeout(mostrarLogros, 4000); return; }
+    if (lgCola.length > 2 && !lgSerie) return hojaVariosLogros();
+    const id = lgCola[0];
+    abrirLogro(id, { nuevo: true, inicio: lgTrasInicio && (lgDe(id).condicion || {}).tipo === 'primer_estudiar' });
+  }
+  // ---- Cuándo se revisan: al abrir, al volver, al entrar a Estudiar, al terminar una ronda o un pomodoro, al subir un archivo, al mandar
+  // un mensaje, al marcar el ánimo y después de cada sincronización (lo de la compu cuenta). También sin internet (se suben al volver). ----
+  const medianocheLg = () => leerLS('liz-logro-medianoche', '') === '1';
+  function notarMedianoche() { if (N.enCR(Date.now()).h < 5) ponerLS('liz-logro-medianoche', '1'); }
+  let ausenciaLg = 0, lgVolverDesde = Number(leerLS('liz-ultima-visita', '0')) || 0, tLgVolver = 0;
+  const anotarVisita = () => ponerLS('liz-ultima-visita', String(Date.now()));
+  // Cuántos días pasaron sin venir (lo último que hizo antes de esta entrada: aquí o en la compu)
+  function medirAusencia(desde) {
+    const entrada = Date.now(), act = [Number(desde) || 0];
+    for (const r of Object.values(E.repasos || {})) if (r && r.fecha && r.fecha < entrada - 60000) act.push(r.fecha);
+    for (const m of charla) if (m && m.quien === 'el' && m.fecha < entrada - 60000) act.push(m.fecha);
+    const ultima = Math.max.apply(null, act);
+    ausenciaLg = ultima > 0 ? Math.max(0, (entrada - ultima) / DIA) : 0;
+  }
+  function volvioLogros() {
+    clearTimeout(tLgVolver);
+    if (lgVolverDesde == null) return;
+    const desde = lgVolverDesde;
+    lgVolverDesde = null;
+    medirAusencia(desde);
+    anotarVisita();
+    revisarLogros('volver');
+  }
+  // Si la sincronización no llega (sin internet), se mide igual a los 20 s con lo que hay aquí (si está sincronizando, se espera)
+  function esperarVuelta() {
+    clearTimeout(tLgVolver);
+    tLgVolver = setTimeout(() => { if (sincronizando && navigator.onLine) esperarVuelta(); else volvioLogros(); }, 20000);
+  }
+  function extraLogros() {
+    const ahora = Date.now();
+    return { ahora, charla, estudiar: false, rondaTerminada: lgRonda, medianoche: medianocheLg(), ausenciaDias: ausenciaLg, fechasHoy: fechasDelDia(ahora).map((f) => f.id) };
+  }
+  function revisarLogros(motivo, mas) {
+    if (!hayLogros() || (!E.usuario && !DEMO) || !Lg.empezados(lgLista(), E)) return [];
+    const nuevos = Lg.revisar(lgLista(), E, Object.assign(extraLogros(motivo), mas || {}));
+    if (!nuevos.length) return [];
+    for (const id of nuevos) Lg.ganar(E, id, DISP);
+    guardarLocal();
+    pedirSincro();
+    lgCola = lgCola.concat(nuevos.filter((id) => !lgCola.includes(id)));
+    lgGuardarCola();
+    if (nuevos.some((id) => (lgDe(id).condicion || {}).tipo === 'medianoche')) ponerLS('liz-logro-medianoche', null);
+    console.log('[Liz] logros (' + motivo + '): ' + nuevos.join(', '));
+    pintarSuave();
+    tLgMostrar = setTimeout(mostrarLogros, 600);
+    return nuevos;
+  }
+  // ---- La PRIMERA vez que entra a Estudiar con esta versión: Liz tiene algo nuevo (el tráiler de los logros) y al terminarlo (o cerrarlo)
+  // se gana el primero (la bata), con su hoja de siempre; después, lo que ya tenía cumplido. Sin internet, el aviso espera. ----
+  const lgTrailerVisto = () => leerLS('liz-logros-trailer', '') === '1';
+  function revisarEntradaEstudiar() {
+    if (!hayLogros() || Lg.empezados(lgLista(), E) || !DE_ESTUDIAR.includes(vista) || (sesion && !sesion.fin)) return;
+    if (!lgEnLinea()) return;                                       // ('online' lo vuelve a revisar)
+    if (!$('#cine').hidden || document.querySelector('#hoja:not([hidden])') || document.body.classList.contains('cargando') || escribiendo()) { setTimeout(revisarEntradaEstudiar, 3000); return; }
+    if (perfil.logros.trailer && !lgTrailerVisto() && lgFallosTrailer < 3) return cineLogros(true);
+    empezarLogros();
+  }
+  function empezarLogros() {
+    const i = Lg.inicio(lgLista());
+    if (!i || Lg.estado(E).ganados[i.id]) return;
+    Lg.ganar(E, i.id, DISP);
+    guardarLocal();
+    subirYa();
+    lgCola = [i.id].concat(lgCola.filter((x) => x !== i.id));
+    lgGuardarCola();
+    lgTrasInicio = true;
+    console.log('[Liz] logros: empezaron (' + i.id + ')');
+    mostrarLogros();
+  }
+  async function cineLogros(primera) {
+    const c = $('#cine');
+    if (!c.hidden || !perfil.logros || !perfil.logros.trailer) return;
+    const url = (await urlsLogros([perfil.logros.trailer]))[perfil.logros.trailer];
+    if (!url) { if (primera) { lgFallosTrailer++; setTimeout(revisarEntradaEstudiar, 8000); } else avisar('Para ver el tráiler necesito internet.'); return; }
+    let hecho = false;
+    const fin = () => { if (hecho) return; hecho = true; if (primera) { ponerLS('liz-logros-trailer', '1'); setTimeout(empezarLogros, 500); } };
+    c.innerHTML = '<div class="cineTapa">' + escena('saludo', primera ? 'Tengo algo nuevo para ti' : 'Mis logros, en treinta segundos 🎬') +
+      '<div class="botones"><button class="bt prin grande" id="cineVer">▶ Ver</button></div></div>' +
+      '<video id="cineVideo" playsinline preload="auto" controls src="' + esc(url) + '"></video><button class="cineCerrar" id="cineCerrar" aria-label="Cerrar">✕</button>';
+    c.hidden = false;
+    requestAnimationFrame(() => c.classList.add('ver'));
+    const v = $('#cineVideo');
+    const esIOS = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    $('#cineVer').onclick = () => {
+      c.classList.add('play');
+      const p = v.play();
+      if (p && p.catch) p.catch(() => {});
+      if (esIOS && v.webkitEnterFullscreen) { try { v.webkitEnterFullscreen(); } catch (e) {} }
+    };
+    v.addEventListener('webkitendfullscreen', () => { fin(); setTimeout(cerrarCine, 200); });
+    $('#cineCerrar').onclick = () => { fin(); cerrarCine(); };
+    v.onended = () => { fin(); try { if (v.webkitDisplayingFullscreen && v.webkitExitFullscreen) v.webkitExitFullscreen(); } catch (e) {} setTimeout(cerrarCine, 700); };
+  }
+  // ---- Lo que la Liz del celular sabe de sus logros (va al cerebro en la PRIMERA línea del contexto, que siempre llega). Igual que en la
+  // compu (src/main/logros.js): lo ya ganado y, si habla de eso o nombra uno, su relato y lo que le dijo. Nunca uno bloqueado. ----
+  // (la arma js/logros.js → contexto: así la prueba del cerebro, herramientas/probar-recuerdos-celular.js, usa exactamente lo mismo)
+  const logrosContexto = (texto) => (hayLogros() && Lg.empezados(lgLista(), E) ? Lg.contexto(lgLista(), E, texto) : '');
+
+  // (21-oct-2026) De vez en cuando, Liz pregunta por su agenda en la charla ("¿tienes algún parcial pronto?", las fechas del verano…): la
+  // misma regla que la compu (agenda.js → preguntaAgenda), una vez cada 4 días entre los dos aparatos. Nunca en medio de un repaso.
+  // (22-oct-2026) La lógica vive APARTE, en js/fechas-u.js (cuándo preguntar, según lo que se publica cada año): si no está, no pregunta.
+  function revisarPreguntaAgenda() {
+    if (!self.FechasU || !E.usuario || (sesion && !sesion.fin) || document.hidden || !$('#entrar').hidden) return;
+    const p = FechasU.preguntar(E, Date.now());
+    if (!p) return;
+    FechasU.anotar(E, p, DISP);
+    guardarLocal(); pedirSincro();
+    agregarMsg({ quien: 'liz', texto: p.texto, animo: 'contenta' });
+    if (vista !== 'charla') { avisoCharla = true; pintarMenu(); }
   }
 
   // (19-oct-2026) Abrir "Acerca de Liz" justo en la CARTA (el enlace #carta y el botón del mensaje del aniversario)
@@ -1616,7 +2024,7 @@
     const aV = (v2) => ' data-v="' + v2 + '"';
     const grupo = (t, filas) => '<h3>' + t + '</h3><div class="panel compacta"><ul class="lista">' + filas + '</ul></div>';
     const hoyAn = Animo.deHoy(E);
-    // (Liz 1.0 · prueba 14) "Más" en 3 partes (Catalina): MÁS OPCIONES (lo de estudio + el diario de ánimo), AJUSTES (avisos, vibración,
+    // (Liz 1.0 · prueba 14) "Más" en 3 partes (la autora): MÁS OPCIONES (lo de estudio + el diario de ánimo), AJUSTES (avisos, vibración,
     // sonido, reducir movimiento, sincronización y, al final, la cuenta: su correo, o "Modo de prueba" en ?demo) y ACERCA DE LIZ sola,
     // con la carita de Liz en un círculo como ícono. Ya no existe "Tu Liz y tu cuenta". Debajo, la versión y "Cerrar sesión".
     const cara = '<span class="ico icoLiz">' + fotoLiz('contenta') + '</span>';
@@ -1772,13 +2180,31 @@
   // Cada clase es un evento semanal (agenda.js crearClase). Con el horario, Liz no manda el aviso de estudio mientras está en clase
   // (supabase/avisos.sql), lo saluda distinto después de clases y le sugiere estudiar en sus ratos libres. Nuevo semestre: "Borrar todo".
   const DIA_CORTO = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
+  // (21-oct-2026) Arriba, "Tus materias": cada materia UNA vez, con su color, aunque tenga varios días o teoría y laboratorio
+  const TIPO_TXT = { teoria: 'Teoría', lab: 'Laboratorio' };
+  const puntoMateria = (color) => '<i class="puntoMateria" style="--mc:' + esc(color || 'var(--clase)') + '"></i>';
   function hojaHorario() {
-    const l = Ag.clases(E);
+    const l = Ag.clases(E), todo = Ag.horario(E), mats = todo.filter((g) => !g.actividad), otras = todo.filter((g) => g.actividad);
     const porDia = Ag.DIAS_SEMANA.map((d, i) => [d, l.filter((c) => c.datos.dia === i)]).filter(([, cs]) => cs.length);
-    abrirHoja('<h2>🎓 Mi horario</h2><p class="suave" style="margin-top:-4px">Tus clases de la semana. Con esto no te mando avisos de estudio mientras estás en clase y te saludo al salir.</p>' +
-      (porDia.length ? porDia.map(([d, cs]) => '<h3 class="diaHorario">' + esc(d.charAt(0).toUpperCase() + d.slice(1)) + '</h3><div class="panel"><ul class="lista">' + cs.map((c) =>
-        '<li><div class="item"><span class="hora claseHora">' + esc(c.datos.inicio) + '–' + esc(c.datos.fin) + '</span><button class="txt" style="text-align:left" data-a="editarClase" data-id="' + esc(c.id) + '"><b>' + esc(c.titulo) + '</b><small>' +
-        esc(c.datos.aula || 'Toca para editar') + '</small></button><button class="borrarFila" data-a="borrarClase" data-id="' + esc(c.id) + '" aria-label="Borrar clase">🗑️</button></div></li>').join('') + '</ul></div>').join('')
+    const resumen = (g) => ['teoria', 'lab'].map((t) => { const ss = g.sesiones.filter((s) => s.tipo === t); return ss.length ? TIPO_TXT[t] + ': ' + ss.map((s) => DIA_CORTO[s.dia]).join(', ') : ''; }).filter(Boolean).join(' · ');
+    abrirHoja('<h2>🎓 Mi horario</h2><p class="suave" style="margin-top:-4px">Tus clases de la semana. Lo que tú programas te llega a su hora, aunque estés en clase. Los avisos que pongo yo (3 días antes, el día antes…) nunca caen en medio de una clase: te llegan antes o al salir, según lo importante que sea.</p>' +
+      (mats.length ? '<h3 class="diaHorario">Tus materias (' + mats.length + ')</h3><div class="panel"><ul class="lista materiasHorario">' + mats.map((g) => {
+        // (21-oct-2026) un laboratorio puede ser parte de la materia o OTRO curso: aquí se separa o se vuelve a juntar (lo ya anotado)
+        const conLab = !g.aparte && g.sesiones.some((s) => s.tipo === 'lab'), base = g.aparte && mats.find((o) => !o.aparte && 'laboratorio ' + o.clave === g.clave);
+        const bt = conLab ? '<button class="bt chico labBt" data-a="separarLab" data-clave="' + esc(g.clave) + '" data-v="1">Separar el lab</button>'
+          : g.aparte ? '<button class="bt chico labBt" data-a="separarLab" data-clave="' + esc(g.clave) + '" data-v="0">' + (base ? 'Juntar con ' + esc(base.materia) : 'Es parte de la materia') + '</button>' : '';
+        return '<li><div class="item">' + puntoMateria(g.color) + '<span class="txt"><b>' + esc(g.materia) + '</b><small>' + esc(resumen(g)) + '</small></span>' + bt + '</div></li>';
+      }).join('') + '</ul></div><p class="suave notaLab">Si un laboratorio es un curso aparte (con su propia nota), toca «Separar el lab».</p>' : '') +
+      // (22-oct-2026) las tutorías que da y su TCU: aparte, con su ícono (no son materias)
+      (otras.length ? '<h3 class="diaHorario">Tutorías y TCU</h3><div class="panel"><ul class="lista materiasHorario">' + otras.map((g) =>
+        '<li><div class="item">' + puntoMateria(g.color) + '<span class="txt"><b>' + Ag.ACTIVIDADES[g.actividad].icono + ' ' + esc(g.materia) + '</b><small>' +
+        esc(g.sesiones.map((s) => DIA_CORTO[s.dia] + ' ' + s.inicio).join(', ')) + '</small></span></div></li>').join('') + '</ul></div>' : '') +
+      (porDia.length ? porDia.map(([d, cs]) => '<h3 class="diaHorario">' + esc(d.charAt(0).toUpperCase() + d.slice(1)) + '</h3><div class="panel"><ul class="lista">' + cs.map((c) => {
+        const n = Ag.nombreClase(c, E);
+        return '<li><div class="item"><span class="hora claseHora">' + esc(c.datos.inicio) + '–' + esc(c.datos.fin) + '</span>' + puntoMateria(n.color) +
+          '<button class="txt" style="text-align:left" data-a="editarClase" data-id="' + esc(c.id) + '"><b>' + (n.actividad ? n.icono + ' ' : '') + esc(n.materia) + '</b><small>' +
+          esc([n.actividad ? (n.actividad === 'tutoria' ? 'Tutoría (la das tú)' : 'TCU') : TIPO_TXT[n.tipo], c.datos.aula].filter(Boolean).join(' · ') || 'Toca para editar') + '</small></button><button class="borrarFila" data-a="borrarClase" data-id="' + esc(c.id) + '" aria-label="Borrar clase">🗑️</button></div></li>';
+      }).join('') + '</ul></div>').join('')
         : '<div class="panel" style="padding:16px;text-align:center"><p class="suave" style="margin:0">Todavía no tienes clases anotadas.</p></div>') +
       '<div class="botones"><button class="bt prin grande" data-a="nuevaClase">＋ Agregar clase</button>' +
       (l.length ? '<button class="bt grande vaciarBt" style="margin:6px auto 0" data-a="borrarHorario">🗑️ Borrar todo el horario (nuevo semestre)</button>' : '') +
@@ -1786,26 +2212,90 @@
   }
   function formClase(fila) {
     const c = fila ? fila.datos : {};
-    const st = { materia: fila ? fila.titulo : '', dia: fila ? c.dia : Math.min(4, (N.enCR(Date.now()).dow + 6) % 7), inicio: c.inicio || '08:00', fin: c.fin || '09:50', aula: c.aula || '' };
+    // (21-oct-2026) + el TIPO (teoría o laboratorio): así "Bacteriología" teoría y laboratorio es UNA materia (y conserva su color)
+    const n0 = fila ? Ag.nombreClase(fila, E) : null;
+    // (un laboratorio que es curso aparte se ve como "Laboratorio de X": aquí se edita "X" con "Curso aparte" marcado)
+    const st = { materia: n0 ? n0.materia.replace(n0.aparte ? /^Laboratorio de / : /^$/, '') : '', dia: fila ? c.dia : Math.min(4, (N.enCR(Date.now()).dow + 6) % 7), inicio: c.inicio || '08:00', fin: c.fin || '09:50', aula: c.aula || '',
+      tipo: n0 ? n0.tipo : 'teoria', aparte: !!(n0 && n0.aparte), color: fila ? c.color || null : null, actividad: (n0 && n0.actividad) || '' };
+    // (22-oct-2026) una tutoría o el TCU: su nombre tal cual (no es una materia)
+    const claveDe = (s) => (s.actividad ? s.actividad + ' ' + Ag.materiaDeClase(s.materia || s.actividad).clave : Ag.materiaDeClase(s.materia, s.tipo, s.tipo === 'lab' && s.aparte).clave);
+    const clave0 = fila ? claveDe(st) : null;
     const leer = (h) => { for (const k of ['materia', 'inicio', 'fin', 'aula']) { const el = $('#fc-' + k, h); if (el) st[k] = el.value; } };
+    // (21-oct-2026) Al AGREGAR: sus materias ya escritas, para tocarlas (no se vuelve a escribir el nombre) y VARIOS días a la vez (una clase
+    // por día, con la misma hora). Al editar, una sola clase: un solo día.
+    st.dias = [st.dia];
+    const mats = fila ? [] : Ag.horario(E).filter((g) => !g.actividad);
     function dibujar() {
-      const h = abrirHoja('<h2>' + (fila ? 'Editar clase' : 'Agregar clase') + '</h2><form id="fClase">' +
-        '<label for="fc-materia">Materia</label><input type="text" id="fc-materia" list="fc-materias" value="' + esc(st.materia) + '" placeholder="Ej.: Micología" maxlength="80">' +
+      const clave = claveDe(st), act = Ag.ACTIVIDADES[st.actividad];
+      const h = abrirHoja('<h2>' + (fila ? 'Editar' : 'Agregar') + ' en mi horario</h2><form id="fClase">' +
+        // (22-oct-2026) ¿Qué es? una clase, una tutoría que él da, o su TCU (estas dos, con su ícono y su color, sin ser materias)
+        '<label>¿Qué es?</label><div class="seg">' + [['', '🎓 Clase'], ['tutoria', '🧑‍🏫 Tutoría'], ['tcu', '🤝 TCU']].map(([v, t]) =>
+          '<button type="button" class="' + (v === st.actividad ? 'on' : '') + '" data-act="' + v + '">' + t + '</button>').join('') + '</div>' +
+        (!act && mats.length ? '<label>Tus materias <small class="suave">(toca una para no escribirla otra vez)</small></label><div class="chipsMateria">' + mats.map((g, i) =>
+          '<button type="button" class="chipMateria' + (g.clave === clave ? ' on' : '') + '" data-mat="' + i + '" style="--mc:' + esc(g.color) + '">' + puntoMateria(g.color) + esc(g.materia) + '</button>').join('') + '</div>' : '') +
+        (act ? '<label for="fc-materia">Nombre <small class="suave">(si quieres)</small></label><input type="text" id="fc-materia" value="' + esc(st.materia) + '" placeholder="' +
+            (st.actividad === 'tutoria' ? 'Ej.: Tutoría de Química General' : 'Ej.: TCU en la escuela') + '" maxlength="80">'
+          : '<label for="fc-materia">' + (mats.length ? 'O una nueva' : 'Materia') + '</label><input type="text" id="fc-materia" list="fc-materias" value="' + esc(st.materia) + '" placeholder="Ej.: Micología" maxlength="80">' +
         '<datalist id="fc-materias">' + materiasConocidas().map((m) => '<option value="' + esc(m) + '">').join('') + '</datalist>' +
-        '<label>Día</label><div class="seg dias">' + DIA_CORTO.map((d, i) => '<button type="button" class="' + (i === st.dia ? 'on' : '') + '" data-dia="' + i + '">' + d + '</button>').join('') + '</div>' +
+        '<label>¿Teoría o laboratorio?</label><div class="seg">' + ['teoria', 'lab'].map((t) => '<button type="button" class="' + (t === st.tipo ? 'on' : '') + '" data-tipo="' + t + '">' + TIPO_TXT[t] + '</button>').join('') + '</div>' +
+        // (21-oct-2026) un laboratorio puede ser parte de la materia (como el de Inmunohematología) o un CURSO APARTE (como el de Hematología)
+        (st.tipo === 'lab' ? '<div class="seg aparteSeg">' + [[false, 'Parte de la materia'], [true, 'Curso aparte']].map(([v, t]) =>
+          '<button type="button" class="' + (v === !!st.aparte ? 'on' : '') + '" data-aparte="' + (v ? 1 : 0) + '">' + t + '</button>').join('') + '</div>' : '')) +
+        '<label>' + (fila ? 'Día' : 'Días <small class="suave">(puedes tocar varios)</small>') + '</label><div class="seg dias">' + DIA_CORTO.map((d, i) =>
+          '<button type="button" class="' + ((fila ? i === st.dia : st.dias.includes(i)) ? 'on' : '') + '" data-dia="' + i + '">' + d + '</button>').join('') + '</div>' +
         '<div class="dos"><div><label for="fc-inicio">Empieza</label><input type="time" id="fc-inicio" value="' + esc(st.inicio) + '"></div><div><label for="fc-fin">Termina</label><input type="time" id="fc-fin" value="' + esc(st.fin) + '"></div></div>' +
         '<label for="fc-aula">Aula (si quieres)</label><input type="text" id="fc-aula" value="' + esc(st.aula) + '" placeholder="Ej.: Aula 203" maxlength="60">' +
         '<p class="error" id="fc-err"></p><div class="botones"><button class="bt prin grande">Guardar</button>' +
         (fila ? '<button type="button" class="bt grande peligro" id="fc-borrar">🗑️ Borrar clase</button>' : '') + '<button type="button" class="bt grande" id="fc-volver">Volver</button></div></form>');
-      h.onclick = (ev) => { const b = ev.target.closest('[data-dia]'); if (!b) return; leer(h); st.dia = Number(b.dataset.dia); dibujar(); };
+      h.onclick = (ev) => {
+        const b = ev.target.closest('[data-dia]'), t = ev.target.closest('[data-tipo]'), m = ev.target.closest('[data-mat]'), ap = ev.target.closest('[data-aparte]');
+        if (ap) { leer(h); st.aparte = ap.dataset.aparte === '1'; st.color = null; dibujar(); return; }
+        const ac = ev.target.closest('[data-act]');
+        if (ac) { leer(h); if (st.actividad !== ac.dataset.act) { st.actividad = ac.dataset.act; st.color = null; } dibujar(); return; }
+        if (b) {
+          leer(h);
+          const d = Number(b.dataset.dia);
+          if (fila) st.dia = d;
+          else { st.dias = st.dias.includes(d) ? (st.dias.length > 1 ? st.dias.filter((x) => x !== d) : st.dias) : st.dias.concat(d).sort((x, y) => x - y); st.dia = st.dias[0]; }
+          dibujar();
+        }
+        if (t) { leer(h); st.tipo = t.dataset.tipo; dibujar(); }
+        if (m) {
+          leer(h);
+          const g = mats[Number(m.dataset.mat)];
+          st.materia = g.aparte ? g.materia.replace(/^Laboratorio de /, '') : g.materia; st.color = g.color;
+          if (g.aparte) { st.tipo = 'lab'; st.aparte = true; } else st.aparte = false;
+          dibujar();
+        }
+      };
       $('#fc-volver', h).onclick = () => hojaHorario();
       if (fila) $('#fc-borrar', h).onclick = () => { Ag.borrar(E, 'eventos', fila.id, DISP); cambio(); avisar('Clase borrada (está en la papelera).'); hojaHorario(); };
       $('#fClase', h).addEventListener('submit', (ev) => {
         ev.preventDefault();
         leer(h);
-        const r = fila ? Ag.editarClase(E, fila.id, st, DISP) : Ag.crearClase(E, st, DISP);
-        if (r.error) { $('#fc-err', h).textContent = r.error.charAt(0).toUpperCase() + r.error.slice(1) + '.'; return; }
-        avisar(fila ? 'Clase guardada.' : 'Clase anotada en tu horario.');
+        if (st.tipo !== 'lab' || st.actividad) st.aparte = false;
+        if (st.actividad && !String(st.materia || '').trim()) st.materia = Ag.ACTIVIDADES[st.actividad].nombre;      // (sin nombre: "Tutoría" / "TCU")
+        if (fila && claveDe(st) !== clave0) st.color = null;     // (otra materia: su color)
+        const errorTxt = (e) => { $('#fc-err', h).textContent = e.charAt(0).toUpperCase() + e.slice(1) + '.'; };
+        if (fila) {
+          const r = Ag.editarClase(E, fila.id, st, DISP);
+          if (r.error) return errorTxt(r.error);
+          avisar('Clase guardada.');
+        } else {
+          // Una clase por cada día elegido (primero se revisa que esté bien; la que ya existe igual —misma materia, día y hora— no se repite)
+          const prueba = { clave: claveDe(st) };
+          const yaEsta = (d) => Ag.clases(E).some((c) => c.datos.dia === d && c.datos.inicio === st.inicio &&
+            claveDe({ materia: c.titulo, tipo: c.datos.tipo, aparte: c.datos.aparte, actividad: c.datos.actividad || '' }) === prueba.clave);
+          const dias = st.dias.filter((d) => !yaEsta(d));
+          if (!dias.length) return errorTxt('esa clase ya está en tu horario');
+          let hechas = 0;
+          for (const d of dias) {
+            const r = Ag.crearClase(E, Object.assign({}, st, { dia: d, color: st.color || (hechas ? Ag.colorDe(E, st.materia) : null) }), DISP);
+            if (r.error) { if (!hechas) return errorTxt(r.error); break; }
+            hechas++;
+          }
+          avisar(hechas > 1 ? 'Anotado en ' + hechas + ' días de tu horario.' : 'Anotado en tu horario.');
+        }
         cambio();
         hojaHorario();
       });
@@ -1820,28 +2310,43 @@
     const esHoy = N.diaCR(ag.dia) === N.diaCR(ahora);
     const base = fila ? fila.cuando : esHoy ? Math.ceil((ahora + 30 * MIN) / H) * H : ag.dia + 9 * H;
     const st = { tabla, que: (fila && fila.que) || 'examen', repite: (fila && fila.repite) || null,
-      titulo: fila ? fila.titulo || fila.texto || '' : '', materia: fila ? fila.materia || '' : '', fecha: N.diaCR(base), hora: N.horaCR(base), nota: fila ? fila.nota || '' : '' };
+      titulo: fila ? fila.titulo || fila.texto || '' : '', materia: fila ? fila.materia || '' : '', fecha: N.diaCR(base), hora: N.horaCR(base), nota: fila ? fila.nota || '' : '',
+      parte: fila && tabla === 'examenes' ? Ag.parteDe(fila) || '' : '',
+      nivel: fila && tabla === 'recordatorios' && fila.datos && Ag.NIVELES[fila.datos.nivel] ? fila.datos.nivel : '',
+      actividad: fila && tabla === 'eventos' ? Ag.actividadDe(fila) || '' : '' };
+  const NIVEL_AYUDA = { normal: 'Te aviso a la hora.', suave: 'Te aviso el día antes y a la hora.', importante: 'Te aviso 3 días antes, el día antes y a la hora.',
+    insistente: 'Te aviso el día antes, ese día temprano, a la hora y cada 3 horas hasta que lo marques listo.' };
     const leer = (h) => { for (const k of ['titulo', 'materia', 'fecha', 'hora', 'nota']) { const el = $('#fa-' + k, h); if (el) st[k] = el.value; } };
     const seg = (accion, opciones, actual) => '<div class="seg">' + opciones.map(([v, t]) => '<button type="button" class="' + (v === actual ? 'on' : '') + '" data-' + accion + '="' + v + '">' + t + '</button>').join('') + '</div>';
     function dibujar() {
       const ex = st.tabla === 'examenes';
       const h = abrirHoja('<h2>' + (editando ? 'Editar' : 'Agregar') + '</h2><form id="fAgenda">' +
         (editando ? '' : seg('tipo', [['eventos', '📅 Evento'], ['examenes', '📝 Examen'], ['recordatorios', '⏰ Recordar']], st.tabla)) +
-        (ex ? '<label>¿Qué es?</label>' + seg('que', [['examen', 'Examen'], ['parcial', 'Parcial'], ['entrega', 'Entrega'], ['quiz', 'Quiz']], st.que) +
-          '<label for="fa-materia">Materia</label><input type="text" id="fa-materia" list="fa-materias" value="' + esc(st.materia) + '" placeholder="Ej.: Micología">'
-          : '<label for="fa-titulo">' + (st.tabla === 'eventos' ? 'Título' : '¿Qué te recuerdo?') + '</label><input type="text" id="fa-titulo" value="' + esc(st.titulo) + '" placeholder="' +
+        (ex ? '<label>¿Qué es?</label>' + seg('que', [['examen', 'Examen'], ['parcial', 'Parcial'], ['quiz', 'Quiz'], ['presentacion', 'Present.'], ['entrega', 'Entrega']], st.que) +
+          '<label for="fa-materia">Materia</label><input type="text" id="fa-materia" list="fa-materias" value="' + esc(st.materia) + '" placeholder="Ej.: Micología">' +
+          // (21-oct-2026) en los cursos con teoría y laboratorio, el parcial puede ser de una parte o de las dos (sin elegir: como siempre)
+          '<label>¿De qué parte? <small class="suave">(si el curso tiene teoría y laboratorio)</small></label>' +
+          seg('parte', [['teoria', 'Teoría'], ['lab', 'Laboratorio'], ['ambos', 'Las dos']], st.parte)
+          : (st.tabla === 'eventos' ? '<label>¿Qué es?</label>' + seg('actev', [['', '📅 Evento'], ['tutoria', '🧑‍🏫 Tutoría'], ['tcu', '🤝 TCU']], st.actividad) : '') +      // (22-oct-2026)
+            '<label for="fa-titulo">' + (st.tabla === 'eventos' ? 'Título' : '¿Qué te recuerdo?') + '</label><input type="text" id="fa-titulo" value="' + esc(st.titulo) + '" placeholder="' +
             (st.tabla === 'eventos' ? 'Ej.: Laboratorio de bacterio' : 'Ej.: Comprar guantes') + '" maxlength="140">' +
             '<label for="fa-materia">Materia (si quieres)</label><input type="text" id="fa-materia" list="fa-materias" value="' + esc(st.materia) + '" placeholder="Ej.: Micología">') +
         '<datalist id="fa-materias">' + materiasConocidas().map((m) => '<option value="' + esc(m) + '">').join('') + '</datalist>' +
         '<div class="dos"><div><label for="fa-fecha">Fecha</label><input type="date" id="fa-fecha" value="' + st.fecha + '"></div><div><label for="fa-hora">Hora</label><input type="time" id="fa-hora" value="' + st.hora + '"></div></div>' +
         (ex ? '' : '<label>Repetir</label>' + seg('rep', [['', 'Nunca'], ['diario', 'Diario'], ['semanal', 'Semanal']].concat(st.repite === 'mensual' ? [['mensual', 'Mensual']] : []), st.repite || '')) +
+        // (21-oct-2026) la INTENSIDAD (solo uno que no se repite): la elijo yo según lo que dice, y él la puede cambiar
+        (st.tabla === 'recordatorios' && !st.repite ? (() => { const n = st.nivel || Ag.nivelDe({ texto: st.titulo }); return '<label>¿Qué tan importante?</label>' +
+          seg('nivel', [['normal', 'Normal'], ['suave', 'Suave'], ['importante', 'Importante'], ['insistente', 'Insistente']], n) + '<p class="suave ayudaNivel">' + NIVEL_AYUDA[n] + '</p>'; })() : '') +
         (st.tabla !== 'recordatorios' ? '<label for="fa-nota">Nota (si quieres)</label><textarea id="fa-nota" maxlength="300" placeholder="Aula, qué llevar, temas…">' + esc(st.nota) + '</textarea>' : '') +
         '<p class="error" id="fa-err"></p><div class="botones"><button class="bt prin grande">Guardar</button>' +
         (editando ? '<button type="button" class="bt grande peligro" id="fa-borrar">🗑️ Borrar</button>' : '') + '<button type="button" class="bt grande" data-cerrar>Cancelar</button></div></form>');
       h.onclick = (ev) => {
-        const b = ev.target.closest('[data-tipo],[data-que],[data-rep]');
+        const b = ev.target.closest('[data-tipo],[data-que],[data-rep],[data-parte],[data-nivel],[data-actev]');
         if (!b) return;
         leer(h);
+        if (b.dataset.actev !== undefined) st.actividad = b.dataset.actev;
+        if (b.dataset.nivel) st.nivel = b.dataset.nivel;
+        if (b.dataset.parte) st.parte = st.parte === b.dataset.parte ? '' : b.dataset.parte;      // (tocar la elegida la quita)
         if (b.dataset.tipo) st.tabla = b.dataset.tipo;
         if (b.dataset.que) st.que = b.dataset.que;
         if (b.dataset.rep !== undefined) st.repite = b.dataset.rep || null;
@@ -1854,9 +2359,9 @@
         const err = $('#fa-err', h);
         if (!isFinite(cuando)) { err.textContent = 'Falta la fecha o la hora.'; return; }
         if (!editando && cuando < Date.now() - MIN && !st.repite) { err.textContent = 'Esa hora ya pasó.'; return; }
-        const d = st.tabla === 'examenes' ? { que: st.que, materia: st.materia, cuando, nota: st.nota }
-          : st.tabla === 'eventos' ? { titulo: st.titulo, materia: st.materia, cuando, repite: st.repite, nota: st.nota }
-          : { texto: st.titulo, materia: st.materia, cuando, repite: st.repite };
+        const d = st.tabla === 'examenes' ? { que: st.que, materia: st.materia, cuando, nota: st.nota, parte: st.parte || null }
+          : st.tabla === 'eventos' ? { titulo: st.titulo, materia: st.materia, cuando, repite: st.repite, nota: st.nota, actividad: st.actividad || (editando ? null : undefined) }
+          : { texto: st.titulo, materia: st.materia, cuando, repite: st.repite, nivel: st.nivel || (editando ? null : undefined) };
         const r = editando ? Ag.editar(E, tabla, fila.id, d, DISP)
           : st.tabla === 'examenes' ? Ag.crearExamen(E, d, DISP) : st.tabla === 'eventos' ? Ag.crearEvento(E, d, DISP) : Ag.crearRecordatorio(E, d, DISP);
         if (r.error) { err.textContent = r.error.charAt(0).toUpperCase() + r.error.slice(1) + '.'; return; }
@@ -1944,6 +2449,7 @@
     cambio();
     subirYa();      // (que la compu se entere ya)
     if (DEMO) simularLaptop(id);
+    setTimeout(() => revisarLogros('archivo'), 3500);     // (21-oct-2026: ¿un logro? El de "tus apuntes" llega cuando ya son tarjetas y las repasa)
   });
   async function abrirArchivo(id) {
     const a = E.archivos[id];
@@ -2164,14 +2670,15 @@
     if (si && !p) { caja.insertAdjacentHTML('beforeend', '<div class="msg liz nuevo" id="pensandoMsg">' + fotoLiz(animoHoy()) + '<div class="burbuja">' + PENSANDO + '</div></div>'); abajoCharla(); gestoLiz('pensar'); }
     if (!si && p) p.remove();
   }
-  // Lo que la app sabe de su estudio ahora (va al cerebro como contexto)
-  function contextoTexto() {
+  // Lo que la app sabe de su estudio ahora (va al cerebro como contexto). texto = lo que él acaba de escribir
+  function contextoTexto(texto) {
     const ahora = Date.now();
     const tocan = tocanHoy();
     const porMazo = {};
     for (const x of tocan) { const n = nombreMazo((x.t || E.tarjetas[x]).mazo_id); porMazo[n] = (porMazo[n] || 0) + 1; }
-    const exs = Ag.proximosExamenes(E, ahora).slice(0, 4).map((x) => N.nombreExamen(x) + ' el ' + N.fechaTxt(x.cuando) + ' a las ' + N.horaCR(x.cuando));
-    const hoyAg = Ag.delDia(E, ahora).map((x) => (x.tipo === 'clase' ? 'clase de ' : '') + x.titulo + ' (' + N.horaCR(x.ms) + (x.fin ? '-' + N.horaCR(x.fin) : '') + (x.hecho ? ', hecho' : '') + ')');
+    const exs = Ag.proximosExamenes(E, ahora).slice(0, 4).map((x) => Ag.nombreExamenCompleto(x) + ' el ' + N.fechaTxt(x.cuando) + ' a las ' + N.horaCR(x.cuando));
+    const hoyAg = Ag.delDia(E, ahora).map((x) => { const n = x.tipo === 'clase' ? Ag.nombreClase(x, E) : null;
+      return (n ? 'clase de ' + n.materia + (n.tipo === 'lab' ? ' (laboratorio)' : '') : x.titulo) + ' (' + N.horaCR(x.ms) + (x.fin ? '-' + N.horaCR(x.fin) : '') + (x.hecho ? ', hecho' : '') + ')'; });
     const prox = Ag.listaRecordatorios(E, ahora).filter((x) => !x.hecho && x.vez > ahora && x.vez < ahora + 7 * DIA).slice(0, 5).map((x) => x.r.texto + ' (' + N.fechaTxt(x.vez) + ' ' + N.horaCR(x.vez) + ')');
     const reps = Object.values(E.repasos), hoyR = reps.filter((r) => r.fecha >= N.inicioDiaCR(ahora));
     // (19-oct-2026) SUS MAZOS y los NUEVOS (a "¿viste los mazos que agregué?" contestaba "no veo tus mazos": no lo sabía). Un mazo es nuevo si
@@ -2181,14 +2688,18 @@
     const mazos = Org.vivos(E.mazos).filter((m) => enMazo[m.id] && !Org.archivadoX(m)).map((m) => ({ nombre: m.nombre, n: enMazo[m.id].n, desde: enMazo[m.id].desde }));
     const nuevos = mazos.filter((m) => ahora - m.desde < 2 * DIA).sort((a, b) => b.desde - a.desde);
     const cuandoM = (ms) => (N.inicioDiaCR(ms) === N.inicioDiaCR(ahora) ? 'hoy' : 'ayer') + ' ' + N.horaCR(ms);
+    // (21-oct-2026) Sus LOGROS van en la PRIMERA línea, junto a su nombre: liz-cerebro siempre manda las 2 primeras líneas (las demás, solo
+    // si habla de estudio, fechas o pide algo)
+    const lg = logrosContexto(texto);
     return [
-      perfil.nombre ? 'Se llama ' + perfil.nombre + '.' : '',
+      [perfil.nombre ? 'Se llama ' + perfil.nombre + '.' : '', lg].filter(Boolean).join(' '),
       'Hoy le tocan ' + tocan.length + ' tarjetas' + (tocan.length ? ' (' + Object.entries(porMazo).map(([k, n]) => k + ': ' + n).join(', ') + ')' : '') + '. Tiene ' + Org.vivos(E.tarjetas).length + ' tarjetas en total.' +
         (nuevos.length ? ' MAZOS NUEVOS (los agregó él, ya los ves): ' + nuevos.slice(0, 6).map((m) => '«' + m.nombre + '» (' + m.n + ' tarjetas, ' + cuandoM(m.desde) + ')').join(', ') + (nuevos.length > 6 ? ' y ' + (nuevos.length - 6) + ' más' : '') + '.' : ''),
       mazos.length ? 'Sus mazos (' + mazos.length + '): ' + mazos.slice().sort((a, b) => b.n - a.n).slice(0, 12).map((m) => m.nombre + ' (' + m.n + ')').join(', ') + (mazos.length > 12 ? '…' : '') + '.' : 'Todavía no tiene mazos.',
       'Hoy repasó ' + hoyR.length + ' (' + hoyR.filter((r) => r.resultado === 'bien').length + ' bien). Racha: ' + N.racha(reps) + ' días.',
       exs.length ? 'Próximos exámenes: ' + exs.join('; ') + '.' : 'No tiene exámenes anotados.',
       hoyAg.length ? 'Su agenda de hoy: ' + hoyAg.join('; ') + '.' : 'Nada en su agenda de hoy.',
+      Ag.textoHorario(E, ahora),          // (21-oct-2026) su horario POR MATERIA (teoría y laboratorio de una materia = una sola)
       prox.length ? 'Recordatorios de esta semana: ' + prox.join('; ') + '.' : '',
       'Materias: ' + (Org.vivos(E.materias).map((m) => m.nombre).join(', ') || 'ninguna') + '.',
     ].filter(Boolean).join('\n');
@@ -2209,6 +2720,9 @@
   const chipRec = (f) => ({ html: '⏰ Anotado: ' + esc(f.texto) + ' · ' + esc(N.fechaTxt(f.cuando)) + ', ' + N.horaCR(f.cuando) + (f.repite ? ' · ' + REPITE_TXT[f.repite] : '') });
   const confirmarRec = (f) => ['Listo, te aviso ' + cuandoBonito(f.cuando) + '.', 'Anotado: te lo recuerdo ' + cuandoBonito(f.cuando) + '.', 'Hecho. ' + cuandoBonito(f.cuando).replace(/^./, (x) => x.toUpperCase()) + ' te aviso.'][Math.floor(Math.random() * 3)];
   const PREGUNTA_CUANDO = '¿Para cuándo te lo pongo? Dime el día y la hora (por ejemplo: «mañana a las 5» o «en 10 minutos»).';
+  // (21-oct-2026) "Listo, te recordé a las 3" → "Listo, te lo recuerdo a las 3" (el recordatorio todavía no ha sonado)
+  const enFuturo = (t) => String(t || '').replace(/\bte (lo |la )?(record[eé]|avis[eé])(?![a-záéíóúñ])/gi,
+    (m, lo, v) => (m[0] === 'T' ? 'T' : 't') + 'e ' + (/^record/i.test(v) ? (lo || 'lo ') + 'recuerdo' : (lo || '') + 'aviso'));
   // ¿Pide un recordatorio (o completa uno que quedó sin hora)? Si ya se sabe cuándo, se anota. Devuelve { fila } (anotado), { falta } o null.
   function recordatorioDeCharla(texto, ahora) {
     let ped = Ag.pedidoRecordatorio(texto, ahora);
@@ -2231,7 +2745,7 @@
       const f = rec.fila, faltan = Math.round((f.cuando - ahora) / MIN);
       return '(Nota de la app, él no la ve: YA quedó anotado en su agenda el recordatorio «' + f.texto + '» para ' + cuandoBonito(f.cuando) +
         (faltan >= 1 && faltan < 120 ? ' (en ' + faltan + (faltan === 1 ? ' minuto' : ' minutos') + ')' : '') + (f.repite ? ', y se repite ' + REPITE_TXT[f.repite] : '') +
-        '. Confírmaselo en UNA frase corta, con esa hora exacta, y sigue normal. No llenes "recordatorio".)';
+        '. Confírmaselo en UNA frase corta, EN FUTURO y con esa hora exacta (por ejemplo: «Listo, te lo recuerdo ' + cuandoBonito(f.cuando) + '»; nunca «te recordé» ni «te avisé»: todavía no pasa), y sigue normal. No llenes "recordatorio".)';
     }
     return '(Nota de la app, él no la ve: quiere un recordatorio' + (rec.texto ? ' («' + rec.texto + '»)' : '') + ' pero ' + (rec.falta === 'pasado' ? 'esa hora ya pasó' : 'no dijo para cuándo') +
       ': pregúntale qué día y a qué hora. NO digas que ya lo anotaste y no llenes "recordatorio".)';
@@ -2246,6 +2760,7 @@
       return hacerTarjetasDeTexto({ texto: texto.slice(corte > 0 ? corte + 1 : 0), nombre: '', materia: '' }, true);
     }
     agregarMsg({ quien: 'el', texto });
+    setTimeout(() => revisarLogros('mensaje'), 1500);      // (21-oct-2026: ¿un logro? Su hoja espera a que Liz termine de contestar)
     // (21-oct-2026) "Hoy estoy estresado", "me siento cansada y un poco triste": va a su diario de ánimo (se suma a lo de hoy)
     const dijo = Animo.delTexto(texto);
     if (dijo.length) {
@@ -2267,7 +2782,7 @@
     const lizDijo = charla.filter((m) => m.quien === 'liz').slice(-10);
     // (21-oct-2026) Su ÁNIMO de ahora (el que él ve en Hoy: dormida, contenta...) va al cerebro: así no dice "¡estoy activa!" si se ve dormida
     // (21-oct-2026) y cómo se siente ÉL hoy (su diario de ánimo): Liz se adapta; si pregunta "¿cómo me he sentido?", el resumen
-    const r = await cerebro('charla', { mensajes: paraCerebro, contexto: contextoTexto(), animo: animoHoy(),
+    const r = await cerebro('charla', { mensajes: paraCerebro, contexto: contextoTexto(texto), animo: animoHoy(),
       animoEl: Animo.deHoy(E), animoDijo: dijo, femenino: fem(), diarioAnimo: Animo.PIDE_RESUMEN.test(texto) ? Animo.resumenTexto(E, Date.now(), { fem: fem() }) : '',
       // (prueba 17) cómo se siente él, armado con LA MISMA función que la compu (animo.js → partePrompt): liz-cerebro lo usa tal cual
       // (19-oct-2026) + lo último que dijo Liz: si ya le propuso respirar, no lo repite
@@ -2298,6 +2813,8 @@
       dice = 'Uy, todavía no lo anoté: no me quedó claro para cuándo. ' + PREGUNTA_CUANDO;
       if (!pendienteRec) pendienteRec = { texto: '', repite: null, ms: Date.now() };
     }
+    // (21-oct-2026) Lo anotado es para DESPUÉS: "te recordé" / "te avisé" (como si ya hubiera pasado) → "te lo recuerdo" / "te aviso"
+    if (anotado) dice = enFuturo(dice);
     // (19-oct-2026) Si ya le propuso respirar hace poco y él no habla de eso, esa frase no se repite (animo.js)
     dice = Animo.sinRespirarOtraVez(dice, lizDijo, texto, Date.now());
     if (r.pegar) extra = { html: '<button class="bt chico prin" data-a="pegarTexto">📋 Pegar el texto</button>' };
@@ -2577,10 +3094,16 @@
     irRecordatorios: () => { cerrarHoja(true); ir('recordatorios'); },
     globoSig: (d, b) => globoSiguiente(b),      // (prueba 15) la burbuja de Hoy: la siguiente frase
     abrirCarta: () => abrirCarta(),             // (19-oct-2026) el botón del mensaje del aniversario
+    // (21-oct-2026, bolsillo 1.1) Los logros: abrir uno, "Ver todos" (desde Estudiar o desde Más → Progreso) y el tráiler otra vez
+    abrirLogro: (d) => abrirLogro(d.id),
+    verLogros: (d) => { lgDesde = d.desde === 'progreso' ? 'progreso' : 'estudiar'; ir('logros'); },
+    verTrailerLogros: () => cineLogros(false),
     // Pomodoro (prueba 14)
     pomoEmpezar: () => pomoEmpezar(), pomoPausar: () => pomoPausar(), pomoParar: () => pomoParar(), pomoSaltar: () => pomoSaltarDescanso(), pomoTiempos: () => hojaPomoTiempos(),
     // Mi horario (prueba 14)
     miHorario: () => hojaHorario(),
+    // (21-oct-2026) "Separar el lab" (es otro curso) / "Juntar con X"
+    separarLab: (d) => { const n = Ag.separarLab(E, d.clave, d.v === '1', DISP); if (n) { cambio(); avisar(d.v === '1' ? 'Listo: el laboratorio ahora es un curso aparte.' : 'Listo: el laboratorio es parte de la materia.'); } hojaHorario(); },
     nuevaClase: () => formClase(null),
     editarClase: (d) => { const f = E.eventos[d.id]; if (f && Ag.esClase(f)) formClase(f); },
     borrarClase: (d) => { Ag.borrar(E, 'eventos', d.id, DISP); cambio(); avisar('Clase borrada (está en la papelera).'); hojaHorario(); },
@@ -3088,7 +3611,7 @@
       s.fase = 'espera'; s.recs = []; cambio2 = true;
       if (ahora - s.finDesc < 2 * MIN) pomoAvisoLocal(pomoTextos(t, s.largo)[1]);
     }
-    if (cambio2) { pomoGuardar(s); subirYa(); pintarSuave(); }
+    if (cambio2) { pomoGuardar(s); subirYa(); pintarSuave(); setTimeout(() => revisarLogros('pomodoro'), 2500); }     // (21-oct-2026: ¿un logro?)
     if (vista === 'pomodoro') { const el = $('#pomoT'); if (el) el.textContent = mmss(pomoQueda(s, ahora)); const an = $('#pomoAnillo'); if (an) an.style.setProperty('--p', pomoProgreso(s, ahora)); }
   }
   function pomoProgreso(s, ahora) {
@@ -3141,11 +3664,15 @@
     if (document.hidden || !$('#entrar').hidden || !E || !E.avisos) return 0;
     const ahora = Date.now();
     let n = 0;
+    // (22-oct-2026) lo que él programó suena a su hora aunque esté en clase; los avisos que pone Liz sola ya vienen movidos fuera de la
+    // clase (antes o después, Agenda.sonidos → fueraDeClase)
     for (const s of Ag.sonidos(E, ahora - VENTANA_AVISO, ahora + 1)) {
       if (Ag.yaSono(E, s.clave, s.ms)) continue;
       Sincro.agregar(E, 'avisos', { clave: s.clave, ocurrencia: s.ms, dispositivo: DISP, presente: true, fecha: ahora });
       n++;
-      const t = s.tabla === 'examenes' ? '📝 ' + s.texto.replace(/^./, (x) => x.toUpperCase()) : s.tabla === 'eventos' ? '📅 Ya empieza: ' + s.texto : '⏰ ¡Es la hora! ' + s.texto;
+      // (21-oct-2026) un recordatorio IMPORTANTE avisa también antes (3 días y el día antes): "📌 En 3 días: …"
+      const antes = s.tabla === 'recordatorios' && /:[a-z0-9]+$/.test(s.clave);      // (los de más: antes, temprano o "todavía no lo marcas")
+      const t = s.tabla === 'examenes' || antes ? (antes ? '📌 ' : '📝 ') + s.texto.replace(/^./, (x) => x.toUpperCase()) : s.tabla === 'eventos' ? '📅 Ya empieza: ' + s.texto : '⏰ ¡Es la hora! ' + s.texto;
       agregarMsg({ quien: 'liz', texto: t, animo: s.tabla === 'examenes' ? 'tierna' : 'sorprendida' });
       avisar(t);
     }
@@ -3169,12 +3696,14 @@
   // Al tocar un aviso con la app abierta: el service worker manda a qué pantalla ir
   if ('serviceWorker' in navigator) navigator.serviceWorker.addEventListener('message', (ev) => { if (ev.data && ev.data.tipo === 'abrir' && E.usuario) irPorEnlace(ev.data.url); });
   window.addEventListener('hashchange', () => { if (E.usuario && !$('#app').hidden) irPorEnlace(location.hash); });
-  window.addEventListener('online', () => sincronizar('abrir'));
+  window.addEventListener('online', () => { sincronizar('abrir'); setTimeout(revisarEntradaEstudiar, 2500); });   // (21-oct-2026: el tráiler de los logros esperaba internet)
   window.addEventListener('offline', pintarEstado);
   let ocultaDesde = 0;
   document.addEventListener('visibilitychange', () => {
     // (prueba 17) Al irse a otra app o bloquear el iPhone: lo pendiente se sube YA (iOS congela la app enseguida)
-    if (document.hidden) { ocultaDesde = Date.now(); if (E.usuario && porSubir()) subirYa(); return; }
+    if (document.hidden) { ocultaDesde = Date.now(); anotarVisita(); if (E.usuario && porSubir()) subirYa(); return; }
+    // (21-oct-2026) Los logros al volver: ¿de madrugada? ¿después de días? (se mide al sincronizar: ver sincronizar)
+    if (E.usuario && ocultaDesde) { notarMedianoche(); lgVolverDesde = ocultaDesde; esperarVuelta(); }
     // (prueba 17, al final) Llegó una versión nueva mientras la usaba: se pone al volver a la app (no en medio de lo que estaba haciendo).
     // Y si estuvo fuera un rato, se revisa si hay versión nueva (un iPhone puede dejar la app "viva" por días sin volver a cargarla).
     if (document.visibilityState === 'visible' && versionNueva && !escribiendo()) { recargarVersion(); return; }
@@ -3308,7 +3837,7 @@
     cartaDemo: (c, para, de) => { if (!DEMO || !c) return false; perfil.lizc = Object.assign({}, perfil.lizc || {}, { carta: c, dueno: para || '', creadora: de || '' }); if (vista === 'acerca') pintar(); return true; },
     revisarCarta: () => revisarCartaAniversario(),
     // (19-oct-2026) para probar-charla-movil.js: lo que sabe el cerebro, la pregunta del ánimo y los avisos con la app abierta
-    contexto: () => contextoTexto(), revisarAnimo: () => { animoPreguntadoEn = 0; esperasAnimo = 0; revisarAnimoDia(); }, revisarAvisos: () => revisarAvisosAbierta(),
+    contexto: (t) => contextoTexto(t), revisarAnimo: () => { animoPreguntadoEn = 0; esperasAnimo = 0; revisarAnimoDia(); }, revisarAvisos: () => revisarAvisosAbierta(),
     animoHace: (ms) => { animoPreguntadoEn = Date.now() - ms; revisarAnimoDia(); },      // (19-oct-2026: "pasaron N ms desde que le preguntó")
     // (19-oct-2026) para probar-trailer-movil.js: un tráiler de prueba (una dirección local, solo en ?demo) y volver a ofrecerlo
     trailerDemo: (url, v) => { if (!DEMO) return false; perfil.trailer = { v: v || 'demo', ruta: 'demo', demo: url }; esperasTrailer = 0; revisarTrailer(); return true; },
@@ -3322,5 +3851,14 @@
     carino: (i) => { const f = frasesCel().sorpresa; if (!f.length) return false; carinoActual = { t: f[Math.min(i || 0, f.length - 1)].t, hasta: Date.now() + 90000, corazones: true }; ir('hoy'); setTimeout(() => corazones($('.heroe')), 50); return true; },
     secreto: () => { secretoToques = []; for (let i = 0; i < 5; i++) tocarSecreto(); },
     archivar: (nombre, valor) => { const b = Org.buscarMateriaOMazo(E, nombre); if (b) { Org.archivar(E, b.tabla, b.fila.id, valor !== false, DISP); cambio(); } return !!b; },
-    sabida: (n) => { const t = Org.vivos(E.tarjetas).find((x) => Org.lim(x.pregunta).includes(Org.lim(n))); if (t) { Org.marcarSabida(E, t.id, true, DISP); cambio(); } return !!t; } };
+    sabida: (n) => { const t = Org.vivos(E.tarjetas).find((x) => Org.lim(x.pregunta).includes(Org.lim(n))); if (t) { Org.marcarSabida(E, t.id, true, DISP); cambio(); } return !!t; },
+    // (21-oct-2026) LOS LOGROS, para las pruebas y las fotos. logrosDemo: SOLO en ?demo (la lista y las direcciones locales las trae la
+    // herramienta de pruebas; nunca se publican)
+    logrosDemo: (lista, trailer, urls) => { if (!DEMO) return false; perfil.logros = { v: 'demo', carpeta: 'demo/logros/', lista: lista || [], trailer: trailer || null }; lgDemoUrls = urls || {}; pintarSuave(true); return true; },
+    logros: { revisar: (m, mas) => revisarLogros(m || 'prueba', mas), estado: () => Lg.estado(E), cola: () => lgCola.slice(), abrir: (id) => abrirLogro(id),
+      sinRed: (b) => { lgSinRed = !!b; }, entrarEstudiar: () => revisarEntradaEstudiar(), volver: (desde) => { lgVolverDesde = desde; volvioLogros(); },
+      medianoche: () => ponerLS('liz-logro-medianoche', '1'), ronda: () => { lgRonda = true; }, contexto: (t) => logrosContexto(t),
+      enFuturo: (t) => enFuturo(t), urlsEnMemoria: () => lgUrls.size,
+      // (solo ?demo) ganar uno a mano, como si se hubiera cumplido su condición (para las fotos de un logro concreto)
+      ganar: (id) => { if (!DEMO || !lgDe(id) || !Lg.ganar(E, id, DISP)) return false; lgCola = lgCola.concat(id); lgGuardarCola(); pintarSuave(); tLgMostrar = setTimeout(mostrarLogros, 300); return true; } } };
 })();

@@ -125,12 +125,14 @@
   const ultimaOcurrencia = (item, ahora) => { const l = ocurrencias(item, ahora - 40 * DIA, ahora + 1); return l.length ? l[l.length - 1] : null; };
   const proximaOcurrencia = (item, ahora) => { const l = ocurrencias(item, ahora, ahora + 400 * DIA, 1); return l.length ? l[0] : null; };
 
-  // ---------- Exámenes: los mismos 4 avisos de la PC (funciones.js) ----------
-  const nombreExamen = (ex) => (ex.que === 'entrega' ? 'la entrega de ' : 'el ' + (ex.que || 'examen') + ' de ') + (ex.materia || 'una materia');
+  // ---------- Exámenes: los avisos (los mismos en la compu, el celular y el servidor: supabase/avisos.sql) ----------
+  // (21-oct-2026) + "presentación"; + un aviso 4 días antes (la autora: "a 4-3 días de un parcial, quiz, examen, presentación")
+  const nombreExamen = (ex) => (ex.que === 'entrega' ? 'la entrega de ' : ex.que === 'presentacion' ? 'la presentación de ' : 'el ' + (ex.que || 'examen') + ' de ') + (ex.materia || 'una materia');
   function avisosExamen(ex) {
     const c = enCR(ex.cuando), n = nombreExamen(ex);
     return [
-      { clave: ex.id + ':3d', ms: deCR(c.y, c.m, c.d - 3, 18, 0), texto: 'faltan 3 días para ' + n + ' (' + fechaTxt(ex.cuando) + '). ¿Armamos un plan de repaso?' },
+      { clave: ex.id + ':4d', ms: deCR(c.y, c.m, c.d - 4, 18, 0), texto: 'faltan 4 días para ' + n + ' (' + fechaTxt(ex.cuando) + '). ¿Armamos un plan de repaso?' },
+      { clave: ex.id + ':3d', ms: deCR(c.y, c.m, c.d - 3, 18, 0), texto: 'faltan 3 días para ' + n + '. ¿Cómo vas? Hoy un repaso de lo que más te cuesta.' },
       { clave: ex.id + ':1d', ms: deCR(c.y, c.m, c.d - 1, 19, 0), texto: 'mañana es ' + n + '. Repaso suave y a dormir temprano.' },
       { clave: ex.id + ':2h', ms: ex.cuando - 2 * H, texto: 'en dos horas es ' + n + '. Tú puedes.' },
       { clave: ex.id + ':0', ms: ex.cuando, texto: 'ahora es ' + n + '. ¡Mucha suerte!' },
