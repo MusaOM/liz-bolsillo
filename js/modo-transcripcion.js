@@ -2,8 +2,10 @@
 // pomodoros (con su PROPIO reloj, que no usa ni cambia el pomodoro normal) a partir de un "paquete de sesión" (*.sesion.json) que prepara Claude con
 // la transcripción de una clase. Liz nunca da la respuesta antes de que él lo intente: primero escribe (o dicta, o dibuja en papel), y al comparar ve
 // lo suyo arriba y abajo la respuesta modelo + la CAPTURA de la transcripción, y marca cada parte (✓ la tenía / ~ a medias / ✗ me faltó).
-// NO toca los logros, la racha, el reto, los avisos, el repaso espaciado ni los mazos: no cuenta para nada de eso. Todo queda EN EL CELULAR
-// (IndexedDB, almacen.js), nada se sube a la nube. Se carga SOLO al abrirlo (app.js → Más → Modo transcripción); quitar este archivo y esa fila
+// NO toca la racha, el reto, los avisos, el repaso espaciado ni los mazos. Lo que escribe, sus marcas y las fotos quedan EN EL CELULAR (IndexedDB,
+// almacen.js). (22-oct-2026, pedido de la autora) Lo ÚNICO que sube: cada pomodoro que termina, con el nombre de la sesión (ctx.anotarPomodoro →
+// Agenda.anotarPomodoroSesion): cuenta como pomodoro en la compu y el celular, y para los logros, y las dos Liz saben qué estudió hoy. Al borrar una
+// sesión empezada queda su RESUMEN en "Ya hechas" (no se pierde lo avanzado). Se carga SOLO al abrirlo (app.js → Más → Modo transcripción); quitar este archivo y esa fila
 // basta para sacarlo. Las imágenes del paquete se pintan solo cuando se ven.
 // Claves en el celular: <K>mt-lista (la lista corta) · <K>mt-ses:<id> (el paquete) · <K>mt-prog:<id> (su avance y lo que escribió) · <K>mt-foto:<id>:<paso>
 (function (raiz, fabrica) {
@@ -142,7 +144,10 @@
 .mt-cap{margin:8px 0 10px}.mt-cap img{display:block;width:100%;border-radius:10px;background:#fff;min-height:40px}.mt-cap figcaption{font-size:12px;color:var(--t-texto-suave);margin-top:3px}
 .mt-pag{margin:0 0 14px}.mt-pag img{display:block;width:100%;border-radius:10px;background:#fff;min-height:200px}.mt-pag div{font-size:12px;color:var(--t-texto-suave);margin:0 0 4px}
 .mt-bots{display:flex;gap:8px;margin:10px 0 4px}.mt-bots .bt{flex:1}
-.mt-fila{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:0;color:inherit;font:inherit;padding:12px 4px;border-bottom:1px solid rgba(160,140,255,.15)}
+.mt-filaC{display:flex;align-items:center;gap:4px;border-bottom:1px solid rgba(160,140,255,.15)}
+.mt-fila{display:flex;align-items:center;gap:10px;flex:1;min-width:0;text-align:left;background:none;border:0;color:inherit;font:inherit;padding:12px 4px}
+.mt-hecha{padding:10px 4px;border-bottom:1px solid rgba(160,140,255,.12)}.mt-hecha b{display:block}.mt-hecha small{display:block;color:var(--t-texto-suave);margin-top:2px}
+.mt-borrar{flex:none;width:40px;height:40px;border-radius:12px;border:1px solid rgba(160,140,255,.25);background:rgba(160,140,255,.06);font-size:17px;line-height:1;opacity:.75}
 .mt-fila b{display:block}.mt-fila small{color:var(--t-texto-suave)}.mt-fila .pct{margin-left:auto;font-weight:900;color:var(--t-acento,#a98bff)}
 .mt-pista{background:rgba(255,225,77,.08);border:1px solid rgba(255,225,77,.3);border-radius:12px;padding:8px 11px;margin:8px 0}
 .mt-aviso{background:rgba(255,225,77,.1);border:1px solid rgba(255,225,77,.35);border-radius:14px;padding:10px 12px;margin:0 0 12px;font-size:14px}
@@ -170,20 +175,31 @@
     estilo();
     if (idAbierta && S && P) return pintarSesion();
     await cargarLista();
+    // (22-oct-2026) Si llegó tocando el aviso del pomodoro (app.js → irPorEnlace('#transcripcion')) y iOS ya había cerrado la app: abre esa sesión
+    if (C.porAviso && C.porAviso()) { const u = ultima(); if (u && lista.some((x) => x.id === u && !x.borrada)) return abrir(u); }
     pintarLista();
   }
+  const ultima = (id) => { try { if (id !== undefined) { if (id) localStorage.setItem(C.K + 'liz-mt-ultima', id); else localStorage.removeItem(C.K + 'liz-mt-ultima'); } return localStorage.getItem(C.K + 'liz-mt-ultima'); } catch (e) { return null; } };
   function salirDeLaVista() { clearInterval(reloj1s); reloj1s = null; }
 
   // ---------- 1. La lista ----------
   function pintarLista() {
     const v = vistaDom;
+    const activas = lista.filter((x) => !x.borrada), hechas = lista.filter((x) => x.borrada).sort((a, b) => b.borrada - a.borrada);
+    const fecha = (ms) => (ms ? new Date(ms).toLocaleDateString('es-CR', { day: 'numeric', month: 'short', timeZone: 'America/Costa_Rica' }) : '');
+    // (22-oct-2026) "Ya hechas": lo que avanzó en las sesiones que borró (para liberar espacio); no se abren
+    const filaHecha = (x) => { const h = x.hecho || {};
+      return '<div class="mt-hecha"><b>' + e(x.titulo) + '</b><small>' + e(x.materia || '') + (h.terminada ? ' · ✅ terminada el ' + fecha(h.terminada) : ' · llegaste al ' + (h.avance || 0) + ' %') + '</small>' +
+        '<small>' + [h.pomodoros ? '🍅 ' + h.pomodoros + (h.pomodoros === 1 ? ' pomodoro' : ' pomodoros') : '', h.bien ? '💪 ' + h.bien + ' por tu cuenta' : '', h.medio ? '🤏 ' + h.medio + ' a medias' : '', h.mal ? '🔁 ' + h.mal + ' para repasar' : ''].filter(Boolean).join(' · ') + '</small></div>'; };
     v.innerHTML = '<button class="volverBt" data-mt="volverMas">‹ Más</button>' +
       C.escena('microscopio', 'Aquí estudiamos con la transcripción de una clase, paso a paso y en pomodoros. Primero intentas tú; después comparamos.') +
-      '<div class="mt-caja">' + (lista.length ? lista.map((x) => '<button class="mt-fila" data-mt="abrir" data-id="' + e(x.id) + '"><span><b>' + e(x.titulo) + '</b><small>' + e(x.materia || '') +
-        (x.duracionMin ? ' · ' + x.duracionMin + ' min' : '') + '</small></span><span class="pct">' + (x.avance || 0) + ' %</span></button>').join('') :
+      '<div class="mt-caja">' + (activas.length ? activas.map((x) => '<div class="mt-filaC"><button class="mt-fila" data-mt="abrir" data-id="' + e(x.id) + '"><span><b>' + e(x.titulo) + '</b><small>' + e(x.materia || '') +
+        (x.duracionMin ? ' · ' + x.duracionMin + ' min' : '') + '</small></span><span class="pct">' + (x.avance || 0) + ' %</span></button>' +
+        '<button class="mt-borrar" data-mt="borrarDe" data-id="' + e(x.id) + '" aria-label="Borrar «' + e(x.titulo) + '»" title="Borrar">🗑️</button></div>').join('') :
         '<p class="mt-suave" style="margin:4px 0 8px">Todavía no tienes sesiones. Importa el archivo <b>.sesion.json</b> que te prepararon con la transcripción.</p>') +
       '<div class="mt-bots"><button class="bt prin grande" data-mt="importar">📥 Importar sesión</button></div></div>' +
-      (lista.length ? '<p class="mt-suave" style="text-align:center">Esto es aparte: no cuenta para tus tarjetas, tu racha ni el reto. Se guarda solo en este celular.</p>' : '');
+      (hechas.length ? '<div class="mt-caja"><h3>📚 Ya hechas</h3>' + hechas.map(filaHecha).join('') + '</div>' : '') +
+      (lista.length ? '<p class="mt-suave" style="text-align:center">Tus respuestas y tus fotos se quedan solo en este celular. Tus pomodoros (y de qué sesión fueron) sí se anotan, para que Liz sepa lo que estudiaste.</p>' : '');
   }
   function hojaImportar() {
     const h = C.abrirHoja('<h2>📥 Importar sesión</h2><p class="mt-suave">El archivo <b>.sesion.json</b> (desde Archivos), o pega su texto aquí.</p>' +
@@ -211,7 +227,7 @@
   }
   async function importar(ses) {
     await cargarLista();
-    const ya = lista.find((x) => x.titulo === ses.titulo && (x.materia || '') === (ses.materia || ''));
+    const ya = lista.find((x) => !x.borrada && x.titulo === ses.titulo && (x.materia || '') === (ses.materia || ''));     // (una ya hecha y borrada queda aparte, con su resumen)
     const id = ya ? ya.id : 'mt' + Date.now().toString(36);
     await C.Almacen.guardar(K() + 'ses:' + id, ses);
     const item = { id, titulo: ses.titulo, materia: ses.materia, fuente: ses.fuente, duracionMin: ses.duracionMin, pasos: totalPasos(ses), avance: ya ? ya.avance || 0 : 0, importada: Date.now() };
@@ -220,19 +236,46 @@
     C.avisar(ya ? 'La actualicé; tu avance se queda.' : '¡Lista tu sesión! Tócala para empezar.');
     return id;
   }
+  // (22-oct-2026) las fotos de los dibujos: el caché es por paso, así que se olvida al cambiar de sesión (si no, mostraba la de otra sesión)
+  const olvidarFotos = () => { for (const k of Object.keys(fotos)) { if (!k.startsWith('_')) URL.revokeObjectURL(fotos[k]); delete fotos[k]; } };
+  const quitar = (k) => (C.Almacen.borrar ? C.Almacen.borrar(k) : C.Almacen.guardar(k, null)).catch(() => {});
+  async function borrarFotos(id, prog) {
+    const r = (prog && prog.r) || {};
+    for (const k of Object.keys(r)) if (r[k] && r[k].foto) await quitar(K() + 'foto:' + id + ':' + k);
+  }
   async function abrir(id) {
     const ses = await C.Almacen.leer(K() + 'ses:' + id).catch(() => null);
     if (!ses) { C.avisar('No encontré esa sesión en este celular.'); return; }
-    S = ses; idAbierta = id;
+    if (idAbierta !== id) olvidarFotos();
+    S = ses; idAbierta = id; ultima(id);
     P = (await C.Almacen.leer(K() + 'prog:' + id).catch(() => null)) || progresoNuevo();
     if (P.pi >= S.pomodoros.length) Object.assign(P, { fase: 'cierre' });
     pintarSesion();
   }
   async function borrarSesion(id) {
-    if (!(await C.confirmar('¿Borrar esta sesión?', 'Se borra de este celular con lo que escribiste. Si la vuelves a importar, empieza de cero.', 'Borrar', true))) return pintarLista();
-    for (const k of ['ses:', 'prog:']) await C.Almacen.guardar(K() + k + id, null).catch(() => {});
-    lista = lista.filter((x) => x.id !== id); await guardarLista();
+    const x = lista.find((s) => s.id === id);
+    const prog = await C.Almacen.leer(K() + 'prog:' + id).catch(() => null), ses = await C.Almacen.leer(K() + 'ses:' + id).catch(() => null);
+    // (22-oct-2026, pedido de la autora) BORRAR SIN PERDER LO AVANZADO: se va lo pesado (el paquete con sus páginas, su avance detallado y las fotos
+    // de los dibujos) y queda un RESUMEN chiquito en "Ya hechas" (cuándo, cuánto avanzó, sus pomodoros y cómo le fue). Sus pomodoros ya anotados
+    // (Agenda.anotarPomodoroSesion) no se tocan. Si nunca la empezó, no hay nada que guardar: se borra entera.
+    const empezada = !!(prog && (prog.empezada || Object.keys(prog.r || {}).length));
+    if (!(await C.confirmar('¿Borrar esta sesión?', (x ? '«' + x.titulo + '»: ' : '') + (empezada ?
+      'se borran sus páginas y las fotos de tus dibujos para liberar espacio. Lo que avanzaste se queda en «Ya hechas», y tus pomodoros siguen contando.' :
+      'todavía no la empezaste, así que se borra de este celular.'), 'Borrar', true))) return pintarLista();
+    if (x && empezada) {
+      const z = ses ? resumen(ses, prog) : { bien: [], medio: [], mal: [] };
+      x.borrada = Date.now();
+      x.hecho = { avance: ses ? pct(ses, prog) : x.avance || 0, terminada: prog.terminada || null, empezada: prog.empezada || null,
+        pomodoros: (prog.contados || []).length, de: ses ? ses.pomodoros.length : 0, bien: z.bien.length, medio: z.medio.length, mal: z.mal.length };
+    }
+    if (prog && prog.aviso && prog.aviso.id && C.quitarAviso) C.quitarAviso(prog.aviso.id);     // (si quedaba un aviso de su reloj, ya no)
+    await borrarFotos(id, prog);                          // (también las fotos, que antes se quedaban ocupando espacio; y de verdad, no "guardar nada")
+    for (const k of ['ses:', 'prog:']) await quitar(K() + k + id);
+    olvidarFotos();
+    if (!(x && empezada)) lista = lista.filter((s) => s.id !== id);
+    await guardarLista();
     pintarLista();
+    C.avisar(x && empezada ? 'Listo: liberé el espacio y guardé lo que avanzaste en «Ya hechas».' : 'Listo, la borré de este celular.');
   }
 
   // ---------- 2-5. La sesión ----------
@@ -259,7 +302,7 @@
       const ed = $('#mtRelojD'), rd = P.fase === 'descanso' ? P.reloj : P.sub && P.sub.relojD;
       if (ed && rd) ed.textContent = mmss(restante(rd, Date.now()));
       if (q <= 0 && !P.reloj.avisado) {
-        P.reloj.avisado = true; guardarProg();
+        P.reloj.avisado = true; quitarAviso(Date.now()); guardarProg(true);          // (avisó la app: el servidor ya no lo manda)
         C.vibrar('aviso'); C.sonar('fin');
         if (P.fase === 'paso' && P.reloj.fase === 'trabajo') pintarSesion();          // (sale el aviso de "se acabó")
         else if (P.fase === 'descanso') pintarSesion();
@@ -419,24 +462,59 @@
       (S.cierre.repasos.length ? '<div class="mt-caja"><h3>📅 Repasos sugeridos</h3>' + S.cierre.repasos.map((x) => '<p class="mt-ins"><b>' + e(x.cuando) + ':</b> ' + e(x.que) + (x.min ? ' <span class="mt-suave">(' + x.min + ' min)</span>' : '') + '</p>').join('') + '</div>' : '') +
       (S.dudosos.length ? '<div class="mt-caja"><h3>⚠ Para revisar en la transcripción</h3>' + S.dudosos.map((d, k) => '<div style="margin:0 0 12px"><p class="mt-ins"><b>Pág. ' + e(d.pag) + ':</b> ' + e(d.dice) + '</p><p class="mt-suave">' + e(d.correcto) + '</p>' +
         (d.img ? '<figure class="mt-cap"><img data-src="dud:' + k + '" alt="Captura de la página ' + e(d.pag) + '" data-mt="zoom"></figure>' : '') + '</div>').join('') + '</div>' : '') +
-      '<div class="mt-bots">' + boton('lista', 'Volver a mis sesiones', true) + '</div><button class="enlaceAgenda" data-mt="reiniciar">Hacerla otra vez desde el principio</button>';
+      '<div class="mt-bots">' + boton('lista', 'Volver a mis sesiones', true) + '</div><button class="enlaceAgenda" data-mt="reiniciar">Hacerla otra vez desde el principio</button>' +
+      '<button class="enlaceAgenda" data-mt="borrar">🗑️ Ya la terminé: borrar esta sesión</button>';
   }
 
   // ---------- Avanzar ----------
+  // (22-oct-2026, pedido de la autora) Un pomodoro del modo CUENTA cuando termina todos sus pasos (el reloj no lo apura) y trabajó en él al
+  // menos 5 minutos (pasar los pasos de un toque no cuenta). Una sola vez por pomodoro (P.contados; "Empezar de cero" los vuelve a contar). Se anota
+  // como pomodoro de verdad, con el nombre de la sesión (Agenda.anotarPomodoroSesion): suma en la compu y el celular, y para los logros.
+  const MIN_TRABAJO = 5 * 60000;
+  // (22-oct-2026, pedido de la autora) AVISO CON LA APP CERRADA: si se va a otra app (TikTok…), iOS congela la página y este reloj no puede avisar.
+  // Como el pomodoro normal del celular, se deja un recordatorio OCULTO a la hora en que termina el pomodoro o el descanso (ctx.programarAviso:
+  // datos.pomodoro) y el servidor lo manda ("LIZ" · "POMODORO: …"; al tocarlo abre el modo). Si la app está a la vista cuando termina, avisa ella
+  // y lo quita anotándolo (no llegan dos). En pausa (o con "Salir") no hay aviso. P.aviso = { id, ms } (se guarda con el avance).
+  function quitarAviso(ms) {
+    if (P && P.aviso && P.aviso.id && C.quitarAviso) C.quitarAviso(P.aviso.id, ms);
+    if (P) P.aviso = null;
+  }
+  function reprogramarAviso() {
+    quitarAviso();
+    if (!P || !S || !P.reloj || P.reloj.pausado || P.reloj.avisado || !C.programarAviso) return;
+    const q = restante(P.reloj, Date.now());
+    if (q <= 5000) return;
+    const fin = Date.now() + q, po = S.pomodoros[P.pi] || {};
+    const texto = P.reloj.fase === 'descanso' ? '¡Se acabó el descanso! Volvemos a «' + S.titulo + '» 📚' :
+      'Se acabó el pomodoro ' + (P.pi + 1) + ' de ' + S.pomodoros.length + ' de «' + S.titulo + '». Termina lo que estás haciendo' + (po.descanso > 0 && P.pi + 1 < S.pomodoros.length ? ' y descansa ' + po.descanso + ' min ☕' : '') + '.';
+    const id = C.programarAviso(fin, texto);
+    P.aviso = id ? { id, ms: fin } : null;
+  }
+  function anotarPomodoroHecho() {
+    const pi = P.pi;
+    P.contados = P.contados || [];
+    if (P.contados.indexOf(pi) >= 0 || !P.reloj || P.reloj.fase !== 'trabajo') return false;
+    if (P.reloj.dur - restante(P.reloj, Date.now()) < MIN_TRABAJO) return false;
+    P.contados.push(pi);
+    if (C.anotarPomodoro) C.anotarPomodoro({ id: idAbierta, titulo: S.titulo, n: pi + 1, total: S.pomodoros.length });
+    return true;
+  }
   function sigPaso() {
     const po = S.pomodoros[P.pi];
     P.sub = {};
     if (P.si + 1 < po.pasos.length) { P.si++; guardarProg(); return pintarSesion(); }
-    // terminó el pomodoro: descanso (si tiene) o el siguiente
-    if (po.descanso > 0 && P.pi + 1 < S.pomodoros.length) { P.fase = 'descanso'; P.reloj = iniciarReloj('descanso', po.descanso, Date.now()); guardarProg(); return pintarSesion(); }
+    // terminó el pomodoro: se anota (si de verdad trabajó en él) y después descanso (si tiene) o el siguiente
+    anotarPomodoroHecho();
+    if (po.descanso > 0 && P.pi + 1 < S.pomodoros.length) { P.fase = 'descanso'; P.reloj = iniciarReloj('descanso', po.descanso, Date.now()); reprogramarAviso(); guardarProg(true); return pintarSesion(); }
     sigPomodoro();
   }
   function sigPomodoro() {
     P.pi++; P.si = 0; P.sub = {};
-    if (P.pi >= S.pomodoros.length) { P.fase = 'cierre'; P.reloj = null; P.terminada = Date.now(); guardarProg(true); clearInterval(reloj1s); C.vibrar('bien'); C.sonar('fin'); return pintarSesion(); }
+    if (P.pi >= S.pomodoros.length) { quitarAviso(); P.fase = 'cierre'; P.reloj = null; P.terminada = Date.now(); guardarProg(true); clearInterval(reloj1s); C.vibrar('bien'); C.sonar('fin'); return pintarSesion(); }
     P.fase = 'paso';
     P.reloj = iniciarReloj('trabajo', S.pomodoros[P.pi].min, Date.now());
-    guardarProg();
+    reprogramarAviso();
+    guardarProg(true);
     pintarSesion();
   }
   // Lo que escribe se guarda solo (en el celular), sin repintar
@@ -523,15 +601,16 @@
       case 'volverMas': salirDeLaVista(); C.ir('mas'); return;
       case 'importar': return hojaImportar();
       case 'abrir': return abrir(el.dataset.id);
-      case 'lista': if (P && P.fase !== 'cierre' && P.fase !== 'inicio' && P.empezada) { pausar(P.reloj, Date.now()); P.volverA = P.fase; P.fase = 'inicio'; } guardarProg(true); idAbierta = null; S = null; P = null; salirDeLaVista(); await cargarLista(); return pintarLista();
-      case 'borrar': { const id = idAbierta; idAbierta = null; S = null; P = null; return borrarSesion(id); }
-      case 'reiniciar': if (!(await C.confirmar('¿Empezar de cero?', 'Se borra lo que escribiste en esta sesión (la sesión se queda).', 'Empezar de cero', true))) return pintarSesion(); P = progresoNuevo(); guardarProg(true); return pintarSesion();
+      case 'lista': if (P && P.fase !== 'cierre' && P.fase !== 'inicio' && P.empezada) { pausar(P.reloj, Date.now()); quitarAviso(); P.volverA = P.fase; P.fase = 'inicio'; } guardarProg(true); idAbierta = null; S = null; P = null; salirDeLaVista(); await cargarLista(); return pintarLista();
+      case 'borrar': { const id = idAbierta; quitarAviso(); guardarProg(true); idAbierta = null; S = null; P = null; salirDeLaVista(); await cargarLista(); return borrarSesion(id); }
+      case 'borrarDe': return borrarSesion(el.dataset.id);
+      case 'reiniciar': if (!(await C.confirmar('¿Empezar de cero?', 'Se borra lo que escribiste en esta sesión y las fotos de tus dibujos (la sesión se queda).', 'Empezar de cero', true))) return pintarSesion(); quitarAviso(); await borrarFotos(idAbierta, P); olvidarFotos(); P = progresoNuevo(); guardarProg(true); return pintarSesion();
       case 'empezar':
         if (!P.empezada) { P.empezada = Date.now(); P.fase = 'paso'; P.pi = 0; P.si = 0; P.reloj = iniciarReloj('trabajo', S.pomodoros[0].min, Date.now()); }
         else { if (P.fase === 'inicio') P.fase = P.volverA || 'paso'; reanudar(P.reloj, Date.now()); }
-        guardarProg(); return pintarSesion();
-      case 'salir': pausar(P.reloj, Date.now()); P.volverA = P.fase; P.fase = 'inicio'; guardarProg(true); C.avisar('Lo dejamos en pausa: al volver, sigues donde quedaste.'); return pintarSesion();
-      case 'pausa': if (P.reloj.pausado) reanudar(P.reloj, Date.now()); else pausar(P.reloj, Date.now()); guardarProg(); return pintarSesion();
+        reprogramarAviso(); guardarProg(true); return pintarSesion();
+      case 'salir': pausar(P.reloj, Date.now()); quitarAviso(); P.volverA = P.fase; P.fase = 'inicio'; guardarProg(true); C.avisar('Lo dejamos en pausa: al volver, sigues donde quedaste.'); return pintarSesion();
+      case 'pausa': if (P.reloj.pausado) { reanudar(P.reloj, Date.now()); reprogramarAviso(); } else { pausar(P.reloj, Date.now()); quitarAviso(); } guardarProg(true); return pintarSesion();
       case 'sigQ': { const x = paso(); P.sub.q = (P.sub.q || 0) + 1; if (P.sub.q >= x.preguntas.length) return sigPaso(); guardarProg(); return pintarSesion(); }
       case 'prevQ': P.sub.q = Math.max(0, (P.sub.q || 0) - 1); return pintarSesion();
       case 'sigPaso': return sigPaso();

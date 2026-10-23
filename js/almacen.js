@@ -30,6 +30,16 @@
       tx.onerror = () => mal(tx.error);
     });
   }
+  // (22-oct-2026) borrar UNA clave de verdad (guardar null deja la clave ocupando su lugar)
+  async function borrar(clave) {
+    const db = await abrir();
+    return new Promise((ok, mal) => {
+      const tx = db.transaction(CAJA, 'readwrite');
+      tx.objectStore(CAJA).delete(clave);
+      tx.oncomplete = () => ok();
+      tx.onerror = () => mal(tx.error);
+    });
+  }
   async function borrarTodo() {
     const db = await abrir();
     return new Promise((ok, mal) => {
@@ -39,5 +49,5 @@
       tx.onerror = () => mal(tx.error);
     });
   }
-  raiz.Almacen = { leer, guardar, borrarTodo };
+  raiz.Almacen = { leer, guardar, borrar, borrarTodo };
 })(self);

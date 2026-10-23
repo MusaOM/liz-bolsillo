@@ -517,10 +517,15 @@
     v.__partesDe = vista;
   }
   // Un enlace a una pantalla (lo usan los avisos al tocarlos): #hoy, #repasar, #charla, #agenda, #recordatorios, #archivos, #mazo=<id>
+  let mtPorAviso = false;          // (22-oct-2026: llegó tocando el aviso del pomodoro del Modo transcripción → el modo abre esa sesión)
   function irPorEnlace(h) {
-    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro|carta|animo|prelab|practico|ritual|reto|tcu)$|^mazo=([\w-]+)$|^(quiz|ritual)=([\w-]+)$/);
+    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro|carta|animo|prelab|practico|ritual|reto|tcu|transcripcion)$|^mazo=([\w-]+)$|^(quiz|ritual)=([\w-]+)$/);
     if (!m) return false;
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    // (22-oct-2026) El aviso del pomodoro del Modo transcripción abre el modo, en su sesión. (Hasta que se corra avisos.sql otra vez, el servidor
+    // los manda con "#pomodoro": si no hay un pomodoro normal andando y hubo un aviso del modo en la última hora, también va al modo.)
+    let avisoMt = 0; try { avisoMt = Number(localStorage.getItem(K + 'liz-mt-aviso')) || 0; } catch (e) {}
+    if (m[1] === 'transcripcion' || (m[1] === 'pomodoro' && !pomoEstado() && Math.abs(Date.now() - avisoMt) < 60 * MIN)) { mtPorAviso = true; ir('transcripcion'); return true; }
     // (22-oct-2026, tanda B) los avisos del modo parcial (#quiz=<examen>), del pre-lab (#prelab) y del ritual (#ritual=<examen>)
     if (m[1] === 'reto') { abrirReto(); return true; }          // (22-oct-2026: el aviso del reto del día)
     if (m[3] === 'quiz') { if (!empezarQuiz(m[4])) ir('hoy'); return true; }
@@ -1099,10 +1104,10 @@
       '<div class="lizRep"><div class="marcoLiz"><div class="aura"></div><span id="lizRep">' + lizImg(sesion.pose, 'c', sesion.reaccion || 'respira') + '</span></div>' +
       '<div class="comic cola-izq" id="lizDice">' + (sesion.diceHtml || esc(sesion.dice)) + '</div></div>' +
       '<div class="tarjetaG' + (sesion.volteada ? ' volteada' : '') + (sesion.entra ? ' entra' : '') + '" data-a="voltear"><div class="giro">' +
-      '<div class="cara frente"><div class="m">' + esc(nombreMazo(t.mazo_id)) + (c.repetida ? ' · otra vez' : '') + '</div><div class="p">' + esc(t.pregunta) + '</div>' +
+      '<div class="cara frente"><div class="m">' + esc(nombreMazo(t.mazo_id)) + (c.repetida ? ' · otra vez' : '') + '</div><div class="p' + largo(t.pregunta, 110, 200) + '">' + esc(t.pregunta) + '</div>' +
       (fig ? '<img src="' + esc(fig.src) + '" alt="" loading="lazy" onerror="this.remove()">' : '') +
       '<div class="toca">👆 Toca para ver la respuesta</div></div>' +
-      '<div class="cara atras"><div class="m">La respuesta</div><div class="r">' + esc(t.respuesta) + '</div>' + contextoTarjeta(t.contexto) +
+      '<div class="cara atras"><div class="m">La respuesta</div><div class="r' + largo(t.respuesta + ' ' + (t.contexto || ''), 150, 260) + '">' + esc(t.respuesta) + '</div>' + contextoTarjeta(t.contexto) +
       (t.fuente ? '<div class="fuente">📖 ' + esc(t.fuente) + '</div>' : '') + (fig ? '<div class="pie">Figura: ' + esc(fig.fuente || 'OpenStax Microbiology') + ' (' + esc(fig.licencia || 'CC BY-NC-SA 4.0') + ')</div>' : '') + '</div></div></div>' +
       '<div class="marcas"><button class="chip' + (t.favorita ? ' on' : '') + '" data-a="marcarFav">⭐ Favorita</button><button class="chip' + (t.dificil ? ' on' : '') +
       '" data-a="marcarDif">🔥 Difícil</button><button class="chip" data-a="yaMeLaSe" title="Ya me la sé: no vuelve a salir">🎓 Ya me la sé</button><button class="chip" data-a="editarActual" aria-label="Editar">✏️</button></div>' +
@@ -1366,6 +1371,8 @@
   }
   // (22-oct-2026, planes/transcripciones.md punto 8) El CONTEXTO de una tarjeta (de dónde viene) se ve al voltearla, chiquito; si trae ⚠ o "OJO"
   // (algo que hay que revisar en la transcripción o la presentación), resaltado
+  // (22-oct-2026) clase de la letra según el largo del texto (estilo.css: .larga / .muyLarga), para que una tarjeta larga quepa sin "buguearse"
+  const largo = (s, a, b) => { const n = String(s || '').length; return n > b ? ' muyLarga' : n > a ? ' larga' : ''; };
   const contextoTarjeta = (c) => { c = String(c || '').trim(); if (!c) return ''; const ojo = /⚠|^\s*OJO/i.test(c); return '<div class="ctxTarjeta' + (ojo ? ' ojo' : '') + '">' + (ojo ? '' : '📄 ') + esc(c) + '</div>'; };
   const creditoImg = (c) => '<p class="credito">Imagen: ' + esc(String(c.autor || '').slice(0, 90)) + ' · ' + esc(c.fuente || '') + ' · ' + esc(c.licencia || '') +
     (c.url ? ' · <a href="' + esc(c.url) + '" target="_blank" rel="noopener">original</a>' : '') + '</p>';
@@ -2474,7 +2481,15 @@
   // ======================================================================================================
   let cargandoMT = null;
   function pintarTranscripcion(v) {
-    const ctx = { esc, abrirHoja, cerrarHoja, confirmar, avisar, vibrar, sonar, cerebro, puedeCerebro, Almacen, K, DEMO, ir, vista: () => vista, escena };
+    const ctx = { esc, abrirHoja, cerrarHoja, confirmar, avisar, vibrar, sonar, cerebro, puedeCerebro, Almacen, K, DEMO, ir, vista: () => vista, escena,
+      // (22-oct-2026, pedido de la autora) un pomodoro terminado en el modo cuenta como pomodoro (compu, celular y logros) y dice de qué sesión fue
+      anotarPomodoro: (s) => { Ag.anotarPomodoroSesion(E, Date.now(), DISP, s); subirYa(); setTimeout(() => revisarLogros('pomodoro'), 2500); },
+      // (22-oct-2026, pedido de la autora) el aviso de fin de pomodoro/descanso con la app cerrada: un recordatorio OCULTO, como el pomodoro normal
+      // (el servidor lo manda; datos.url = a dónde abre). Sube YA: si se va a TikTok enseguida, iOS congela la app.
+      programarAviso: (ms, texto) => { const r = Ag.crearRecordatorio(E, { texto, cuando: ms, datos: { pomodoro: true, transcripcion: true, url: './#transcripcion' } }, DISP);
+        try { localStorage.setItem(K + 'liz-mt-aviso', String(ms)); } catch (e) {} subirYa(); return r.ok ? r.fila.id : null; },
+      quitarAviso: (id, ms) => { pomoQuitar(id, ms); subirYa(); },
+      porAviso: () => { const v = mtPorAviso; mtPorAviso = false; return v; } };
     if (self.ModoTranscripcion) return self.ModoTranscripcion.pintar(v, ctx);
     v.innerHTML = '<p class="suave" style="text-align:center;margin-top:40px">Abriendo…</p>';
     cargandoMT = cargandoMT || new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'js/modo-transcripcion.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
@@ -3311,7 +3326,8 @@
     return [
       [perfil.nombre ? 'Se llama ' + perfil.nombre + '.' : '', lg].filter(Boolean).join(' '),
       'Hoy le tocan ' + tocan.length + ' tarjetas' + (tocan.length ? ' (' + Object.entries(porMazo).map(([k, n]) => k + ': ' + n).join(', ') + ')' : '') + '. Tiene ' + Org.vivos(E.tarjetas).length + ' tarjetas en total.' +
-        (nuevos.length ? ' MAZOS NUEVOS (los agregó él, ya los ves): ' + nuevos.slice(0, 6).map((m) => '«' + m.nombre + '» (' + m.n + ' tarjetas, ' + cuandoM(m.desde) + ')').join(', ') + (nuevos.length > 6 ? ' y ' + (nuevos.length - 6) + ' más' : '') + '.' : ''),
+        (nuevos.length ? ' MAZOS NUEVOS (los agregó él, ya los ves): ' + nuevos.slice(0, 6).map((m) => '«' + m.nombre + '» (' + m.n + ' tarjetas, ' + cuandoM(m.desde) + ')').join(', ') + (nuevos.length > 6 ? ' y ' + (nuevos.length - 6) + ' más' : '') + '.' : '') +
+        (Ag.textoTranscripcion ? (' ' + Ag.textoTranscripcion(E, ahora)).trimEnd() : ''),          // (22-oct-2026: lo que hizo hoy en el Modo transcripción)
       mazos.length ? 'Sus mazos (' + mazos.length + '): ' + mazos.slice().sort((a, b) => b.n - a.n).slice(0, 12).map((m) => m.nombre + ' (' + m.n + ')').join(', ') + (mazos.length > 12 ? '…' : '') + '.' : 'Todavía no tiene mazos.',
       'Hoy repasó ' + hoyR.length + ' (' + hoyR.filter((r) => r.resultado === 'bien').length + ' bien). Racha: ' + N.racha(reps) + ' días.',
       Rt ? Rt.partePrompt(E, ahora) : '',          // (22-oct-2026: el reto del día: si ya lo hizo; invitarlo una vez, sin presión)
@@ -4529,6 +4545,7 @@
     animos: (m) => { animos = cortas(m); pintar(); }, gestos: (m) => { gestos = clipsCortos(m); }, gesto: (n) => { gestoHasta = 0; return gestoLiz(n); }, animo: (a) => { animoForzado = a || null; pintar(); }, enviar: enviarCharla, escribir: (t) => { A.escribirResp(); setTimeout(() => revisarEscrito(t), 100); },
     pegar: hojaPegar, hacerTarjetas: hacerTarjetasDeTexto,
     msgLiz: (t) => agregarMsg({ quien: 'liz', texto: t }),      // (22-oct-2026: el puntito y el aviso de la charla)
+    contexto: (t) => contextoTexto(t || ''),      // (22-oct-2026: lo que recibe el cerebro, p. ej. los pomodoros del Modo transcripción)
     tcu: { preguntar: () => { esperasTcu = 0; revisarTcuHoy(); }, jornada: abrirJornada, exportar: exportarTcu },      // (22-oct-2026: la bitácora del TCU)
     teclado: (px) => { tecladoSimulado = px || null; ajustarTeclado(); },      // (para las capturas: simula el teclado abierto)
     loNuevo: () => revisarLoNuevo(true),      // (para las fotos)

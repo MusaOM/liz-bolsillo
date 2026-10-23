@@ -522,6 +522,31 @@
   // (solo se agregan: nunca se pisan aunque los dos aparatos anoten a la vez) con clave "pomodoro" y la hora en que terminó.
   // (avisos solo tiene clave, ocurrencia, dispositivo, presente y fecha: no agregarle campos, o la nube rechazaría la fila)
   function anotarPomodoro(E, ms, disp) { return Sincro.agregar(E, 'avisos', { clave: 'pomodoro', ocurrencia: ms, dispositivo: disp, presente: true, fecha: ms }); }
+  // (22-oct-2026, pedido de la autora) EL MODO TRANSCRIPCIÓN (solo celular): cada pomodoro que él termina se anota DOS veces: "pomodoro" (cuenta
+  // igual que los demás: hoy/semana en la compu y el celular, y para los logros) y "mt:<id>:<n>/<de>:<título>" (de qué sesión fue). Solo eso
+  // sube: sus respuestas y sus fotos se quedan en el celular. Así las dos Liz saben qué hizo hoy (textoTranscripcion).
+  function anotarPomodoroSesion(E, ms, disp, s) {
+    anotarPomodoro(E, ms, disp);
+    return Sincro.agregar(E, 'avisos', { clave: 'mt:' + s.id + ':' + s.n + '/' + s.total + ':' + String(s.titulo || 'Sesión').slice(0, 90), ocurrencia: ms, dispositivo: disp, presente: true, fecha: ms });
+  }
+  function pomodorosTranscripcion(E, desde) {
+    const por = {};
+    for (const a of Object.values(E.avisos || {})) {
+      if (!a || typeof a.clave !== 'string' || a.clave.slice(0, 3) !== 'mt:' || Number(a.ocurrencia) < (desde || 0)) continue;
+      const m = a.clave.match(/^mt:([^:]+):(\d+)\/(\d+):([\s\S]*)$/);
+      if (!m) continue;
+      const x = por[m[1]] || (por[m[1]] = { id: m[1], titulo: m[4], pomodoros: 0, de: Number(m[3]), ultimo: 0, ultima: 0 });
+      x.pomodoros++; x.ultimo = Math.max(x.ultimo, Number(m[2])); x.ultima = Math.max(x.ultima, Number(a.ocurrencia));
+    }
+    return Object.values(por).sort((a, b) => b.ultima - a.ultima);
+  }
+  function textoTranscripcion(E, ahora) {
+    const hoy = pomodorosTranscripcion(E, Nucleo.inicioDiaCR(ahora || Date.now()));
+    if (!hoy.length) return '';
+    return 'Hoy estudió con el Modo transcripción (las sesiones de sus clases, por pomodoros, en el celular): ' +
+      hoy.map((x) => x.pomodoros + (x.pomodoros === 1 ? ' pomodoro' : ' pomodoros') + ' de «' + x.titulo + '» (va en el ' + x.ultimo + ' de ' + x.de + ')').join('; ') +
+      '. Si viene al caso, reconócele el esfuerzo (sin preguntarle notas ni presionarlo a seguir).';
+  }
   function pomodoros(E, ahora) {
     ahora = ahora || Date.now();
     const d0 = Nucleo.inicioDiaCR(ahora), lunes = d0 - ((Nucleo.enCR(d0).dow + 6) % 7) * Nucleo.DIA;
@@ -695,6 +720,6 @@
   return { REPITE, QUE, crearEvento, crearRecordatorio, crearExamen, editar, borrar, marcarHecho, estaHecho, rango, delDia, proximosExamenes,
     listaRecordatorios, sonidos, yaSono, paraAvisar, oculto, esClase, DIAS_SEMANA, crearClase, editarClase, clases, borrarHorario, clasesDelDia, claseAhora,
     importante, avisosImportante, avisosExtra, nivelDe, NIVELES, porEntregar, TIPOS_CLASE, ACTIVIDADES, actividadDe, COLORES_MATERIA, materiaDeClase, horario, colorDe, nombreClase, asegurarColores, textoHorario, separarLab, PARTES, parteDe, nombreExamenCompleto,
-    anotarPomodoro, pomodoros, cuandoDeFrase, pedidoRecordatorio, RECORDATORIO_SIN_NOMBRE,
+    anotarPomodoro, pomodoros, anotarPomodoroSesion, pomodorosTranscripcion, textoTranscripcion, cuandoDeFrase, pedidoRecordatorio, RECORDATORIO_SIN_NOMBRE,
     normCodigo, codigoDelNombre, nombrePorCodigo, fijarCodigo, conClinico };
 });

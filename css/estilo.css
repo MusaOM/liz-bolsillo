@@ -268,9 +268,13 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 @keyframes entraT { from { transform: translateY(50px) scale(.82) rotate(-4deg); opacity: 0; } to { transform: none; opacity: 1; } }
 @keyframes vuelaT { 30% { transform: rotateY(180deg) scale(1.05); } to { transform: rotateY(180deg) translate(-60vw, -40vh) rotate(-18deg) scale(.5); opacity: 0; } }
 @keyframes tiembla { 20%, 60% { transform: rotateY(180deg) translateX(-9px); } 40%, 80% { transform: rotateY(180deg) translateX(9px); } }
-.cara { position: absolute; inset: 0; border-radius: 28px; padding: 34px 22px 24px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
+.cara { position: absolute; inset: 0; border-radius: 28px; padding: 42px 22px 24px; backface-visibility: hidden; -webkit-backface-visibility: hidden;
   background: linear-gradient(165deg, #322942, #1f1928); border: 2px solid rgba(169, 139, 255, .55); box-shadow: var(--brillo);
-  display: flex; flex-direction: column; justify-content: center; gap: 12px; text-align: center; overflow-y: auto; }
+  display: flex; flex-direction: column; justify-content: flex-start; gap: 12px; text-align: center; overflow-y: auto; overscroll-behavior: contain; }
+.cara::before, .cara::after { content: ''; flex: 1 0 0; }
+.cara::before { margin-bottom: -12px; } .cara::after { margin-top: -12px; }
+.cara .p.larga { font-size: 20px; } .cara .p.muyLarga { font-size: 17px; line-height: 1.35; }
+.cara .r.larga { font-size: 18px; line-height: 1.38; } .cara .r.muyLarga { font-size: 16px; line-height: 1.38; }
 .cara .m { position: absolute; top: 16px; left: 22px; right: 22px; font-size: 12px; font-weight: 900; color: var(--t-acento); text-transform: uppercase; letter-spacing: .12em; text-align: left; }
 .cara .p { font-size: 24px; font-weight: 900; line-height: 1.3; }
 .cara .r { font-size: 22px; font-weight: 800; line-height: 1.4; }
