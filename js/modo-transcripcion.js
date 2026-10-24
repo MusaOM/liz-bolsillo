@@ -183,6 +183,8 @@
   function salirDeLaVista() { clearInterval(reloj1s); reloj1s = null; }
 
   // ---------- 1. La lista ----------
+  // (22-oct-2026) volver a "Mis sesiones": con las pestañas, la app repinta todo (pestañas + lista); si no, la lista sola
+  const aLista = () => (C.conPestanas && C.repintar ? C.repintar() : pintarLista());
   function pintarLista() {
     const v = vistaDom;
     const activas = lista.filter((x) => !x.borrada), hechas = lista.filter((x) => x.borrada).sort((a, b) => b.borrada - a.borrada);
@@ -191,7 +193,7 @@
     const filaHecha = (x) => { const h = x.hecho || {};
       return '<div class="mt-hecha"><b>' + e(x.titulo) + '</b><small>' + e(x.materia || '') + (h.terminada ? ' · ✅ terminada el ' + fecha(h.terminada) : ' · llegaste al ' + (h.avance || 0) + ' %') + '</small>' +
         '<small>' + [h.pomodoros ? '🍅 ' + h.pomodoros + (h.pomodoros === 1 ? ' pomodoro' : ' pomodoros') : '', h.bien ? '💪 ' + h.bien + ' por tu cuenta' : '', h.medio ? '🤏 ' + h.medio + ' a medias' : '', h.mal ? '🔁 ' + h.mal + ' para repasar' : ''].filter(Boolean).join(' · ') + '</small></div>'; };
-    v.innerHTML = '<button class="volverBt" data-mt="volverMas">‹ Más</button>' +
+    v.innerHTML = (C.conPestanas ? '' : '<button class="volverBt" data-mt="volverMas">‹ Más</button>') +          // (con pestañas, "‹ Más" va arriba de ellas)
       C.escena('microscopio', 'Aquí estudiamos con la transcripción de una clase, paso a paso y en pomodoros. Primero intentas tú; después comparamos.') +
       '<div class="mt-caja">' + (activas.length ? activas.map((x) => '<div class="mt-filaC"><button class="mt-fila" data-mt="abrir" data-id="' + e(x.id) + '"><span><b>' + e(x.titulo) + '</b><small>' + e(x.materia || '') +
         (x.duracionMin ? ' · ' + x.duracionMin + ' min' : '') + '</small></span><span class="pct">' + (x.avance || 0) + ' %</span></button>' +
@@ -250,6 +252,7 @@
     S = ses; idAbierta = id; ultima(id);
     P = (await C.Almacen.leer(K() + 'prog:' + id).catch(() => null)) || progresoNuevo();
     if (P.pi >= S.pomodoros.length) Object.assign(P, { fase: 'cierre' });
+    if (C.conPestanas && C.repintar) return C.repintar();          // (22-oct-2026: la sesión va a pantalla completa, sin las pestañas "Mi día · Sesiones")
     pintarSesion();
   }
   async function borrarSesion(id) {
@@ -261,7 +264,7 @@
     const empezada = !!(prog && (prog.empezada || Object.keys(prog.r || {}).length));
     if (!(await C.confirmar('¿Borrar esta sesión?', (x ? '«' + x.titulo + '»: ' : '') + (empezada ?
       'se borran sus páginas y las fotos de tus dibujos para liberar espacio. Lo que avanzaste se queda en «Ya hechas», y tus pomodoros siguen contando.' :
-      'todavía no la empezaste, así que se borra de este celular.'), 'Borrar', true))) return pintarLista();
+      'todavía no la empezaste, así que se borra de este celular.'), 'Borrar', true))) return aLista();
     if (x && empezada) {
       const z = ses ? resumen(ses, prog) : { bien: [], medio: [], mal: [] };
       x.borrada = Date.now();
@@ -274,7 +277,7 @@
     olvidarFotos();
     if (!(x && empezada)) lista = lista.filter((s) => s.id !== id);
     await guardarLista();
-    pintarLista();
+    aLista();
     C.avisar(x && empezada ? 'Listo: liberé el espacio y guardé lo que avanzaste en «Ya hechas».' : 'Listo, la borré de este celular.');
   }
 
@@ -601,7 +604,7 @@
       case 'volverMas': salirDeLaVista(); C.ir('mas'); return;
       case 'importar': return hojaImportar();
       case 'abrir': return abrir(el.dataset.id);
-      case 'lista': if (P && P.fase !== 'cierre' && P.fase !== 'inicio' && P.empezada) { pausar(P.reloj, Date.now()); quitarAviso(); P.volverA = P.fase; P.fase = 'inicio'; } guardarProg(true); idAbierta = null; S = null; P = null; salirDeLaVista(); await cargarLista(); return pintarLista();
+      case 'lista': if (P && P.fase !== 'cierre' && P.fase !== 'inicio' && P.empezada) { pausar(P.reloj, Date.now()); quitarAviso(); P.volverA = P.fase; P.fase = 'inicio'; } guardarProg(true); idAbierta = null; S = null; P = null; salirDeLaVista(); await cargarLista(); return aLista();
       case 'borrar': { const id = idAbierta; quitarAviso(); guardarProg(true); idAbierta = null; S = null; P = null; salirDeLaVista(); await cargarLista(); return borrarSesion(id); }
       case 'borrarDe': return borrarSesion(el.dataset.id);
       case 'reiniciar': if (!(await C.confirmar('¿Empezar de cero?', 'Se borra lo que escribiste en esta sesión y las fotos de tus dibujos (la sesión se queda).', 'Empezar de cero', true))) return pintarSesion(); quitarAviso(); await borrarFotos(idAbierta, P); olvidarFotos(); P = progresoNuevo(); guardarProg(true); return pintarSesion();
@@ -644,5 +647,6 @@
 
   return { validar, pct, hechos, totalPasos, restante, iniciarReloj, pausar, reanudar, resumen, progresoNuevo,
     pintar: (v, ctx) => { enlazar(ctx); return pintar(v, ctx); }, salir: salirDeLaVista,
+    abierta: () => !!(idAbierta && S && P),          // (22-oct-2026: hay una sesión abierta → la app la muestra en pantalla completa, sin pestañas)
     _prueba: { estado: () => ({ S, P, idAbierta, lista }), importar: (ses) => importar(ses), abrir: (id) => abrir(id), accion } };
 });

@@ -350,6 +350,9 @@ textarea { min-height: 92px; resize: vertical; line-height: 1.4; }
 .barras .b .fila { font-size: 15px; font-weight: 800; }
 .barras .b .t { height: 10px; border-radius: 9px; background: rgba(169, 139, 255, .14); overflow: hidden; margin-top: 6px; }
 .barras .b .t i { display: block; height: 100%; border-radius: 9px; background: linear-gradient(90deg, var(--celeste), var(--t-acento)); box-shadow: 0 0 10px rgba(169, 139, 255, .5); }
+.barras .b .t.tLista i { background: linear-gradient(90deg, #4cd69a, #8ef0c4); box-shadow: 0 0 10px rgba(76, 214, 154, .45); }
+.barras .b .nLista { color: #8ef0c4; font-weight: 900; }
+.barras .b .cuentaL { white-space: nowrap; margin-left: 10px; }
 .cajas div:last-child { background: linear-gradient(0deg, #2f9e6f, var(--t-bien)); box-shadow: 0 0 14px rgba(76, 214, 154, .4); }
 .cajas { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; align-items: end; height: 120px; margin: 10px 12px 0; }
 .cajas div { border-radius: 10px 10px 4px 4px; min-height: 6px; background: linear-gradient(0deg, var(--t-acento-fuerte), var(--rosa)); box-shadow: 0 0 14px rgba(169, 139, 255, .4); }
@@ -594,6 +597,7 @@ body { min-height: 100vh; min-height: 100dvh; }
 #menu .caraMenu { width: 30px; height: 30px; }
 #menu .punto { right: calc(50% - 27px); }
 .seg.estudiar { margin-bottom: 12px; }
+.seg.mtTabs { margin-top: 4px; }
 .seg.estudiar button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
 .seg.estudiar .punto-n { min-width: 20px; padding: 1px 6px; font-size: 11.5px; box-shadow: none; }
 html, body { height: 100%; min-height: 0; overflow: hidden; overscroll-behavior: none; }
@@ -922,6 +926,12 @@ body.quieto .lgCasilla.nuevo .lgMarco { animation: none; box-shadow: 0 0 0 1.5px
 .retoBt .e { font-size: 30px; line-height: 1; }
 .retoBt .t { flex: 1; display: flex; flex-direction: column; gap: 2px; } .retoBt .t b { font-size: 19px; font-weight: 900; } .retoBt .t small { font-size: 13px; font-weight: 700; opacity: .9; }
 .retoBt .flecha { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: rgba(255, 255, 255, .2); font-size: 18px; }
+.antesBt { display: flex; align-items: center; gap: 12px; width: 100%; margin: -4px 0 14px; padding: 11px 14px; border-radius: 20px; text-align: left; color: var(--t-texto);
+  background: rgba(44, 33, 74, .62); border: 1px solid rgba(160, 140, 255, .4); transition: transform .2s var(--rebote); }
+.antesBt:active { transform: scale(.97); }
+.antesBt .e { font-size: 24px; line-height: 1; }
+.antesBt .t { flex: 1; display: flex; flex-direction: column; gap: 2px; } .antesBt .t b { font-size: 15.5px; font-weight: 800; } .antesBt .t small { font-size: 12.5px; color: var(--t-texto-suave); }
+.antesBt .flecha { color: var(--t-acento, #a98bff); font-size: 15px; }
 .retoHecho { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 4px 0 14px; padding: 10px 14px; border-radius: 18px; font-size: 14px;
   background: rgba(76, 214, 154, .12); border: 1px solid rgba(76, 214, 154, .35); color: var(--t-texto); }
 .sesion.reto .retoCurso { margin: 10px 4px 6px; font-size: 13px; font-weight: 800; letter-spacing: .03em; color: var(--t-texto-suave); text-transform: uppercase; }

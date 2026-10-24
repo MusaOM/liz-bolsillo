@@ -17,8 +17,9 @@
   // (21-oct-2026, Liz 1.1) "animo" = el diario de ánimo (una fila por día). Es OPCIONAL: si todavía no se corrió supabase/animo.sql,
   // se salta sin frenar lo demás (y lo de aquí se sube cuando exista).
   // (22-oct-2026) "tcu" = la bitácora del TCU (una fila por jornada; supabase/tcu.sql). También OPCIONAL.
-  const TABLAS = ['materias', 'mazos', 'tarjetas', 'eventos', 'examenes', 'recordatorios', 'archivos', 'animo', 'tcu'];
-  const OPCIONALES = ['animo', 'tcu'];
+  // (22-oct-2026) "recuerdos_clase" = "Mi día": lo que recuerda de cada clase (supabase/mi-dia.sql; movil/js/mi-dia.js). También OPCIONAL.
+  const TABLAS = ['materias', 'mazos', 'tarjetas', 'eventos', 'examenes', 'recordatorios', 'archivos', 'animo', 'tcu', 'recuerdos_clase'];
+  const OPCIONALES = ['animo', 'tcu', 'recuerdos_clase'];
   const AGREGAR = { repasos: 'pendientes', avisos: 'pendAvisos' };          // tabla de "solo agregar" → su lista de pendientes
   const SOLAPE_MS = 5000;                                     // el cursor retrocede 5 s: así no se pierde nada que llegó a la vez
 

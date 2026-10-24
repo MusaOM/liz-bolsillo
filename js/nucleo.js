@@ -71,6 +71,12 @@
     }
     return n;
   }
+  // (24-oct-2026, planes/modo-diario.md, parte 2) "LISTA PARA EL PARCIAL": una tarjeta está lista cuando la acertó ("bien") en 3 DÍAS DISTINTOS
+  // (en hora de Costa Rica). Por resultado, nunca por sensación ("ya me la sé" no cuenta); los aciertos de antes de sincronizar (datos.base)
+  // tampoco, porque no se sabe en qué días fueron. Varios aciertos el mismo día cuentan como uno.
+  const DIAS_LISTA = 3;
+  function diasBien(repasos) { const s = new Set(); for (const r of repasos || []) if (r && r.resultado === 'bien') s.add(Math.floor((r.fecha + CR) / DIA)); return s.size; }   // (el día de Costa Rica, sin armar el texto: es rápido)
+  const lista = (repasos) => diasBien(repasos) >= DIAS_LISTA;
   // Tiempo repasando: repasos seguidos (menos de 5 min entre uno y otro) forman una sesión; cada repaso suma lo que tardó
   // (como mucho 2 min) — es tiempo de verdad, medido en los dos dispositivos.
   function tiempoPorMateria(repasos, materiaDe) {
@@ -148,6 +154,6 @@
     ];
   }
 
-  return { MIN, H, DIA, ESPERA_CAJA, PAPELERA_DIAS, aplicarRepaso, estadoDe, gana, uuid, vivo, enPapelera, racha, tiempoPorMateria, diaDe,
+  return { MIN, H, DIA, ESPERA_CAJA, PAPELERA_DIAS, aplicarRepaso, estadoDe, gana, uuid, vivo, enPapelera, racha, tiempoPorMateria, diaDe, DIAS_LISTA, diasBien, lista,
     ZONA, enCR, deCR, diaCR, horaCR, inicioDiaCR, msDeCR, fechaTxt, siguiente, ocurrencias, ultimaOcurrencia, proximaOcurrencia, nombreExamen, avisosExamen };
 });

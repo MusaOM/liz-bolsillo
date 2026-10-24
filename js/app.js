@@ -21,6 +21,7 @@
   const Lg = self.Logros;                                 // (21-oct-2026, bolsillo 1.1) los logros de Liz: cuándo se gana cada uno (js/logros.js)
   const Cl = self.Clinico || null;                        // (22-oct-2026, tanda B) el estudio clínico: fichas, quiz del parcial, pre-lab, CENDEISSS, ritual (js/clinico.js)
   const Rt = self.Reto || null;                           // (22-oct-2026) EL RETO DEL DÍA: un poquito todos los días (js/reto.js)
+  const MD = self.MiDia || null;                          // (22-oct-2026) "MI DÍA" (dentro del Modo transcripción): qué toca hoy y el puntito (js/mi-dia.js)
   const { MIN, H, DIA } = N;
   const MAX_ARCHIVO = 50 * 1024 * 1024, ESPACIO_GRATIS = 1024 * 1024 * 1024;
 
@@ -425,6 +426,9 @@
     if (v === 'recordatorios') { v = 'agenda'; bajarARec = true; ag.dia = N.inicioDiaCR(Date.now()); ag.ref = ag.dia; }
     if (DE_ESTUDIAR.includes(v)) { try { localStorage.setItem('liz-estudiar', v); } catch (e) {} }
     if (!PINTA[v]) v = 'hoy';
+    // (22-oct-2026, Mi día) al salir del modo, lo que estaba escribiendo queda guardado; al entrar, la pestaña se elige otra vez (si nadie la pidió)
+    if (vista === 'transcripcion' && v !== 'transcripcion' && self.MiDiaUI) self.MiDiaUI.salir();
+    if (v === 'transcripcion' && vista !== 'transcripcion') { mtTab = mtTabPedida; mtTabPedida = null; mtInicio = true; }
     vista = v;
     if (v !== 'mazos') { mazoAbierto = null; mazoPendiente = null; }
     // (21-oct-2026) "Ver todos" los logros: desde Estudiar (o desde Más → Progreso: entonces marca Más)
@@ -519,7 +523,7 @@
   // Un enlace a una pantalla (lo usan los avisos al tocarlos): #hoy, #repasar, #charla, #agenda, #recordatorios, #archivos, #mazo=<id>
   let mtPorAviso = false;          // (22-oct-2026: llegó tocando el aviso del pomodoro del Modo transcripción → el modo abre esa sesión)
   function irPorEnlace(h) {
-    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro|carta|animo|prelab|practico|ritual|reto|tcu|transcripcion)$|^mazo=([\w-]+)$|^(quiz|ritual)=([\w-]+)$/);
+    const m = String(h || '').replace(/^.*#/, '').match(/^(hoy|estudiar|repasar|charla|agenda|recordatorios|archivos|mazos|mas|progreso|archivados|pomodoro|carta|animo|prelab|practico|ritual|reto|tcu|transcripcion|midia)$|^mazo=([\w-]+)$|^(quiz|ritual)=([\w-]+)$/);
     if (!m) return false;
     try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     // (22-oct-2026) El aviso del pomodoro del Modo transcripción abre el modo, en su sesión. (Hasta que se corra avisos.sql otra vez, el servidor
@@ -528,6 +532,7 @@
     if (m[1] === 'transcripcion' || (m[1] === 'pomodoro' && !pomoEstado() && Math.abs(Date.now() - avisoMt) < 60 * MIN)) { mtPorAviso = true; ir('transcripcion'); return true; }
     // (22-oct-2026, tanda B) los avisos del modo parcial (#quiz=<examen>), del pre-lab (#prelab) y del ritual (#ritual=<examen>)
     if (m[1] === 'reto') { abrirReto(); return true; }          // (22-oct-2026: el aviso del reto del día)
+    if (m[1] === 'midia') { A.miDia(); return true; }           // (22-oct-2026: el aviso diario cuando hoy toca "Lo que recuerdo" → Modo transcripción → Mi día)
     if (m[3] === 'quiz') { if (!empezarQuiz(m[4])) ir('hoy'); return true; }
     if (m[3] === 'ritual' || m[1] === 'ritual') { abrirRitual(m[4] || null); return true; }
     if (m[1] === 'prelab') { ir('hoy'); setTimeout(() => { const s = $('#prelabHoy'), a = $('#app'); if (s && a) a.scrollTo({ top: Math.max(0, s.getBoundingClientRect().top - a.getBoundingClientRect().top + a.scrollTop - 80) }); }, 120); return true; }
@@ -545,6 +550,10 @@
     let p = b.querySelector('.punto');
     if (n) { if (!p) { p = document.createElement('i'); p.className = 'punto'; b.appendChild(p); } p.textContent = n > 99 ? '99+' : n; }
     else if (p) p.remove();
+    // (22-oct-2026, Mi día) el puntito de "Más": lo que falta HOY de Mi día (nunca días anteriores; se va al hacerlo o con "Hoy no")
+    const nm = midiaPend(), bm = document.querySelector('#menu [data-v=mas]');
+    let pm = bm && bm.querySelector('.punto');
+    if (bm) { if (nm) { if (!pm) { pm = document.createElement('i'); pm.className = 'punto'; bm.appendChild(pm); } pm.textContent = nm; } else if (pm) pm.remove(); }
     // (20-oct-2026) Un puntito en la pestaña Liz si ella escribió algo en la charla. (22-oct-2026) Con CUÁNTOS sin leer; se quita solo cuando
     // de verdad ve la charla (si la app está en segundo plano con la charla abierta, todavía no lo vio)
     if (vista === 'charla' && !document.hidden) { avisoCharla = false; sinLeer = 0; }
@@ -676,6 +685,8 @@
     return calc;
   }
   const tocanHoy = () => calculos().tocan;
+  // (22-oct-2026) Lo que falta HOY de "Mi día" (el puntito): se calcula una vez por pintado, como lo demás (nada en segundo plano)
+  function midiaPend() { const c = calculos(); if (c.midia == null) { try { c.midia = MD ? MD.pendientes(E, c.ms) : 0; } catch (e) { c.midia = 0; } } return c.midia; }
   function animoHoy() { return animoForzado || calculos().animo; }
   function calcularAnimo(tocan, ahora) {
     // (21-oct-2026) Si él marcó cómo se siente hoy, Liz lo acompaña: tierna si está triste, estresado, ansioso o cansado; pensativa
@@ -829,6 +840,7 @@
       '<div class="marcoFoto respira"><div class="aura"></div>' + fotoLiz(animo, 'grande') + '</div>' +
       globoHoy(frasesDeHoy({ carino, mom, tocan, msg, racha })) + '</div>' +
       tarjetaReto(ahora, racha, total) +          // (22-oct-2026) EL RETO DEL DÍA, arriba
+      tarjetaAntes(ahora) +                       // (24-oct-2026, Mi día parte 4) en los 30 min antes de una clase, opcional
       (tocan.length ? (sug < tocan.length
         ? '<button class="repasarYa" data-a="repasarSuave"><span class="n">' + sug + '</span><span class="t"><b>Solo ' + sug + ', con calma</b>de las ' + tocan.length + ' de hoy</span><span class="flecha">▶</span></button>'
         : '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + tocan.length + '</span><span class="t"><b>Repasar ahora</b>' +
@@ -1087,7 +1099,13 @@
         (hoy ? '<button class="repasarYa" data-a="repasarHoy"><span class="n">' + hoy + '</span><span class="t"><b>Las de hoy</b>según tu repaso espaciado</span><span class="flecha">▶</span></button>' : '') +
         '<h3>Otras rondas</h3><div class="panel"><ul class="lista">' +
         op('repasarFav', '⭐', 'oro', 'Mis favoritas', favs) + op('repasarDif', '🔥', 'rosa', 'Las difíciles', difs) +
-        op('repasarTodas', '🔀', '', 'Repaso libre', todas) + '</ul></div>' +
+        op('repasarTodas', '🔀', '', 'Repaso libre', todas) +
+        // (22-oct-2026, Mi día) escribir lo que recuerda de una clase (de cualquier materia): abre Modo transcripción → Mi día
+        (MD ? '<li><button class="item" data-a="miDia"><span class="ico celeste">📝</span><span class="txt"><b>Lo que recuerdo</b><small>De la clase de hoy, sin mirar · 5 min</small></span>' +
+          (midiaPend() ? '<span class="punto-n">' + midiaPend() + '</span>' : '') + '<span class="chev">›</span></button></li>' : '') +
+        // (24-oct-2026, Mi día parte 3) imágenes en contraste, cualquier día (si alguno de sus cursos tiene pares)
+        ((cxA) => cxA.length ? '<li><button class="item" data-a="contraste"><span class="ico">🔍</span><span class="txt"><b>Imágenes en contraste</b><small>Unas 10 imágenes que se confunden · ' +
+          esc(cxA.map((a) => self.Contraste.NOMBRE[a]).join(' y ')) + '</small></span><span class="chev">›</span></button></li>' : '')(self.Contraste ? self.Contraste.areas(E) : []) + '</ul></div>' +
         seccionLogros();          // (21-oct-2026) los logros: una fila de 4 y "Ver todos ›"
       cargarMinis(v);
       return;
@@ -1299,6 +1317,13 @@
     const va = Rt.progreso(E, N.diaCR(ahora)).size;          // (22-oct-2026: lo empezó aquí o en la compu)
     return '<button class="retoBt toque" data-a="reto"><span class="e">⚡</span><span class="t"><b>' + (va ? 'Sigue tu reto de hoy' : 'Tu reto de hoy') + '</b><small>' +
       (va ? 'llevas ' + va + (va === 1 ? ' pregunta' : ' preguntas') + ' · sigues donde quedaste' : (Rt.diaLargo(E, ahora) ? '5 minutos' : '10 minutos') + ' · preguntas mezcladas de tus cursos') + '</small></span><span class="flecha">▶</span></button>';
+  }
+  // (24-oct-2026, planes/modo-diario.md parte 4) ANTES DE CLASE: "¿qué crees que van a ver hoy?" (2 min, opcional; sin puntito). Abre Mi día.
+  function tarjetaAntes(ahora) {
+    const a = MD && MD.antesDeClase(E, ahora);
+    if (!a || a.hecho) return '';
+    return '<button class="antesBt toque" data-a="antesClase"><span class="e">🔮</span><span class="t"><b>' + esc(a.materia) + ' empieza en ' + a.min + ' min</b>' +
+      '<small>¿Qué crees que van a ver? Escribe 2 o 3 cosas · si quieres</small></span><span class="flecha">▶</span></button>';
   }
   // Los cursos de ahora (del horario) sin tarjetas ni apuntes subidos todavía
   function cursosSinMaterial() {
@@ -1809,6 +1834,7 @@
       '<div class="grandes"><div><b>' + racha + '</b><small>🔥 días seguidos</small></div><div><b>' + pct + '%</b><small>la sabía (30 días)</small></div>' +
       '<div><b>' + r30.length + '</b><small>repasos (30 días)</small></div></div>' +
       filaLogrosProgreso() +          // (21-oct-2026) "Logros ›"
+      seccionListas() +               // (24-oct-2026) "Lista para el parcial", por materia
       seccionAnimo() +
       '<h3>⏱️ Tiempo repasando</h3><div class="panel"><div class="barras">' +
       (Object.keys(siempre).length ? Object.entries(siempre).sort((a, b) => b[1] - a[1]).map(([m, ms]) => '<div class="b"><div class="fila entre"><span>' + esc(m) +
@@ -1823,6 +1849,26 @@
       '</div><div class="cajasN">' + cajas.map((c, i) => '<span>' + c + (i < 5 ? '<br>caja ' + (i + 1) : ' 🎓<br>ya me<br>las sé') + '</span>').join('') + '</div>' +
       '<p class="nota">Caja 1: aprendiendo · caja 5: ¡dominadas! Cada vez que la sabes, sube una caja y vuelve más tarde. 🎓: las que marcaste "Ya me la sé".' +
       (archivadas ? ' Además tienes ' + archivadas + ' en 📦 Archivados.' : '') + '</p></div>';
+  }
+
+  // (24-oct-2026, planes/modo-diario.md, parte 2) LISTA PARA EL PARCIAL, por materia: cuántas tarjetas acertó en 3 días distintos (Org.listasPorMateria;
+  // por resultado, nunca por sensación). Primero las materias con parcial más cerca. Sin presionar: es para saber qué repasar.
+  function seccionListas() {
+    const l = Org.listasPorMateria(E).filter((x) => x.total);
+    if (!l.length) return '';
+    const ahora = Date.now(), exs = Ag.proximosExamenes(E, ahora).filter((x) => x.que !== 'entrega');
+    const misma = (a, b) => (Rt ? Rt.mismaMateria(a, b) : Org.lim(a) === Org.lim(b));
+    for (const x of l) {
+      const ex = exs.find((e) => misma(e.materia, x.materia));
+      x.dias = ex ? Math.round((N.inicioDiaCR(ex.cuando) - N.inicioDiaCR(ahora)) / DIA) : null;
+      x.que = ex ? String(ex.que || 'examen') : '';
+    }
+    l.sort((a, b) => (a.dias == null ? 999 : a.dias) - (b.dias == null ? 999 : b.dias) || b.total - a.total);
+    const cuando = (d) => (d === 0 ? 'hoy' : d === 1 ? 'mañana' : 'en ' + d + ' días');
+    return '<h3>🎯 Lista para el parcial</h3><div class="panel"><div class="barras">' + l.map((x) =>
+      '<div class="b"><div class="fila entre"><span>' + esc(x.materia) + (x.dias != null && x.dias <= 14 ? ' <small class="suave">· 📝 ' + esc(x.que) + ' ' + cuando(x.dias) + '</small>' : '') + '</span>' +
+      '<span class="suave cuentaL"><b class="nLista">' + x.listas + '</b> de ' + x.total + '</span></div><div class="t tLista"><i style="width:' + Math.round((x.listas / x.total) * 100) + '%"></i></div></div>').join('') +
+      '</div><p class="nota">Una tarjeta está <b>lista</b> cuando la acertaste en <b>3 días distintos</b>: se cuenta por lo que te salió, no por lo que sientes. Cuando se acerca un parcial, el reto te pregunta primero las que todavía no lo están.</p></div>';
   }
 
   // (21-oct-2026) "Cómo te has sentido" (en Progreso): la semana (sus caritas y cuánto estudió cada día), el mes en colores, lo más
@@ -2375,7 +2421,8 @@
         // (22-oct-2026) la bitácora del TCU: SOLO aquí, la primera de "Más opciones" (la autora: "debe estar en más opciones, no en ajustes", "sobre progreso")
         (Tc ? fila('ir', '🤝', 'verde', 'TCU', Tc.inicio(E) ? horasTxt(Tc.total(E)) + ' de ' + Tc.META + ' h' : '', aV('tcu')) : '') +
         // (22-oct-2026, planes/modo-transcripcion.md) el MODO TRANSCRIPCIÓN, aparte: debajo de TCU (su archivo se carga solo al abrirlo)
-        fila('ir', '📝', 'celeste', 'Modo transcripción', '', aV('transcripcion')) +
+        // (22-oct-2026, Mi día) con su puntito: lo que falta hoy
+        fila('ir', '📝', 'celeste', 'Modo transcripción', midiaPend() ? '<span class="punto-n">' + midiaPend() + '</span>' : '', aV('transcripcion')) +
         fila('ir', '📈', 'verde', 'Progreso', '', aV('progreso')) +
         fila('ir', '📚', 'celeste', 'Archivos', esperando ? esperando + ' esperando' : '', aV('archivos')) +
         fila('ir', '📦', '', 'Archivados', arch ? String(arch) : '', aV('archivados')) +
@@ -2479,9 +2526,18 @@
   // (22-oct-2026, planes/modo-transcripcion.md) EL MODO TRANSCRIPCIÓN: vive en js/modo-transcripcion.js, que se carga SOLO al abrirlo (no al abrir
   // la app). Aquí solo se le pasan las herramientas de siempre; no toca nada más (logros, racha, reto, avisos, repaso, mazos).
   // ======================================================================================================
-  let cargandoMT = null;
+  // (22-oct-2026, planes/modo-diario.md) DOS PESTAÑAS arriba: "Mi día" (lo nuevo, js/mi-dia-ui.js) y "Sesiones" (EXACTAMENTE lo de antes). Se abre en
+  // "Mi día" si hay algo pendiente hoy; si no, en "Sesiones". Dentro de una sesión (o al tocar su aviso de pomodoro) no hay pestañas: pantalla completa.
+  let cargandoMT = null, mtTab = null, mtTabPedida = null, mtInicio = false, mdAbrir = null;
+  const cargarScript = (src) => new Promise((ok, no) => { const s = document.createElement('script'); s.src = src; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
   function pintarTranscripcion(v) {
     const ctx = { esc, abrirHoja, cerrarHoja, confirmar, avisar, vibrar, sonar, cerebro, puedeCerebro, Almacen, K, DEMO, ir, vista: () => vista, escena,
+      // (Mi día) lo de siempre de la app, para la pestaña nueva
+      estado: () => E, DISP, MiDia: MD, empezar, pestana: () => mtTab, conPestanas: true,
+      // (24-oct-2026, Mi día parte 3) imágenes en contraste: el MISMO banco del práctico que el reto (índice, fichas, flecha y crédito)
+      Contraste: self.Contraste, practico: { indice: indicePractico, ficha: fichaPractico, flechaImg, creditoImg },
+      cambio: () => { guardarLocal(); pedirSincro(); pintarMenu(); },
+      repintar: () => { if (vista === 'transcripcion') pintarTranscripcion($('#vista')); },
       // (22-oct-2026, pedido de la autora) un pomodoro terminado en el modo cuenta como pomodoro (compu, celular y logros) y dice de qué sesión fue
       anotarPomodoro: (s) => { Ag.anotarPomodoroSesion(E, Date.now(), DISP, s); subirYa(); setTimeout(() => revisarLogros('pomodoro'), 2500); },
       // (22-oct-2026, pedido de la autora) el aviso de fin de pomodoro/descanso con la app cerrada: un recordatorio OCULTO, como el pomodoro normal
@@ -2490,11 +2546,24 @@
         try { localStorage.setItem(K + 'liz-mt-aviso', String(ms)); } catch (e) {} subirYa(); return r.ok ? r.fila.id : null; },
       quitarAviso: (id, ms) => { pomoQuitar(id, ms); subirYa(); },
       porAviso: () => { const v = mtPorAviso; mtPorAviso = false; return v; } };
-    if (self.ModoTranscripcion) return self.ModoTranscripcion.pintar(v, ctx);
-    v.innerHTML = '<p class="suave" style="text-align:center;margin-top:40px">Abriendo…</p>';
-    cargandoMT = cargandoMT || new Promise((ok, no) => { const s = document.createElement('script'); s.src = 'js/modo-transcripcion.js'; s.onload = ok; s.onerror = no; document.head.appendChild(s); });
-    cargandoMT.then(() => { if (vista === 'transcripcion') self.ModoTranscripcion.pintar($('#vista'), ctx); })
-      .catch(() => { cargandoMT = null; v.innerHTML = '<p class="suave" style="text-align:center;margin-top:40px">No pude abrir el modo transcripción. ¿Hay internet?</p>'; });
+    if (!self.ModoTranscripcion || !self.MiDiaUI) {
+      v.innerHTML = '<p class="suave" style="text-align:center;margin-top:40px">Abriendo…</p>';
+      cargandoMT = cargandoMT || Promise.all([self.ModoTranscripcion ? 0 : cargarScript('js/modo-transcripcion.js'), self.MiDiaUI ? 0 : cargarScript('js/mi-dia-ui.js')]);
+      cargandoMT.then(() => { if (vista === 'transcripcion') pintarTranscripcion($('#vista')); })
+        .catch(() => { cargandoMT = null; v.innerHTML = '<p class="suave" style="text-align:center;margin-top:40px">No pude abrir el modo transcripción. ¿Hay internet?</p>'; });
+      return;
+    }
+    const MT = self.ModoTranscripcion;
+    if (mtPorAviso) mtTab = 'sesiones';                  // (el aviso del pomodoro de una sesión)
+    if (MT.abierta && MT.abierta() && mtTab !== 'midia') { mtTab = 'sesiones'; return MT.pintar(v, ctx); }
+    if (!mtTab) mtTab = midiaPend() ? 'midia' : 'sesiones';
+    const n = midiaPend(), inicio = mtInicio, abrir = mdAbrir; mtInicio = false; mdAbrir = null;
+    v.innerHTML = '<button class="volverBt" data-a="ir" data-v="mas">‹ Más</button>' +
+      '<div class="seg estudiar mtTabs"><button class="' + (mtTab === 'midia' ? 'on' : '') + '" data-a="mtPestana" data-t="midia">Mi día' + (n ? ' <span class="punto-n">' + n + '</span>' : '') + '</button>' +
+      '<button class="' + (mtTab === 'sesiones' ? 'on' : '') + '" data-a="mtPestana" data-t="sesiones">Sesiones</button></div><div id="mtCont"></div>';
+    const cont = v.querySelector('#mtCont');
+    if (mtTab === 'midia') self.MiDiaUI.pintar(cont, ctx, { inicio, abrir });
+    else MT.pintar(cont, ctx);
   }
   // Comprimir una foto EN el celular: lado mayor ≤ max px; webp si el navegador sabe (si no, jpg); bajando la calidad hasta pesar < kb
   function comprimirFoto(file, max, kb) {
@@ -3308,7 +3377,10 @@
     const tocan = tocanHoy();
     const porMazo = {};
     for (const x of tocan) { const n = nombreMazo((x.t || E.tarjetas[x]).mazo_id); porMazo[n] = (porMazo[n] || 0) + 1; }
-    const exs = Ag.proximosExamenes(E, ahora).slice(0, 4).map((x) => Ag.nombreExamenCompleto(x) + ' el ' + N.fechaTxt(x.cuando) + ' a las ' + N.horaCR(x.cuando));
+    // (24-oct-2026, Mi día parte 2) con cuántas tarjetas de esa materia tiene "listas para el parcial" (acertadas en 3 días distintos)
+    const proxEx = Ag.proximosExamenes(E, ahora).slice(0, 4), listas = proxEx.length ? Org.listasPorMateria(E) : [];
+    const listasDe = (m) => { const x = listas.find((y) => (Rt ? Rt.mismaMateria(m, y.materia) : Org.lim(m) === Org.lim(y.materia))); return x && x.total ? ' (lista para el parcial: ' + x.listas + ' de ' + x.total + ' tarjetas)' : ''; };
+    const exs = proxEx.map((x) => Ag.nombreExamenCompleto(x) + ' el ' + N.fechaTxt(x.cuando) + ' a las ' + N.horaCR(x.cuando) + listasDe(x.materia));
     const hoyAg = Ag.delDia(E, ahora).map((x) => { const n = x.tipo === 'clase' ? Ag.nombreClase(x, E) : null;
       return (n ? 'clase de ' + n.materia + (n.tipo === 'lab' ? ' (laboratorio)' : '') : x.titulo) + ' (' + N.horaCR(x.ms) + (x.fin ? '-' + N.horaCR(x.fin) : '') + (x.hecho ? ', hecho' : '') + ')'; });
     const prox = Ag.listaRecordatorios(E, ahora).filter((x) => !x.hecho && x.vez > ahora && x.vez < ahora + 7 * DIA).slice(0, 5).map((x) => x.r.texto + ' (' + N.fechaTxt(x.vez) + ' ' + N.horaCR(x.vez) + ')');
@@ -3714,6 +3786,12 @@
     repasarDif: () => empezar(Org.paraRepasar(E, { dificiles: true }), '🔥 Difíciles'),
     repasarTodas: () => empezar(Org.paraRepasar(E, {}).slice(0, 20), 'Repaso libre'),
     repasarMazo: (d) => empezar(Org.paraRepasar(E, { mazo: d.id }), nombreMazo(d.id)),
+    // (22-oct-2026, Mi día) las pestañas del Modo transcripción, y "📝 Lo que recuerdo" desde Estudiar (abre Mi día)
+    mtPestana: (d) => { if (self.MiDiaUI && mtTab === 'midia' && d.t !== 'midia') self.MiDiaUI.salir(); mtTab = d.t === 'midia' ? 'midia' : 'sesiones'; mtInicio = true; pintar(); },
+    miDia: () => { if (vista === 'transcripcion') { mtTab = 'midia'; mtInicio = true; pintar(); } else { mtTabPedida = 'midia'; ir('transcripcion'); } },
+    // (24-oct-2026, Mi día parte 3) "🔍 Imágenes en contraste" desde Estudiar → Repasar: abre Mi día directo en la ronda
+    contraste: () => { mdAbrir = 'contraste'; A.miDia(); },
+    antesClase: () => { mdAbrir = 'antes'; A.miDia(); },          // (parte 4: desde Hoy, en los 30 min antes de una clase)
     repasarCuestan: () => empezar(lasQueCuestan(), 'Las que más te cuestan'),
     voltear: () => {
       if (!sesion || sesion.fin || respondiendo) return;

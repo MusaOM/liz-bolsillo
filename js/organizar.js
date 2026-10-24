@@ -260,8 +260,22 @@
     const resto = conEstado.filter((x) => x.e.proxima > ahora).sort((a, b) => (b.e.fallos - b.e.aciertos) - (a.e.fallos - a.e.aciertos) || a.e.caja - b.e.caja);
     return tocan.concat(resto);
   }
+  // (24-oct-2026, planes/modo-diario.md, parte 2) "LISTA PARA EL PARCIAL" por materia: de sus tarjetas activas (sin las archivadas ni las de "ya me la
+  // sé", que no se repasan), cuántas acertó en 3 días distintos (Nucleo.lista). [{ materiaId, materia, total, listas }]
+  function listasPorMateria(E) {
+    const por = {};
+    for (const t of vivos(E.tarjetas)) {
+      if (sabida(t) || archivada(E, t)) continue;
+      const m = E.materias[t.materia_id], k = m ? m.id : '_';
+      const x = por[k] || (por[k] = { materiaId: m ? m.id : null, materia: m ? m.nombre : 'Sin materia', total: 0, listas: 0 });
+      x.total++;
+      if (Nucleo.lista(Sincro.repasosDe(E, t.id))) x.listas++;
+    }
+    return Object.values(por);
+  }
+  const estaLista = (E, t) => !!t && Nucleo.lista(Sincro.repasosDe(E, t.id));
 
   return { lim, vivos, crearMateria, crearMazo, crearTarjeta, editarTarjeta, marcar, borrarTarjeta, borrarMazo, borrarMateria, restaurar, papelera, borrarParaSiempre, vaciado,
     renombrarMazo, renombrarMateria, moverMazo, juntarMazos, arbol, buscar, paraRepasar,
-    sabida, archivada, archivadoX, activa, marcarSabida, archivar, archivados, buscarMateriaOMazo };
+    sabida, archivada, archivadoX, activa, marcarSabida, archivar, archivados, buscarMateriaOMazo, listasPorMateria, estaLista };
 });

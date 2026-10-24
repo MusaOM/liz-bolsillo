@@ -133,9 +133,18 @@
     for (const p of activos) {
       const n = cuantas.get(p);
       if (!n) continue;
-      const fuente = manana ? p.l.filter(visto) : p.l;
       // de las primeras (las que tocan / más le cuestan), un poco al azar del día: así cada día no son exactamente las mismas
-      const elegidas = barajar(fuente.slice(0, Math.max(n, n * 3)), r).slice(0, n);
+      const elegir = (l, k) => barajar(l.slice(0, Math.max(k, k * 3)), r).slice(0, k);
+      let elegidas;
+      if (manana) elegidas = elegir(p.l.filter(visto), n);
+      else if (p.ex) {
+        // (24-oct-2026, planes/modo-diario.md, parte 2) Los 10 días antes de un parcial de esa materia: se eligen SOLO entre las que todavía NO
+        // están listas (acertadas en 3 días distintos); las listas, solo si no alcanzan. (Barajarlas juntas dejaba colar las listas.)
+        const no = [], si = [];
+        for (const x of p.l) (N.lista(Sincro.repasosDe(E, x.t.id)) ? si : no).push(x);
+        elegidas = elegir(no, n);
+        if (elegidas.length < n) elegidas = elegidas.concat(elegir(si, n - elegidas.length));
+      } else elegidas = elegir(p.l, n);
       const respuestasOtras = (t) => p.l.map((x) => x.t).filter((o) => o.id !== t.id && o.respuesta && o.respuesta.length <= 160 && Org.lim(o.respuesta) !== Org.lim(t.respuesta));
       for (const x of elegidas) {
         const t = x.t, corta = t.respuesta.length <= 160, otras = respuestasOtras(t);
@@ -274,7 +283,10 @@
     if (!k.length || !String(suya || '').trim()) return { frase: '', nivel: null };
     const s = plano(suya), tiene = k.filter((w) => s.includes(w.slice(0, Math.max(4, w.length - 2)))), faltan = k.filter((w) => !tiene.includes(w));
     const p = tiene.length / k.length;
-    return { nivel: p >= 0.7 ? 'bien' : p >= 0.35 ? 'medio' : 'mal', frase: p >= 0.7 ? 'Tienes lo principal de la respuesta.' : faltan.length ? 'Te faltó: ' + faltan.slice(0, 4).join(', ') + '.' : '' };
+    // (24-oct-2026) lo que le faltó, escrito como en la tarjeta ("núcleo", no "nucleo")
+    const como = {};
+    for (const w of String(correcta).split(/[^0-9A-Za-zÀ-ÿ]+/)) { const q = plano(w); if (q && !como[q]) como[q] = w.toLowerCase(); }
+    return { nivel: p >= 0.7 ? 'bien' : p >= 0.35 ? 'medio' : 'mal', frase: p >= 0.7 ? 'Tienes lo principal de la respuesta.' : faltan.length ? 'Te faltó: ' + faltan.slice(0, 4).map((w) => como[w] || w).join(', ') + '.' : '' };
   }
   // Una respuesta HABLADA a una pregunta de opciones: "la segunda", "la b", "verdadero", o el texto de una opción
   function opcionDeTexto(texto, opciones) {

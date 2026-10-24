@@ -22,9 +22,11 @@
   // (22-oct-2026, noche) bolsillo 1.4 = el MODO TRANSCRIPCIÓN (Más opciones, debajo del TCU) y el contexto de la tarjeta al voltearla
   // (22-oct-2026, noche) bolsillo 1.5 = el Modo transcripción más completo (sus pomodoros cuentan y las dos Liz lo saben, borrar sin perder lo
   // avanzado, aviso con la app cerrada) y las tarjetas con mucho texto se leen completas
-  const versiones = { pc: '1.5', bolsillo: '1.5' };
+  // (24-oct-2026) bolsillo 1.6 = MI DÍA (en el Modo transcripción): «Lo que recuerdo», «Mis preguntas», «lista para el parcial», imágenes en contraste,
+  // tabla de memoria y casos tipo examen los fines de semana, y «Antes de clase»
+  const versiones = { pc: '1.5', bolsillo: '1.6' };
   const liz = versiones[app] || versiones.bolsillo;
-  const bolsillo = 34;
+  const bolsillo = 35;
   // (20-oct-2026, tanda final) El número de PRUEBA de la compu (no se muestra: lo visible sigue siendo "Liz 1.0"). Lo usan las actualizaciones de
   // la Liz de su dueño (herramientas/armar-actualizacion.js y src/main/actualizar.js): cada actualización lo sube. 28 = el regalo.
   // 29 = la primera actualización (21-oct-2026): los clics de la tarjeta de ánimo, no volver a preguntar y nada de PowerShell escondido.
@@ -63,8 +65,14 @@
     // lo-nuevo-visto.json) y en una actualización enseña SOLO las que nunca vio; si no queda ninguna, la lista no sale. Para la próxima
     // actualización: cambiar el "id" de la lista y agregar las novedades nuevas con un id nuevo (las viejas se pueden quitar o dejar: no se repiten).
     loNuevoCelular: {
-      id: 'celular-34',
+      id: 'celular-35',
       cosas: [
+        { id: 'mi-dia', t: '📅 Mi día, en Más → Más opciones → Modo transcripción: lo de cada día, cortito. Después de cada clase, «Lo que recuerdo»: escribes o dictas lo que te acuerdes sin mirar, lo corriges con tus apuntes y escribes las preguntas que haría el profe.' },
+        { id: 'mi-dia-preguntas', t: '❓ Tus preguntas de profe se vuelven tarjetas en «Mis preguntas» y te las pregunto a los 2 días, sin esperar la transcripción.' },
+        { id: 'lista-parcial', t: '🎯 En Progreso: cuántas tarjetas tienes «listas para el parcial» (las que acertaste en 3 días distintos). Cuando se acerca un parcial, el reto te pregunta primero las que faltan.' },
+        { id: 'contraste', t: '🔍 Imágenes en contraste: rondas rápidas con las imágenes que más se confunden (neutrófilo o eosinófilo…) y cuántos segundos tardas en cada una.' },
+        { id: 'tabla-casos', t: '🗂️ Los fines de semana: una tabla de memoria de un curso y, si hay parcial cerca, casos tipo examen (verdadero o falso, con tu justificación).' },
+        { id: 'antes-clase', t: '🔮 Antes de clase, si quieres: escribe qué crees que van a ver, y después te lo muestro junto a lo que recordaste.' },
         { id: 'modo-transcripcion', t: '📝 Modo transcripción, en Más → Más opciones: importa la sesión de una clase y estúdiala por pomodoros, paso a paso. Lo intentas tú primero, después lo comparas con el modelo (y conmigo, si quieres). Lo que escribes se queda solo en tu celular.' },
         { id: 'transcripcion-pomodoros', t: '🍅 Los pomodoros que terminas en el Modo transcripción cuentan como pomodoros (también para tus logros), y en la compu y aquí sé qué sesión estudiaste hoy.' },
         { id: 'transcripcion-borrar', t: '🗑️ Puedes borrar una sesión para liberar espacio sin perder lo que avanzaste: queda en «Ya hechas».' },
@@ -116,7 +124,7 @@
       ['Dónde se guardan tus cosas', [
         'En tu compu: lo que recuerdo de ti, nuestras charlas, mi diario, tus apuntes y, si me la enseñaste, la huella de tu voz.',
         'En tu celular: tus tarjetas, tu agenda y lo que hablamos ahí, para que funcione aunque no haya internet. Tus sesiones del Modo transcripción (las páginas, tus respuestas y las fotos de tus dibujos) se quedan SOLO ahí; de ellas solo se anotan tus pomodoros y el nombre de la sesión.',
-        'En la nube (Supabase), en tu cuenta privada: tus tarjetas, mazos y progreso, tus pomodoros (también los del Modo transcripción, con el nombre de la sesión), tu agenda, los archivos que subes, tu bitácora del TCU (con sus fotos), cómo te has sentido, lo que hablamos en el celular y un respaldo diario de lo de tu compu. Así tu compu y tu celular se ponen de acuerdo, y si uno se daña no pierdes nada.',
+        'En la nube (Supabase), en tu cuenta privada: tus tarjetas, mazos y progreso, tus pomodoros (también los del Modo transcripción, con el nombre de la sesión), lo que escribes en «Mi día» (lo que recuerdas de tus clases), tu agenda, los archivos que subes, tu bitácora del TCU (con sus fotos), cómo te has sentido, lo que hablamos en el celular y un respaldo diario de lo de tu compu. Así tu compu y tu celular se ponen de acuerdo, y si uno se daña no pierdes nada.',
         'Las reglas de la nube solo dejan entrar a tu cuenta. Las fotos de tu cámara y de tu pantalla no las guardo en ningún lado, y mi voz se hace en tu propia compu.',
       ]],
       ['A quién le pregunto para responderte', [
